@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Django
+*.log
+db.sqlite3
+backend/staticfiles/
+backend/media/
+
+# Окружение — в git не входит никогда
+.env
+backend/.env
+backend/.env.prod
+frontend/.env.local
+frontend/.env.production
+
+# Node
+node_modules/
+frontend/dist/
+frontend/coverage/
+
+# IDE и ОС
+.vscode/
+.idea/
+.DS_Store
