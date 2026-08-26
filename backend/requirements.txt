@@ -1,0 +1,15 @@
+# Ядро
+Django==5.2.17
+djangorestframework==3.18.0
+psycopg[binary]==3.3.4
+python-dotenv==1.2.3
+
+# Контракт API — схема, из которой генерируются типы фронтенда
+drf-spectacular==0.30.0
+
+# Прод
+gunicorn==26.2.0
+
+# Разработка и тесты
+pytest==9.0.2
+pytest-django==4.14.0
