@@ -16,7 +16,9 @@ const STORAGE_KEY = "theme"
 const DARK_QUERY = "(prefers-color-scheme: dark)"
 const THEMES: Theme[] = ["light", "dark", "system"]
 
-const ThemeContext = React.createContext<ThemeContextValue | undefined>(undefined)
+const ThemeContext = React.createContext<ThemeContextValue | undefined>(
+  undefined
+)
 
 function isTheme(value: string | null): value is Theme {
   return value !== null && THEMES.includes(value as Theme)
@@ -42,7 +44,7 @@ function useSystemTheme(): ResolvedTheme {
       return () => media.removeEventListener("change", onChange)
     },
     () => (window.matchMedia(DARK_QUERY).matches ? "dark" : "light"),
-    () => "light",
+    () => "light"
   )
 }
 
@@ -92,6 +94,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const root = document.documentElement
     root.classList.remove("light", "dark")
     root.classList.add(resolved)
+
+    // Цвет системной строки в ярлыке на телефоне. Стартовое значение ставит
+    // скрипт в index.html, но там оно системное — а человек мог выбрать тему
+    // вручную, и тогда над шапкой осталась бы полоса чужого цвета.
+    //
+    // Цвет берётся вычисленным, а не из переменной: в CSS она задана в oklch,
+    // и не всякий браузер примет такой формат в meta.
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", getComputedStyle(document.body).backgroundColor)
   }, [resolved])
 
   const setTheme = React.useCallback(
@@ -108,12 +120,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
       setStoredTheme(next)
     },
-    [setStoredTheme],
+    [setStoredTheme]
   )
 
   const value = React.useMemo(
     () => ({ theme, resolved, setTheme }),
-    [theme, resolved, setTheme],
+    [theme, resolved, setTheme]
   )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

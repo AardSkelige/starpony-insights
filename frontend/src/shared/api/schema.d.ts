@@ -74,6 +74,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/shipments/products/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Товары в отгрузках
+         * @description Что и сколько продано за период, свёрнутое по товару.
+         */
+        get: operations["api_shipments_products_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shipments/products/{product_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Товар в отгрузках — детали строки
+         * @description Разбивка по каналам, последние отгрузки и остаток. Фильтры те же, что у таблицы: детали обязаны сходиться с числами своей строки.
+         */
+        get: operations["api_shipments_products_retrieve_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shipments/products/xlsx/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Товары в отгрузках — выгрузка в Excel
+         * @description Та же выборка, что на экране, но целиком: все страницы, а не видимая.
+         */
+        get: operations["api_shipments_products_xlsx_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/refresh/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Обновить данные из МойСклада
+         * @description Единственное место, где запрос человека доходит до МойСклада. Ограничено паузой между запусками и блокировкой: корзина лимита общая с ботом, который проверяет учёт круглосуточно.
+         */
+        post: operations["api_sync_refresh_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -94,6 +174,14 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description Доля канала в продажах товара. Основа полос в раскрытии строки. */
+        ChannelShare: {
+            id: number | null;
+            name: string;
+            /** Format: decimal */
+            quantity: string;
+            revenue_kopecks: number;
+        };
         Csrf: {
             csrfToken: string;
         };
@@ -115,12 +203,91 @@ export interface components {
             group: string;
             route: string;
         };
+        ProductDocument: {
+            number: string;
+            /** Format: date-time */
+            moment: string;
+            agent: string;
+            /** Format: decimal */
+            quantity: string;
+            total_kopecks: number;
+        };
+        ProductStock: {
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            reserved: string;
+            /** Format: decimal */
+            available: string;
+            stock_days: number | null;
+        };
         Profile: {
             id: number;
             username: string;
             full_name: string;
             is_superuser: boolean;
             pages: components["schemas"]["Page"][];
+        };
+        Refused: {
+            detail: string;
+            retry_after_seconds: number;
+        };
+        SalesChannel: {
+            id: number;
+            name: string;
+        };
+        ShipmentProductDetail: {
+            channels: components["schemas"]["ChannelShare"][];
+            documents: components["schemas"]["ProductDocument"][];
+            stock: components["schemas"]["ProductStock"] | null;
+        };
+        ShipmentProductRow: {
+            product_id: number;
+            name: string;
+            article: string;
+            code: string;
+            uom: string;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            free_quantity: string;
+            revenue_kopecks: number;
+            documents_count: number;
+            /** Format: decimal */
+            avg_price_kopecks: string | null;
+            /** Format: decimal */
+            avg_price_paid_kopecks: string | null;
+            /** Format: decimal */
+            revenue_share: string | null;
+        };
+        ShipmentProducts: {
+            /** Format: date-time */
+            synced_at: string | null;
+            count: number;
+            totals: components["schemas"]["ShipmentProductsTotals"];
+            results: components["schemas"]["ShipmentProductRow"][];
+            channels: components["schemas"]["SalesChannel"][];
+        };
+        ShipmentProductsTotals: {
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            free_quantity: string;
+            revenue_kopecks: number;
+            documents_count: number;
+            products_count: number;
+        };
+        SyncRun: {
+            status: string;
+            status_label: string;
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            finished_at: string | null;
+            /** Format: double */
+            duration_seconds: number | null;
+            request_count: number;
+            error: string;
         };
     };
     responses: never;
@@ -216,6 +383,173 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Profile"];
+                };
+            };
+        };
+    };
+    api_shipments_products_retrieve: {
+        parameters: {
+            query?: {
+                channel_id?: number | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-avg_price` - -avg_price
+                 *     * `-free` - -free
+                 *     * `-name` - -name
+                 *     * `-quantity` - -quantity
+                 *     * `-revenue` - -revenue
+                 *     * `-share` - -share
+                 *     * `avg_price` - avg_price
+                 *     * `free` - free
+                 *     * `name` - name
+                 *     * `quantity` - quantity
+                 *     * `revenue` - revenue
+                 *     * `share` - share
+                 */
+                ordering?: "-avg_price" | "-free" | "-name" | "-quantity" | "-revenue" | "-share" | "avg_price" | "free" | "name" | "quantity" | "revenue" | "share";
+                page?: number;
+                page_size?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentProducts"];
+                };
+            };
+        };
+    };
+    api_shipments_products_retrieve_2: {
+        parameters: {
+            query?: {
+                channel_id?: number | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-avg_price` - -avg_price
+                 *     * `-free` - -free
+                 *     * `-name` - -name
+                 *     * `-quantity` - -quantity
+                 *     * `-revenue` - -revenue
+                 *     * `-share` - -share
+                 *     * `avg_price` - avg_price
+                 *     * `free` - free
+                 *     * `name` - name
+                 *     * `quantity` - quantity
+                 *     * `revenue` - revenue
+                 *     * `share` - share
+                 */
+                ordering?: "-avg_price" | "-free" | "-name" | "-quantity" | "-revenue" | "-share" | "avg_price" | "free" | "name" | "quantity" | "revenue" | "share";
+                page?: number;
+                page_size?: number;
+                search?: string;
+            };
+            header?: never;
+            path: {
+                product_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentProductDetail"];
+                };
+            };
+            /** @description No response body */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    api_shipments_products_xlsx_retrieve: {
+        parameters: {
+            query?: {
+                channel_id?: number | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-avg_price` - -avg_price
+                 *     * `-free` - -free
+                 *     * `-name` - -name
+                 *     * `-quantity` - -quantity
+                 *     * `-revenue` - -revenue
+                 *     * `-share` - -share
+                 *     * `avg_price` - avg_price
+                 *     * `free` - free
+                 *     * `name` - name
+                 *     * `quantity` - quantity
+                 *     * `revenue` - revenue
+                 *     * `share` - share
+                 */
+                ordering?: "-avg_price" | "-free" | "-name" | "-quantity" | "-revenue" | "-share" | "avg_price" | "free" | "name" | "quantity" | "revenue" | "share";
+                page?: number;
+                page_size?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+        };
+    };
+    api_sync_refresh_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncRun"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
                 };
             };
         };

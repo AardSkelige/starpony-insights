@@ -68,7 +68,10 @@ services:
       --workers 2
       --worker-class gthread
       --threads 4
-      --timeout 60
+      # Больше минуты: кнопка «Обновить» гоняет полный проход синхронизации
+      # прямо в запросе, и убитый по таймауту воркер оставил бы запись
+      # журнала навсегда в состоянии «идёт».
+      --timeout 300
       --preload
       --max-requests 1000
       --max-requests-jitter 100

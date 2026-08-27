@@ -1,5 +1,5 @@
 import { Bell, Search } from "lucide-react"
-import { useLocation } from "react-router"
+import { Link, useLocation } from "react-router"
 
 import { ICON_GROUP } from "@/app/layout/icon-group"
 import { SidebarToggle } from "@/app/layout/sidebar-controls"
@@ -8,6 +8,7 @@ import type { Profile } from "@/shared/api/client"
 import {
   Breadcrumb,
   BreadcrumbItem,
+  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
@@ -37,7 +38,17 @@ export function AppHeader({ profile }: { profile: Profile }) {
 
       <Breadcrumb>
         <BreadcrumbList>
-          <BreadcrumbItem className="hidden sm:block">StarPony</BreadcrumbItem>
+          <BreadcrumbItem className="hidden sm:block">
+            {/* Название компании в крошках — ссылка на главную: на неё
+                кликают, ожидая туда попасть, и молчащая крошка обманывает. */}
+            <BreadcrumbLink
+              render={
+                <Link to="/" viewTransition>
+                  StarPony
+                </Link>
+              }
+            />
+          </BreadcrumbItem>
           {current ? (
             <>
               <BreadcrumbSeparator className="hidden sm:block" />

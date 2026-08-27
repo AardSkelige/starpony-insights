@@ -5,6 +5,8 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 urlpatterns = [
     path("auth/", include("api.auth.urls")),
+    path("shipments/", include("api.shipments.urls")),
+    path("sync/", include("api.sync.urls")),
     # Схема — источник типов фронтенда: `npm run api:types` берёт её отсюда.
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     # Страница для человека: посмотреть, что API отдаёт, и попробовать запрос

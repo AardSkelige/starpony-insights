@@ -4,6 +4,7 @@ import { Lock } from "lucide-react"
 
 import { ThemeSwitch } from "@/app/layout/theme-switch"
 import { ApiError } from "@/shared/api/client"
+import { Logo } from "@/shared/components/logo"
 import { sessionKeys, signIn } from "@/shared/auth/session"
 import { Button } from "@/shared/ui/button"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/shared/ui/field"
@@ -42,15 +43,15 @@ export function LoginPage() {
           входа читается как обложка, а не как ещё одна страница приложения. */}
       <aside className="hidden flex-col justify-between bg-foreground p-10 text-background lg:flex">
         <div className="flex items-center gap-3">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-background text-sm font-semibold text-foreground">
-            SP
+          <div className="flex size-9 items-center justify-center rounded-lg bg-background text-foreground">
+            <Logo className="size-6" />
           </div>
           <span className="font-semibold">StarPony Insights</span>
         </div>
 
         <p className="max-w-sm text-lg leading-relaxed text-balance">
-          Отгрузки, материалы, сроки оплаты и себестоимость — в одном месте,
-          с объяснением каждой цифры.
+          Отгрузки, материалы, сроки оплаты и себестоимость — в одном месте, с
+          объяснением каждой цифры.
         </p>
       </aside>
 
@@ -64,7 +65,9 @@ export function LoginPage() {
         >
           <div className="flex flex-col gap-1">
             <h1 className="text-xl font-semibold tracking-tight">Вход</h1>
-            <p className="text-sm text-muted-foreground">Введите логин и пароль</p>
+            <p className="text-sm text-muted-foreground">
+              Введите логин и пароль
+            </p>
           </div>
 
           <FieldGroup>

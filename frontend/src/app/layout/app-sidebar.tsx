@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router"
+import { NavLink, useLocation, useNavigate } from "react-router"
 import { ChevronsUpDown, LogOut } from "lucide-react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 
@@ -6,6 +6,7 @@ import { splitNavigation } from "@/app/layout/nav-groups"
 import { FALLBACK_ICON, NAV_ICONS } from "@/app/layout/nav-icons"
 import { SidebarResizer } from "@/app/layout/sidebar-controls"
 import type { Page, Profile } from "@/shared/api/client"
+import { Logo } from "@/shared/components/logo"
 import { signOut } from "@/shared/auth/session"
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar"
 import {
@@ -35,9 +36,21 @@ function initials(fullName: string): string {
 
 function PageLink({ page }: { page: Page }) {
   const Icon = NAV_ICONS[page.key] ?? FALLBACK_ICON
+  const { pathname } = useLocation()
+
+  // `NavLink` сам по себе пункт не подсветит: `SidebarMenuButton` красит
+  // по своему пропу `isActive`, а не по `aria-current`, который ставит ссылка.
+  // Вложенные пути тоже считаются активными — «/shipments/products/42»
+  // остаётся тем же разделом меню.
+  const active =
+    page.route === "/"
+      ? pathname === "/"
+      : pathname === page.route || pathname.startsWith(`${page.route}/`)
+
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
+        isActive={active}
         tooltip={{ children: page.label, sideOffset: 10 }}
         render={
           <NavLink to={page.route} end={page.route === "/"} viewTransition>
@@ -91,12 +104,14 @@ export function AppSidebar({
               size="lg"
               render={
                 <NavLink to="/" end viewTransition>
-                  <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-foreground">
-                    SP
+                  <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                    <Logo className="size-7" />
                   </div>
                   <div className="grid flex-1 text-left leading-tight">
                     <span className="truncate font-semibold">StarPony</span>
-                    <span className="truncate text-xs text-muted-foreground">Insights</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      Insights
+                    </span>
                   </div>
                 </NavLink>
               }
@@ -160,7 +175,9 @@ export function AppSidebar({
                       </AvatarFallback>
                     </Avatar>
                     <div className="grid flex-1 text-left leading-tight">
-                      <span className="truncate font-medium">{profile.full_name}</span>
+                      <span className="truncate font-medium">
+                        {profile.full_name}
+                      </span>
                       <span className="truncate text-xs text-muted-foreground">
                         {profile.is_superuser ? "Полный доступ" : "Сотрудник"}
                       </span>
