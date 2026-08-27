@@ -3,7 +3,12 @@ import type {
   ShipmentProductsQuery,
 } from "@/sections/shipments-products/api"
 import { RowDetail } from "@/sections/shipments-products/ui/row-detail"
+import {
+  DRAWER_HANDLE,
+  DRAWER_PHONE_HEIGHT,
+} from "@/shared/components/drawer-handle"
 import { useScreen } from "@/shared/hooks/use-screen"
+import { cn } from "@/shared/lib/utils"
 import {
   Drawer,
   DrawerContent,
@@ -32,14 +37,8 @@ export function DetailPanel({
   const screen = useScreen()
 
   return (
-    // `showSwipeHandle` — полоска сверху, за которую панель тянут вниз.
-    // Без неё непонятно, что панель вообще двигается пальцем.
-    <Drawer
-      open={row !== null}
-      onOpenChange={(open: boolean) => !open && onClose()}
-      showSwipeHandle
-    >
-      <DrawerContent>
+    <Drawer open={row !== null} onOpenChange={(open: boolean) => !open && onClose()}>
+      <DrawerContent className={cn(DRAWER_HANDLE, DRAWER_PHONE_HEIGHT)}>
         {row ? (
           <>
             <DrawerHeader>
@@ -48,7 +47,9 @@ export function DetailPanel({
                 {[row.code, row.article].filter(Boolean).join(" · ")}
               </DrawerDescription>
             </DrawerHeader>
-            <div className="overflow-y-auto px-4 pb-6">
+            {/* Прокручивается только содержимое: сама панель высоту
+                не меняет, иначе она дёргается при каждой подгрузке. */}
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
               <RowDetail
                 row={row}
                 query={query}

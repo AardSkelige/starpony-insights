@@ -2,6 +2,7 @@ import { SlidersHorizontal } from "lucide-react"
 
 import { Filters, type FilterValue } from "@/sections/shipments-products/ui/filters"
 import type { ShipmentProducts } from "@/sections/shipments-products/api"
+import { DRAWER_HANDLE } from "@/shared/components/drawer-handle"
 import { Button } from "@/shared/ui/button"
 import {
   Drawer,
@@ -31,7 +32,7 @@ export function FiltersDrawer({
   activeCount: number
 }) {
   return (
-    <Drawer showSwipeHandle>
+    <Drawer>
       <DrawerTrigger
         render={
           <Button variant="outline" className="h-10 w-full sm:hidden">
@@ -41,7 +42,7 @@ export function FiltersDrawer({
           </Button>
         }
       />
-      <DrawerContent>
+      <DrawerContent className={DRAWER_HANDLE}>
         <DrawerHeader>
           <DrawerTitle className="text-left">Фильтры</DrawerTitle>
         </DrawerHeader>
