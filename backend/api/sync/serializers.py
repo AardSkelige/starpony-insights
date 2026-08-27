@@ -15,6 +15,11 @@ class SyncRunSerializer(serializers.Serializer):
     error = serializers.CharField(allow_blank=True)
 
 
+class SyncStatusSerializer(serializers.Serializer):
+    running = serializers.BooleanField()
+    started_at = serializers.DateTimeField(allow_null=True)
+
+
 class RefusedSerializer(serializers.Serializer):
     detail = serializers.CharField()
     retry_after_seconds = serializers.IntegerField()

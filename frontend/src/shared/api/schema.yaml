@@ -349,7 +349,7 @@ paths:
           description: ''
   /api/sync/refresh/:
     post:
-      operationId: api_sync_refresh_create
+      operationId: sync_refresh
       description: 'Единственное место, где запрос человека доходит до МойСклада.
         Ограничено паузой между запусками и блокировкой: корзина лимита общая с ботом,
         который проверяет учёт круглосуточно.'
@@ -376,6 +376,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Refused'
+          description: ''
+  /api/sync/status/:
+    get:
+      operationId: sync_status
+      description: 'Состояние живёт на сервере, а не в памяти вкладки: иначе перезагрузка
+        стирает его у запустившего, а остальные не видят вовсе.'
+      summary: Идёт ли синхронизация
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncStatus'
           description: ''
   /healthz:
     get:
@@ -701,6 +718,18 @@ components:
       - started_at
       - status
       - status_label
+    SyncStatus:
+      type: object
+      properties:
+        running:
+          type: boolean
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - running
+      - started_at
   securitySchemes:
     cookieAuth:
       type: apiKey

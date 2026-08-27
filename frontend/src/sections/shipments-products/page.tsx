@@ -17,7 +17,7 @@ import {
 import { Page, Toolbar } from "@/shared/components/page"
 import { PageHeader } from "@/shared/components/page-header"
 import { PageSize } from "@/shared/components/page-size"
-import { refusalText, useRefresh } from "@/shared/api/sync"
+import { refusalText, useRefresh, useSyncStatus } from "@/shared/api/sync"
 import { TablePagination } from "@/shared/components/table-pagination"
 import { useDebounced } from "@/shared/hooks/use-debounced"
 import { useScreen } from "@/shared/hooks/use-screen"
@@ -67,6 +67,9 @@ export function ShipmentProductsPage() {
     : DEFAULT_PAGE_SIZE
 
   const refresh = useRefresh()
+  // Прогон могли запустить в другой вкладке или вовсе не вы — кнопка обязана
+  // это показывать, иначе четверо коллег нажмут её впустую.
+  const sync = useSyncStatus()
 
   const query = useShipmentProducts({
     ...applied,
@@ -146,8 +149,8 @@ export function ShipmentProductsPage() {
         subtitle="Что и сколько продано за период"
         syncedAt={data?.synced_at ?? null}
         onRefresh={() => refresh.mutate()}
-        refreshing={refresh.isPending}
-        refreshNote={refreshNote(refresh)}
+        refreshing={refresh.isPending || sync.running}
+        refreshNote={refreshNote(refresh, sync.running)}
         onExport={() => {
           window.location.assign(exportUrl({ ...applied, ordering: params.sort }))
         }}
@@ -234,8 +237,13 @@ export function ShipmentProductsPage() {
  * явного ответа кнопка выглядит сломанной. Отказ приходит с сервера уже
  * написанным для человека — здесь его не переписывают.
  */
-function refreshNote(refresh: ReturnType<typeof useRefresh>): string | null {
-  if (refresh.isPending) return "идёт обновление из МойСклада…"
+function refreshNote(
+  refresh: ReturnType<typeof useRefresh>,
+  running: boolean
+): string | null {
+  // `running` покрывает и чужой прогон, и свой после перезагрузки страницы,
+  // когда состояние мутации уже потеряно.
+  if (refresh.isPending || running) return "идёт обновление из МойСклада…"
 
   const refusal = refusalText(refresh.error)
   if (refusal) return refusal

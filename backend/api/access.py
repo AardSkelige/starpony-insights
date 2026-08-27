@@ -74,6 +74,7 @@ SHARED_PREFIXES: tuple[str, ...] = (
     # с ботом, и его сдерживают пауза между запусками и блокировка,
     # а не список страниц.
     "/api/sync/refresh/",
+    "/api/sync/status/",
     "/api/schema/",
     "/api/docs/",
 )

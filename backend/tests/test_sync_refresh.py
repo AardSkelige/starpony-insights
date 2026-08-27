@@ -271,3 +271,73 @@ def test_endpoint_sends_retry_after_header(client, make_user):
     response = client.post(URL)
 
     assert response["Retry-After"] == str(response.json()["retry_after_seconds"])
+
+
+# --- Состояние для страницы ---------------------------------------------------
+
+
+def test_status_reports_a_running_sync():
+    """Идущий прогон виден всем, а не только тому, кто нажал кнопку."""
+    started = timezone.now() - timedelta(seconds=5)
+    SyncRun.objects.create(
+        kind=SyncKind.DOCUMENTS, status=SyncStatus.RUNNING, started_at=started
+    )
+
+    state = services.status()
+
+    assert state["running"] is True
+    assert state["started_at"] == started
+
+
+def test_status_is_quiet_when_nothing_runs():
+    finished_run(minutes_ago=10)
+
+    assert services.status()["running"] is False
+
+
+def test_status_does_not_report_an_abandoned_run_as_running():
+    """Брошенная запись не должна вечно держать кнопку заблокированной."""
+    SyncRun.objects.create(
+        kind=SyncKind.DOCUMENTS,
+        status=SyncStatus.RUNNING,
+        started_at=timezone.now() - services.STALE_AFTER - timedelta(minutes=1),
+    )
+
+    assert services.status()["running"] is False
+
+
+def test_status_ignores_the_state_sync():
+    """Прогон остатков идёт каждые 15 минут и кнопку блокировать не должен."""
+    SyncRun.objects.create(
+        kind=SyncKind.STATE, status=SyncStatus.RUNNING, started_at=timezone.now()
+    )
+
+    assert services.status()["running"] is False
+
+
+def test_status_endpoint_requires_login(client):
+    assert client.get("/api/sync/status/").status_code == 401
+
+
+def test_status_endpoint_answers_any_signed_in_user(client, make_user):
+    client.force_login(make_user(pages=[]))
+
+    assert client.get("/api/sync/status/").status_code == 200
+
+
+@pytest.mark.parametrize(
+    "seconds, expected",
+    [(5, "5 с"), (59, "59 с"), (60, "1 мин"), (133, "2 мин 13 с"), (180, "3 мин")],
+)
+def test_remaining_time_reads_as_words(seconds, expected):
+    """«2 мин 13 с» вместо «133 с»: перевод в минуты человек делает медленнее."""
+    assert services._human(seconds) == expected
+
+
+def test_refusal_text_shows_minutes(client, make_user):
+    finished_run(minutes_ago=0.5)
+    client.force_login(make_user(pages=[]))
+
+    detail = client.post(URL).json()["detail"]
+
+    assert "мин" in detail

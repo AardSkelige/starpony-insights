@@ -1,9 +1,46 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+
+import * as React from "react"
 
 import { api, ApiError } from "@/shared/api/client"
 import type { components } from "@/shared/api/schema"
 
 export type SyncRun = components["schemas"]["SyncRun"]
+export type SyncStatus = components["schemas"]["SyncStatus"]
+
+/** Как часто спрашивать, не закончился ли прогон. */
+const POLL_MS = 3000
+
+/**
+ * Идёт ли синхронизация — по данным сервера, а не по памяти вкладки.
+ *
+ * Без этого состояние «идёт» теряется при перезагрузке страницы у того, кто
+ * нажал кнопку, а остальные четверо не видят его вовсе и жмут впустую.
+ *
+ * Пока прогон идёт, статус опрашивается; как только закончился — данные
+ * разделов перечитываются, потому что они только что изменились.
+ */
+export function useSyncStatus() {
+  const queryClient = useQueryClient()
+  const wasRunning = React.useRef(false)
+
+  const query = useQuery({
+    queryKey: ["sync", "status"],
+    queryFn: () => api.get<SyncStatus>("/api/sync/status/"),
+    refetchInterval: (query) => (query.state.data?.running ? POLL_MS : false),
+  })
+
+  const running = query.data?.running ?? false
+
+  React.useEffect(() => {
+    if (wasRunning.current && !running) {
+      queryClient.invalidateQueries()
+    }
+    wasRunning.current = running
+  }, [running, queryClient])
+
+  return { running, startedAt: query.data?.started_at ?? null }
+}
 
 /**
  * Кнопка «Обновить»: единственное место, где запрос человека доходит
@@ -22,6 +59,11 @@ export function useRefresh() {
       // Обновились все разделы сразу, а не только открытый: перечитываем
       // всё, что успело закешироваться.
       queryClient.invalidateQueries()
+    },
+    onSettled: () => {
+      // И статус тоже: прогон закончился, кнопка должна разблокироваться
+      // у всех, кто сейчас смотрит на страницу.
+      queryClient.invalidateQueries({ queryKey: ["sync", "status"] })
     },
   })
 }

@@ -147,7 +147,27 @@ export interface paths {
          * Обновить данные из МойСклада
          * @description Единственное место, где запрос человека доходит до МойСклада. Ограничено паузой между запусками и блокировкой: корзина лимита общая с ботом, который проверяет учёт круглосуточно.
          */
-        post: operations["api_sync_refresh_create"];
+        post: operations["sync_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/status/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Идёт ли синхронизация
+         * @description Состояние живёт на сервере, а не в памяти вкладки: иначе перезагрузка стирает его у запустившего, а остальные не видят вовсе.
+         */
+        get: operations["sync_status"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -288,6 +308,11 @@ export interface components {
             duration_seconds: number | null;
             request_count: number;
             error: string;
+        };
+        SyncStatus: {
+            running: boolean;
+            /** Format: date-time */
+            started_at: string | null;
         };
     };
     responses: never;
@@ -527,7 +552,7 @@ export interface operations {
             };
         };
     };
-    api_sync_refresh_create: {
+    sync_refresh: {
         parameters: {
             query?: never;
             header?: never;
@@ -558,6 +583,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    sync_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncStatus"];
                 };
             };
         };

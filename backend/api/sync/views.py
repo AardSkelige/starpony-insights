@@ -6,10 +6,29 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from api.sync import services
-from api.sync.serializers import RefusedSerializer, SyncRunSerializer
+from api.sync.serializers import (
+    RefusedSerializer,
+    SyncRunSerializer,
+    SyncStatusSerializer,
+)
 
 
 @extend_schema(
+    operation_id="sync_status",
+    responses=SyncStatusSerializer,
+    summary="Идёт ли синхронизация",
+    description=(
+        "Состояние живёт на сервере, а не в памяти вкладки: иначе перезагрузка "
+        "стирает его у запустившего, а остальные не видят вовсе."
+    ),
+)
+@api_view(["GET"])
+def sync_status(request):
+    return Response(SyncStatusSerializer(services.status()).data)
+
+
+@extend_schema(
+    operation_id="sync_refresh",
     request=None,
     responses={200: SyncRunSerializer, 429: RefusedSerializer, 409: RefusedSerializer},
     summary="Обновить данные из МойСклада",

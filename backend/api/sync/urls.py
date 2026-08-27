@@ -6,4 +6,5 @@ from api.sync import views
 
 urlpatterns = [
     path("refresh/", views.refresh, name="sync-refresh"),
+    path("status/", views.sync_status, name="sync-status"),
 ]

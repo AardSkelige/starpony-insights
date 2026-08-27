@@ -48,12 +48,43 @@ def last_run() -> SyncRun | None:
     return SyncRun.objects.filter(kind=SyncKind.DOCUMENTS).order_by("-started_at").first()
 
 
+def _human(seconds: int) -> str:
+    """Остаток паузы словами: «2 мин 13 с» вместо «133 с».
+
+    Сто тридцать три секунды человек всё равно переводит в минуты сам —
+    и делает это медленнее, чем прочитал бы готовый ответ.
+    """
+    if seconds < 60:
+        return f"{seconds} с"
+    minutes, rest = divmod(seconds, 60)
+    return f"{minutes} мин" if rest == 0 else f"{minutes} мин {rest} с"
+
+
 def _abandon(run: SyncRun) -> None:
     """Пометить прогон брошенным: процесс умер, не закрыв запись."""
     run.status = SyncStatus.FAILED
     run.finished_at = timezone.now()
     run.error = "Прогон оборван: процесс завершился, не закрыв запись."
     run.save(update_fields=["status", "finished_at", "error"])
+
+
+def status() -> dict:
+    """Идёт ли синхронизация прямо сейчас и когда данные обновлялись.
+
+    Спрашивается страницей: состояние «идёт» должно жить на сервере, а не
+    в памяти вкладки. Иначе перезагрузка стирает его у того, кто запустил,
+    а остальные четверо не видят вовсе — и жмут кнопку впустую.
+    """
+    previous = last_run()
+    running = (
+        previous is not None
+        and previous.status == SyncStatus.RUNNING
+        and timezone.now() - previous.started_at < STALE_AFTER
+    )
+    return {
+        "running": running,
+        "started_at": previous.started_at if running else None,
+    }
 
 
 def refresh() -> SyncRun:
@@ -80,7 +111,7 @@ def refresh() -> SyncRun:
             left = max(1, int((COOLDOWN - waited).total_seconds()))
             raise Refused(
                 f"Данные обновлялись меньше трёх минут назад. "
-                f"Следующее обновление — через {left} с.",
+                f"Следующее обновление — через {_human(left)}.",
                 retry_after_seconds=left,
             )
 
