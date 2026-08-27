@@ -1,0 +1,156 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'docker-compose.prod.yml'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: "Шаг 1 — тесты"
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Та же мажорная версия, что на проде: различия в поведении Postgres
+        # между версиями должны падать здесь, а не после выкатки.
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: starpony_test
+          POSTGRES_USER: starpony
+          POSTGRES_PASSWORD: starpony
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U starpony"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Установка зависимостей
+        run: pip install -r requirements.txt
+        working-directory: backend
+
+      - name: Тесты
+        run: python -m pytest -q
+        working-directory: backend
+        env:
+          SECRET_KEY: ci-test-only
+          DEBUG: 'True'
+          POSTGRES_DB: starpony_test
+          POSTGRES_USER: starpony
+          POSTGRES_PASSWORD: starpony
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: '5432'
+
+      - name: Схема API генерируется без ошибок
+        # Схема — контракт с фронтендом. Если она перестала собираться,
+        # типы на фронте молча устареют, а расхождение всплывёт в браузере.
+        run: python manage.py spectacular --file /dev/null --fail-on-warn --validate
+        working-directory: backend
+        env:
+          SECRET_KEY: ci-test-only
+          POSTGRES_DB: starpony_test
+          POSTGRES_USER: starpony
+          POSTGRES_PASSWORD: starpony
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: '5432'
+
+  deploy:
+    name: "Шаг 2 — сборка и выкатка"
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Владелец строчными
+        id: vars
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Сборка образа
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/${{ steps.vars.outputs.owner }}/starpony-backend:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Переменные окружения на сервер
+        uses: appleboy/ssh-action@v1
+        env:
+          BACKEND_ENV_PROD: ${{ secrets.BACKEND_ENV_PROD }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: BACKEND_ENV_PROD,POSTGRES_PASSWORD
+          script: |
+            set -e
+            mkdir -p /root/starpony/backend
+            # Права ставятся при создании, а не chmod'ом после: иначе между
+            # записью и chmod файл с токеном МойСклада успевает пожить
+            # доступным на чтение любому пользователю системы.
+            ( umask 077
+              printf '%s' "$BACKEND_ENV_PROD" > /root/starpony/backend/.env.prod
+              printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD" > /root/starpony/.env )
+
+      - name: Конфигурация на сервер
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "docker-compose.prod.yml"
+          target: "/root/starpony"
+
+      - name: Выкатка
+        uses: appleboy/ssh-action@v1
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: GHCR_TOKEN,GHCR_USER
+          script: |
+            set -e
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            cd /root/starpony
+            docker compose -f docker-compose.prod.yml pull backend db
+            # --force-recreate, а не restart: перезапуск не перечитывает env_file,
+            # и контейнер поднимется со старыми переменными. А после перезагрузки
+            # сервера сеть Docker получает новый идентификатор, и старый контейнер
+            # к ней уже не подключится. Обе грабли проверены на Horse Bio.
+            docker compose -f docker-compose.prod.yml up -d --force-recreate --remove-orphans \
+              --wait --wait-timeout 180 backend db
+            docker image prune -f

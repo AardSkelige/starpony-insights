@@ -75,3 +75,9 @@ services:
 volumes:
   pgdata:
   frontend_modules:
+
+networks:
+  # Одна сеть на всё: локально нечего разделять, но имя задаём явно —
+  # иначе compose соберёт starpony-local_default.
+  default:
+    name: starpony-local

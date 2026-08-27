@@ -1,0 +1,40 @@
+# Общий прокси на два проекта. Живёт на сервере в /root/caddy/.
+# Копия здесь — чтобы конфигурация была в истории, а не только на диске машины.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: shared_caddy
+    restart: unless-stopped
+    ports:
+      - "443:443"          # только HTTPS; порт 80 остаётся за Horse Bio
+      - "443:443/udp"      # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # сертификаты переживают пересоздание
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+      # Статика StarPony: тома создаёт его собственный compose, Caddy только читает.
+      - starpony_static:/srv/starpony:ro
+      - starpony_admin_static:/srv/starpony-admin:ro
+    networks:
+      - horsebio_app-network   # Horse Bio: пока живёт в своей сети
+      - shared-proxy           # StarPony и всё, что появится дальше
+
+volumes:
+  caddy_data:
+  caddy_config:
+  caddy_logs:
+  # Тома чужие: их создаёт и наполняет compose StarPony, поэтому external.
+  # Если объявить их обычными, Caddy создаст пустые и будет отдавать 404
+  # на живом сайте, а причина будет неочевидна.
+  starpony_static:
+    external: true
+  starpony_admin_static:
+    external: true
+
+networks:
+  horsebio_app-network:
+    external: true
+  shared-proxy:
+    external: true

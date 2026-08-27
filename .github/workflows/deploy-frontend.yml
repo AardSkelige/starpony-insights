@@ -1,0 +1,107 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'docker-compose.prod.yml'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: "Шаг 1 — линт, типы, тесты"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Установка зависимостей
+        run: npm ci
+        working-directory: frontend
+
+      - name: Линт
+        # Здесь же проверяется запрет захардкоженных цветов (DESIGN.md §1):
+        # правило живёт в eslint.config.js и валит сборку.
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Типы
+        run: npm run typecheck
+        working-directory: frontend
+
+      - name: Тесты
+        run: npm test
+        working-directory: frontend
+
+  deploy:
+    name: "Шаг 2 — сборка и выкатка"
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Владелец строчными
+        id: vars
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Сборка образа
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/${{ steps.vars.outputs.owner }}/starpony-frontend:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Конфигурация на сервер
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "docker-compose.prod.yml"
+          target: "/root/starpony"
+
+      - name: Выкатка статики
+        uses: appleboy/ssh-action@v1
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: GHCR_TOKEN,GHCR_USER
+          script: |
+            set -e
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            cd /root/starpony
+            docker compose -f docker-compose.prod.yml pull frontend
+            # Контейнер фронтенда не служба: он выкладывает собранные файлы
+            # в том, который читает Caddy, и завершается. Поэтому run --rm,
+            # а не up -d, и поэтому же его падение нельзя пропустить молча.
+            docker compose -f docker-compose.prod.yml run --rm frontend
+            docker image prune -f

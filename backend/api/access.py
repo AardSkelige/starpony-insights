@@ -58,7 +58,7 @@ PUBLIC_PREFIXES: tuple[str, ...] = (
     "/api/auth/csrf/",
     "/healthz",
     "/admin/login/",
-    "/static/",
+    "/django-static/",
 )
 
 # Доступно любому вошедшему, независимо от выданных страниц.

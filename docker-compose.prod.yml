@@ -45,6 +45,12 @@ services:
     environment:
       POSTGRES_HOST: db
       POSTGRES_PORT: "5432"
+      # Пароль берётся из того же .env, что и у базы. Держать его ещё и внутри
+      # .env.prod — значит завести два источника одного значения; разойдутся
+      # они молча, а проявится это отказом подключения после деплоя.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD обязателен}
+      POSTGRES_DB: ${POSTGRES_DB:-starpony}
+      POSTGRES_USER: ${POSTGRES_USER:-starpony}
     # Параметры проверены на практике в других проектах:
     #   preload        — код читается один раз до форка, экономит память;
     #   max-requests   — воркер перезапускается, чтобы утечки не копились;
@@ -68,7 +74,7 @@ services:
       - static_admin:/app/staticfiles
     networks:
       - internal
-      - edge
+      - shared-proxy
     depends_on:
       db:
         condition: service_healthy
@@ -105,10 +111,16 @@ volumes:
     name: starpony_admin_static
 
 networks:
+  # Django и Postgres. Имя задано явно: без него compose собирает его из имени
+  # проекта и получается что-то вроде starpony_internal — читаемо машине,
+  # не человеку, который смотрит `docker network ls` в три часа ночи.
   internal:
-  # Caddy вынесен в отдельную сеть намеренно. Пока он сидел в сети приложения,
-  # `docker compose down` в соседнем проекте пересоздавал её — и прокси терял
-  # оба сайта разом.
-  edge:
+    name: starpony-internal
+
+  # Общая сеть прокси: через неё Caddy видит приложения обоих проектов.
+  # Своя, а не сеть приложения, — намеренно: пока Caddy сидел в сети Horse Bio,
+  # `docker compose down` в том проекте пересоздавал её, и прокси разом терял
+  # оба сайта.
+  shared-proxy:
     external: true
-    name: edge
+    name: shared-proxy
