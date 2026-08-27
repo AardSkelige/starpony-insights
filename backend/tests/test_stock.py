@@ -164,6 +164,46 @@ class TestPartialReport:
         zeroed = Stock.objects.filter(quantity=0).first()
         assert zeroed.stock_days is None
 
+    def test_unknown_rows_do_not_make_a_partial_report_look_full(self, client, stocked):
+        """Модификации и комплекты не должны выдавать неполный отчёт за полный.
+
+        В отчёт попадает не только номенклатура из зеркала. Считай мы полноту
+        по всем строкам, отчёт с четырьмя товарами и сотней модификаций
+        выглядел бы исчерпывающим — и остальные шесть позиций склада
+        обнулились бы молча, по расписанию, каждые пятнадцать минут.
+        """
+        from moysklad.sync.stock import sync_stock
+
+        run, products = stocked
+        rows = [self._row(p) for p in products[:4]]
+        # Строки, которых нет в зеркале: у них свой идентификатор.
+        rows += [
+            {
+                "meta": {
+                    "href": "https://api.moysklad.ru/api/remap/1.2/entity/variant/"
+                    # Префикс заведомо чужой: товары фикстуры начинаются
+                    # с нулей, и «00000000-…-000000000000» — это товар №0.
+                    f"ffffffff-0000-0000-0000-{index:012d}"
+                },
+                "stock": "5",
+                "reserve": 0,
+                "inTransit": 0,
+                "price": 1000,
+                "stockDays": 3,
+            }
+            for index in range(100)
+        ]
+
+        outcome = sync_stock(client(rows), run)
+
+        assert outcome.fetched == 104
+        assert outcome.extra["skipped"] == 100
+        assert outcome.extra["partial"] is True, (
+            "полнота должна считаться по узнанным позициям, а не по всем строкам"
+        )
+        assert outcome.extra["zeroed"] == 0
+        assert Stock.objects.filter(quantity=0).count() == 0
+
     def test_empty_report_changes_nothing(self, client, stocked):
         """Пустой ответ — сбой на стороне API, а не пустой склад."""
         from moysklad.sync.stock import sync_stock

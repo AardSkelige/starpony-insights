@@ -56,6 +56,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
   /api/auth/logout/:
     post:
       operationId: api_auth_logout_create
@@ -82,7 +88,7 @@ paths:
           description: ''
   /api/shipments/products/:
     get:
-      operationId: api_shipments_products_retrieve
+      operationId: shipment_products_list
       description: Что и сколько продано за период, свёрнутое по товару.
       summary: Товары в отгрузках
       parameters:
@@ -166,7 +172,7 @@ paths:
           description: ''
   /api/shipments/products/{product_id}/:
     get:
-      operationId: api_shipments_products_retrieve_2
+      operationId: shipment_product_detail
       description: 'Разбивка по каналам, последние отгрузки и остаток. Фильтры те
         же, что у таблицы: детали обязаны сходиться с числами своей строки.'
       summary: Товар в отгрузках — детали строки
@@ -258,7 +264,7 @@ paths:
           description: No response body
   /api/shipments/products/xlsx/:
     get:
-      operationId: api_shipments_products_xlsx_retrieve
+      operationId: shipment_products_xlsx
       description: 'Та же выборка, что на экране, но целиком: все страницы, а не видимая.'
       summary: Товары в отгрузках — выгрузка в Excel
       parameters:

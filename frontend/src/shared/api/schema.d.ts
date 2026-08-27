@@ -85,7 +85,7 @@ export interface paths {
          * Товары в отгрузках
          * @description Что и сколько продано за период, свёрнутое по товару.
          */
-        get: operations["api_shipments_products_retrieve"];
+        get: operations["shipment_products_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -105,7 +105,7 @@ export interface paths {
          * Товар в отгрузках — детали строки
          * @description Разбивка по каналам, последние отгрузки и остаток. Фильтры те же, что у таблицы: детали обязаны сходиться с числами своей строки.
          */
-        get: operations["api_shipments_products_retrieve_2"];
+        get: operations["shipment_product_detail"];
         put?: never;
         post?: never;
         delete?: never;
@@ -125,7 +125,7 @@ export interface paths {
          * Товары в отгрузках — выгрузка в Excel
          * @description Та же выборка, что на экране, но целиком: все страницы, а не видимая.
          */
-        get: operations["api_shipments_products_xlsx_retrieve"];
+        get: operations["shipment_products_xlsx"];
         put?: never;
         post?: never;
         delete?: never;
@@ -348,6 +348,14 @@ export interface operations {
                     "application/json": components["schemas"]["Detail"];
                 };
             };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
         };
     };
     api_auth_logout_create: {
@@ -387,7 +395,7 @@ export interface operations {
             };
         };
     };
-    api_shipments_products_retrieve: {
+    shipment_products_list: {
         parameters: {
             query?: {
                 channel_id?: number | null;
@@ -428,7 +436,7 @@ export interface operations {
             };
         };
     };
-    api_shipments_products_retrieve_2: {
+    shipment_product_detail: {
         parameters: {
             query?: {
                 channel_id?: number | null;
@@ -478,7 +486,7 @@ export interface operations {
             };
         };
     };
-    api_shipments_products_xlsx_retrieve: {
+    shipment_products_xlsx: {
         parameters: {
             query?: {
                 channel_id?: number | null;

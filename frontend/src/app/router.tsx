@@ -54,8 +54,15 @@ function RequireAuth() {
   }
 
   if (error instanceof ApiError && error.status === 401) {
-    // Куда шли — запоминаем: после входа человек попадёт туда, а не на главную.
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+    // Куда шли — запоминаем вместе с фильтрами: пересланная ссылка на раздел
+    // за конкретный период должна открыться целиком, а не без периода.
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: `${location.pathname}${location.search}` }}
+      />
+    )
   }
 
   if (error) {
@@ -83,12 +90,18 @@ function RequireAuth() {
 function RedirectIfAuthenticated() {
   const { data: profile, isPending } = useProfile()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Куда человек шёл до того, как его отправили на вход. `RequireAuth`
+  // кладёт путь сюда — и без этого он терялся: после входа все попадали
+  // на главную, даже открыв ссылку на конкретный раздел.
+  const from = (location.state as { from?: string } | null)?.from
 
   React.useEffect(() => {
     if (profile) {
-      navigate("/", { replace: true, viewTransition: true })
+      navigate(from ?? "/", { replace: true, viewTransition: true })
     }
-  }, [profile, navigate])
+  }, [profile, navigate, from])
 
   if (isPending) {
     return <LoadingScreen />

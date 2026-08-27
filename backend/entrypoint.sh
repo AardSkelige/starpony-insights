@@ -25,6 +25,8 @@ done
 echo "База отвечает."
 
 python manage.py migrate --noinput
+# Идемпотентно: если таблица есть, команда просто сообщает об этом.
+python manage.py createcachetable
 python manage.py collectstatic --noinput --clear
 
 exec "$@"

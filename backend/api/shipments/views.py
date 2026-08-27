@@ -18,6 +18,7 @@ from core.services.freshness import documents_synced_at
 
 
 @extend_schema(
+    operation_id="shipment_products_list",
     parameters=[ShipmentProductsQuerySerializer],
     responses=ShipmentProductsSerializer,
     summary="Товары в отгрузках",
@@ -39,6 +40,7 @@ def shipment_products(request):
 
 
 @extend_schema(
+    operation_id="shipment_product_detail",
     parameters=[ShipmentProductsQuerySerializer],
     responses={200: ShipmentProductDetailSerializer, 404: None},
     summary="Товар в отгрузках — детали строки",
@@ -74,6 +76,7 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 @extend_schema(
+    operation_id="shipment_products_xlsx",
     parameters=[ShipmentProductsQuerySerializer],
     responses={(200, XLSX): OpenApiTypes.BINARY},
     summary="Товары в отгрузках — выгрузка в Excel",

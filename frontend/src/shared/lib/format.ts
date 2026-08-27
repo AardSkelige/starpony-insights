@@ -9,6 +9,16 @@
 
 const RU = "ru-RU"
 
+/**
+ * Время показывается московским, а не по часам машины.
+ *
+ * Учёт ведётся в Москве, и «данные на 14:32» должно значить московские 14:32
+ * — иначе сотрудник в командировке увидит время, не совпадающее ни с чем
+ * в МойСкладе. Пояс здесь же делает форматирование предсказуемым: без него
+ * тот же тест на машине разработчика и на сервере сборки даёт разный ответ.
+ */
+const TIMEZONE = "Europe/Moscow"
+
 /** Неразрывный пробел перед знаком рубля: «231 530,38 ₽» не переносится. */
 const NBSP = " "
 
@@ -69,17 +79,30 @@ export function formatSyncedAt(iso: string | null, now: Date = new Date()): stri
   if (!iso) return "данные ещё не загружались"
 
   const moment = new Date(iso)
-  const time = moment.toLocaleTimeString(RU, { hour: "2-digit", minute: "2-digit" })
+  const time = moment.toLocaleTimeString(RU, {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: TIMEZONE,
+  })
 
-  const sameDay =
-    moment.getFullYear() === now.getFullYear() &&
-    moment.getMonth() === now.getMonth() &&
-    moment.getDate() === now.getDate()
+  // Сравниваются московские календарные дни, а не дни по часам машины:
+  // иначе у человека западнее Москвы вчерашняя синхронизация показалась бы
+  // сегодняшней, и «14:32» прочиталось бы как «только что».
+  const sameDay = moscowDay(moment) === moscowDay(now)
 
   if (sameDay) return `данные на ${time}`
 
-  const date = moment.toLocaleDateString(RU, { day: "2-digit", month: "2-digit" })
+  const date = moment.toLocaleDateString(RU, {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: TIMEZONE,
+  })
   return `данные на ${date}, ${time}`
+}
+
+/** Календарный день в Москве — «2026-08-27», для сравнения дат. */
+function moscowDay(date: Date): string {
+  return date.toLocaleDateString("en-CA", { timeZone: TIMEZONE })
 }
 
 /** Дата для полей периода: «01.04.2026». */
@@ -88,5 +111,6 @@ export function formatDate(iso: string): string {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    timeZone: TIMEZONE,
   })
 }

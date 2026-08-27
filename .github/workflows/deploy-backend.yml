@@ -6,6 +6,10 @@ on:
     paths:
       - 'backend/**'
       - 'docker-compose.prod.yml'
+      # Деплой копирует расписание на сервер — значит его правка должна
+      # деплой и запускать. Иначе изменённый крон лежит в репозитории
+      # и не работает, а понять это можно только по отсутствию прогонов.
+      - 'deploy/**'
       - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
 
@@ -62,6 +66,27 @@ jobs:
         # Схема — контракт с фронтендом. Если она перестала собираться,
         # типы на фронте молча устареют, а расхождение всплывёт в браузере.
         run: python manage.py spectacular --file /dev/null --fail-on-warn --validate
+        working-directory: backend
+        env:
+          SECRET_KEY: ci-test-only
+          POSTGRES_DB: starpony_test
+          POSTGRES_USER: starpony
+          POSTGRES_PASSWORD: starpony
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: '5432'
+
+      - name: Схема совпадает с той, из которой собраны типы фронтенда
+        # Собирает схему заново и сравнивает с закоммиченной. Без этой
+        # проверки правку сериализатора можно выкатить, не обновив
+        # `npm run api:types`: бэкенд отдаёт новое поле, фронт о нём не знает,
+        # и расхождение находит пользователь, а не сборка.
+        run: |
+          python manage.py spectacular --file /tmp/schema.yaml
+          if ! diff -u ../frontend/src/shared/api/schema.yaml /tmp/schema.yaml; then
+            echo "::error::Схема разошлась с frontend/src/shared/api/schema.yaml."
+            echo "Выполните: cd frontend && npm run api:types — и закоммитьте результат."
+            exit 1
+          fi
         working-directory: backend
         env:
           SECRET_KEY: ci-test-only

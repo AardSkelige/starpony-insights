@@ -164,6 +164,19 @@ SECURE_HSTS_PRELOAD = False
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 
+# --- Кеш --------------------------------------------------------------------
+
+# Таблица в Postgres, а не память процесса: в кеше живёт счётчик неудачных
+# попыток входа, а у gunicorn два воркера. В памяти счётчик был бы у каждого
+# свой, и допустимое число попыток удвоилось бы. Redis ради одного счётчика
+# — лишний контейнер на машине с 1.9 ГБ памяти.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "cache_entries",
+    }
+}
+
 # --- API --------------------------------------------------------------------
 
 REST_FRAMEWORK = {

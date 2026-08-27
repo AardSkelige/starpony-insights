@@ -73,10 +73,16 @@ def sync_stock(client: MoySkladClient, run: SyncRun) -> EntityOutcome:
     # поэтому товар может выпасть из одного прогона и вернуться в следующий.
     # Безусловное обнуление стирало бы его остаток каждые 15 минут, и расчёт
     # закупки видел бы ноль там, где товар есть на складе.
+    # Полнота меряется по **узнанным** позициям, а не по всем строкам отчёта.
+    # В отчёт попадают и модификации с комплектами, которых в зеркале нет:
+    # они раздувают счётчик, и отчёт, вернувший половину товаров и сотню
+    # модификаций, выглядел бы полным. Тогда вторая половина склада
+    # обнулялась бы — молча и по расписанию, каждые пятнадцать минут.
+    recognised = len(seen)
     zeroed = 0
     known = Stock.objects.count()
-    complete_enough = outcome.fetched > 0 and (
-        known == 0 or outcome.fetched >= known * MIN_REPORT_COMPLETENESS
+    complete_enough = recognised > 0 and (
+        known == 0 or recognised >= known * MIN_REPORT_COMPLETENESS
     )
 
     if complete_enough:
@@ -85,10 +91,10 @@ def sync_stock(client: MoySkladClient, run: SyncRun) -> EntityOutcome:
         )
     elif known:
         logger.warning(
-            "Остатки: отчёт вернул %s позиций против %s известных — похоже "
-            "на пересчёт в МойСкладе. Обнуление пропущено, старые остатки "
-            "сохранены до следующего прогона.",
-            outcome.fetched, known,
+            "Остатки: отчёт вернул %s известных позиций против %s в базе "
+            "(всего строк %s) — похоже на пересчёт в МойСкладе. Обнуление "
+            "пропущено, старые остатки сохранены до следующего прогона.",
+            recognised, known, outcome.fetched,
         )
 
     outcome.extra = {"skipped": skipped, "zeroed": zeroed, "partial": not complete_enough}
