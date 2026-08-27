@@ -49,6 +49,11 @@
 }
 
 :root {
+    /* Смена экрана и темы. 500мс — заметно, но не успевает надоесть
+       при частой навигации. */
+    --transition-screen: 500ms;
+    --transition-screen-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
@@ -127,4 +132,29 @@
   html {
     @apply font-sans;
     }
+}
+/* Переходы между экранами и сменой темы — через View Transitions API
+   (DESIGN.md §3). Браузер сам сводит старый кадр с новым; здесь задаётся
+   только длительность и кривая, чтобы переход читался как движение,
+   а не как мигание.
+
+   Длительность одна на всё приложение и живёт переменной: переходы разной
+   скорости в одном интерфейсе читаются как несогласованность, а искать их
+   потом пришлось бы по всем файлам. */
+@media not (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: var(--transition-screen);
+    animation-timing-function: var(--transition-screen-ease);
+  }
+}
+
+/* При выключенной анимации переход мгновенный: это не украшение,
+   а требование к доступности. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }

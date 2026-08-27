@@ -4,6 +4,9 @@
 то, чего в реестре нет. Обход реестра нашёл бы лишь опечатки в нём самом.
 """
 
+import re
+from pathlib import Path
+
 import pytest
 from django.urls import URLPattern, URLResolver, get_resolver
 
@@ -70,3 +73,26 @@ def test_shared_and_public_do_not_overlap_pages():
         for prefix in page.api_prefixes:
             assert not matches(prefix, PUBLIC_PREFIXES), f"{prefix} открыт публично"
             assert not matches(prefix, SHARED_PREFIXES), f"{prefix} открыт всем вошедшим"
+
+
+def test_every_page_has_an_icon():
+    """У каждой страницы реестра есть иконка на фронтенде.
+
+    В свёрнутом сайдбаре виден только значок (DESIGN.md §4), поэтому пункт без
+    иконки превращается в пустое место. Проверка идёт со стороны бэкенда
+    намеренно: реестр — здесь, и забывают обычно после добавления строки в него,
+    а не при правке фронтенда.
+    """
+    icons = Path(__file__).resolve().parents[2] / "frontend/src/app/layout/nav-icons.ts"
+    if not icons.exists():
+        pytest.skip("Фронтенд не собран рядом — проверять нечего")
+
+    source = icons.read_text(encoding="utf-8")
+    body = source[source.index("NAV_ICONS: Record<string, LucideIcon> = {") :]
+    declared = set(re.findall(r'^\s+"?([\w-]+)"?:\s*\w+,', body, re.M))
+
+    missing = {page.key for page in PAGES} - declared
+    assert not missing, (
+        f"Нет иконок для страниц: {', '.join(sorted(missing))}. "
+        f"Добавьте их в frontend/src/app/layout/nav-icons.ts"
+    )

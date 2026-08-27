@@ -1,10 +1,35 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>vite-app</title>
+    <title>StarPony Insights</title>
+    <script>
+      // Тема ставится до первой отрисовки, а не в React.
+      //
+      // Иначе документ успевает показаться без класса — то есть светлым, —
+      // и человек с тёмной темой получает белую вспышку на каждой загрузке.
+      // Ровно то, что DESIGN.md §3 обещает не допускать на экране входа.
+      //
+      // Скрипт синхронный и стоит в <head> намеренно: любая асинхронность
+      // здесь возвращает вспышку.
+      ;(function () {
+        try {
+          var stored = localStorage.getItem("theme")
+          var theme =
+            stored === "light" || stored === "dark"
+              ? stored
+              : window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light"
+          document.documentElement.classList.add(theme)
+        } catch (error) {
+          // Приватный режим может запрещать localStorage. Тогда просто
+          // остаёмся на светлой теме — это лучше, чем пустая страница.
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
