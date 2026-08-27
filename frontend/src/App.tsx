@@ -1,9 +1,9 @@
+import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 
 /**
- * Временная страница каркаса: показывает, что тема и добавленные токены
- * работают в обеих темах. Заменяется оболочкой приложения — сайдбар, шапка,
- * роутинг — когда та появится.
+ * Временная страница каркаса: проверяет, что компоненты реестра и обе темы
+ * работают. Заменяется оболочкой приложения, когда та появится.
  */
 export function App() {
   return (
@@ -19,12 +19,9 @@ export function App() {
         <Button>Основное действие</Button>
         <Button variant="outline">Второстепенное</Button>
         <Button variant="destructive">Опасное</Button>
-        <span className="rounded-md bg-success px-2 py-1 text-sm text-success-foreground">
-          success
-        </span>
-        <span className="rounded-md bg-warning px-2 py-1 text-sm text-warning-foreground">
-          warning
-        </span>
+        <Badge>Метка</Badge>
+        <Badge variant="secondary">Вторичная</Badge>
+        <Badge variant="outline">Контурная</Badge>
       </div>
     </div>
   )
