@@ -70,6 +70,7 @@ SHARED_PREFIXES: tuple[str, ...] = (
     "/api/auth/logout/",
     "/api/auth/me/",
     "/api/schema/",
+    "/api/docs/",
 )
 
 PAGES_BY_KEY = {page.key: page for page in PAGES}

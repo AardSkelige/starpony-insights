@@ -46,6 +46,9 @@ for _internal in ("127.0.0.1", "localhost"):
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
 
 INSTALLED_APPS = [
+    # Статика Swagger UI. Стоит выше staticfiles: приложение отдаёт свои файлы,
+    # и порядок здесь определяет, чьи найдутся первыми.
+    "drf_spectacular_sidecar",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -179,6 +182,11 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "StarPony Insights API",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    # Файлы страницы берутся из установленного пакета, а не с cdn.jsdelivr.net.
+    # На CDN стоял тег @latest: версия сменилась бы сама, и страница сломалась
+    # бы без единой правки с нашей стороны.
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
 }
 
 # --- Логи -------------------------------------------------------------------
