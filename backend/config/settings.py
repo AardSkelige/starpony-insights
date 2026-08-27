@@ -33,6 +33,14 @@ DEBUG = env_bool("DEBUG", False)
 
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "localhost,127.0.0.1")
 
+# Проверка здоровья контейнера обращается к приложению изнутри, по 127.0.0.1,
+# и без этого адреса Django отвечает ей 400 — контейнер считается больным,
+# хотя работает. Снаружи адрес недостижим: наружу смотрит только прокси,
+# и он передаёт настоящее имя домена.
+for _internal in ("127.0.0.1", "localhost"):
+    if _internal not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_internal)
+
 # Домены со схемой: "https://insight.star-pony.ru". Схема приходит из окружения
 # целиком, чтобы переход на HTTPS не требовал правки кода.
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
