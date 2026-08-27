@@ -16,6 +16,7 @@ OUR_APPS = {"core", "api", "moysklad"}
 # и уезжают в бэкап вместе с ним.
 EXEMPT = {
     "DocumentPosition",  # существует только внутри документа, каскадом
+    "ProcessingPlanMaterial",  # существует только внутри техкарты, каскадом
 }
 
 

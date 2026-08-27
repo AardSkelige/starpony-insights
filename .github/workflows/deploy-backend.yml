@@ -129,8 +129,11 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "docker-compose.prod.yml"
+          # Скрипты расписания едут вместе с кодом: иначе они живут только
+          # на сервере, и правка теряется при первой же переустановке.
+          source: "docker-compose.prod.yml,deploy/cron/*"
           target: "/root/starpony"
+          strip_components: 0
 
       - name: Выкатка
         uses: appleboy/ssh-action@v1
@@ -146,6 +149,12 @@ jobs:
             set -e
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             cd /root/starpony
+            # Скрипт расписания приезжает без права на запуск: scp его теряет.
+            # Ошибку не глушим: молча пропущенный chmod всплыл бы ночью,
+            # когда cron не сможет его запустить, — и без единого следа
+            # в журнале деплоя.
+            test -f /root/starpony/deploy/cron/starpony-sync.sh
+            chmod +x /root/starpony/deploy/cron/starpony-sync.sh
             docker compose -f docker-compose.prod.yml pull
             # --force-recreate, а не restart: перезапуск не перечитывает env_file,
             # и контейнер поднимется со старыми переменными. А после перезагрузки

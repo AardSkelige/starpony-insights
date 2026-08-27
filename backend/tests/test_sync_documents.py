@@ -186,3 +186,20 @@ class TestPositionRounding:
         )
         position.refresh_from_db()
         assert position.total_kopecks == expected
+
+
+class TestHrefParsing:
+    """Разбор ссылок — место, где уже дважды терялись данные молча."""
+
+    def test_strips_query_parameters(self):
+        """Отчёт об остатках отдаёт ссылку с параметром запроса.
+
+        `.../entity/product/<uuid>?expand=supplier` — без отрезания хвоста
+        товар не находится, и все 253 позиции остатков пропадают без ошибки.
+        """
+        ref = {"meta": {"href": "https://api.moysklad.ru/api/remap/1.2/entity/product/abc-123?expand=supplier"}}
+        assert ms_id_from(ref) == "abc-123"
+
+    def test_strips_trailing_slash(self):
+        ref = {"meta": {"href": "https://api.moysklad.ru/api/remap/1.2/entity/product/abc-123/"}}
+        assert ms_id_from(ref) == "abc-123"

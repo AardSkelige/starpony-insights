@@ -22,9 +22,17 @@ logger = logging.getLogger(__name__)
 
 
 def ms_id_from(ref: dict | None) -> str | None:
-    """Идентификатор из ссылки вида `.../entity/counterparty/<uuid>`."""
+    """Идентификатор из ссылки вида `.../entity/counterparty/<uuid>`.
+
+    Параметры запроса отрезаются: в отчёте об остатках ссылка приходит
+    как `.../entity/product/<uuid>?expand=supplier`, и без этого в идентификатор
+    попадал хвост `?expand=supplier`. Ошибка тихая — товар «не находится»,
+    и все 253 позиции остатков молча пропадали.
+    """
     href = (ref or {}).get("meta", {}).get("href", "")
-    return href.rsplit("/", 1)[-1] if href else None
+    if not href:
+        return None
+    return href.split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1]
 
 
 def sync_counterparties(client: MoySkladClient, run: SyncRun) -> EntityOutcome:
