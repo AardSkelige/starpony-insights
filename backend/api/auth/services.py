@@ -1,7 +1,5 @@
 """Логика входа. Views остаются тонкими, запросы к БД живут здесь."""
 
-from dataclasses import asdict
-
 from django.contrib.auth import authenticate, login, logout
 
 from api.access import pages_for_user
@@ -31,5 +29,8 @@ def profile(user) -> dict:
         "username": user.username,
         "full_name": user.get_full_name() or user.username,
         "is_superuser": user.is_superuser,
-        "pages": [asdict(page) for page in pages_for_user(user)],
+        "pages": [
+            {"key": p.key, "label": p.label, "group": p.group, "route": p.route}
+            for p in pages_for_user(user)
+        ],
     }

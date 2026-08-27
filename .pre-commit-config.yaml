@@ -1,15 +1,39 @@
+# Один менеджер хуков на репозиторий. Husky здесь не используется намеренно:
+# он переключает core.hooksPath на .husky и тем самым отключает .git/hooks,
+# где стоит сканер секретов. Два менеджера одного хука — это тихо потерянная
+# проверка, а теряется всегда та, которую забыли.
+#
+# Каждый хук начинается с `source scripts/hook-env.sh`: git из IDE приходит
+# с голым PATH, где нет ни node, ни gitleaks. Подробности — в самом скрипте.
 repos:
   - repo: local
     hooks:
       - id: gitleaks
-        name: gitleaks (secret scan)
-        # PATH берётся у процесса, запустившего git: у IDE, открытой из Dock, это
-        # голый /usr/bin:/bin:/usr/sbin:/sbin, и gitleaks оттуда не виден. Поэтому
-        # перед запуском добавляем стандартные каталоги Homebrew (Apple Silicon
-        # и Intel), если бинарник ещё не найден.
-        entry: >-
-          bash -c 'command -v gitleaks >/dev/null ||
-          export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH";
-          exec gitleaks git --pre-commit --staged --redact --verbose'
+        name: gitleaks (секреты)
+        entry: bash -c 'source scripts/hook-env.sh && exec gitleaks git --pre-commit --staged --redact --verbose'
         language: system
+        pass_filenames: false
+
+      - id: frontend-lint
+        name: eslint (фронтенд)
+        # Имена файлов не передаём намеренно: pre-commit отдаёт пути от корня
+        # репозитория, а eslint запускается из frontend/ и таких путей не видит —
+        # хук молча зеленел бы на любом файле. Проверяем весь фронтенд, это секунды.
+        entry: bash -c 'source scripts/hook-env.sh && cd frontend && npm run --silent lint'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+
+      - id: frontend-typecheck
+        name: tsc (фронтенд)
+        entry: bash -c 'source scripts/hook-env.sh && cd frontend && npm run --silent typecheck'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+
+      - id: backend-tests
+        name: pytest (бэкенд)
+        entry: bash -c 'cd backend && ../.venv/bin/python -m pytest -q'
+        language: system
+        files: ^backend/.*\.py$
         pass_filenames: false
