@@ -17,7 +17,9 @@ COPY . .
 
 # Приложение работает не от root: если процесс скомпрометирован, у него
 # не должно быть прав менять собственный код и системные файлы.
-RUN useradd --system --create-home app && chown -R app:app /app
+RUN useradd --system --create-home app \
+    && mkdir -p /app/staticfiles \
+    && chown -R app:app /app
 USER app
 
 EXPOSE 8000

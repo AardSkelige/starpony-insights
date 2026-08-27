@@ -76,32 +76,24 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
-      - name: Конфигурация на сервер
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "docker-compose.prod.yml"
-          target: "/root/starpony"
-
       - name: Выкатка статики
         uses: appleboy/ssh-action@v1
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
+          IMAGE: ghcr.io/${{ steps.vars.outputs.owner }}/starpony-frontend:latest
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: GHCR_TOKEN,GHCR_USER
+          envs: GHCR_TOKEN,GHCR_USER,IMAGE
+          # Через docker run, а не compose. Выкладка статики — копирование
+          # файлов в том; ни база, ни её пароль здесь ни при чём. Compose же
+          # разбирает файл целиком и потребовал бы передать сюда секрет базы,
+          # то есть отдать его процессу, которому он не нужен.
           script: |
             set -e
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            cd /root/starpony
-            docker compose -f docker-compose.prod.yml pull frontend
-            # Контейнер фронтенда не служба: он выкладывает собранные файлы
-            # в том, который читает Caddy, и завершается. Поэтому run --rm,
-            # а не up -d, и поэтому же его падение нельзя пропустить молча.
-            docker compose -f docker-compose.prod.yml run --rm frontend
+            docker pull "$IMAGE"
+            docker run --rm -v starpony_static:/target "$IMAGE"
             docker image prune -f

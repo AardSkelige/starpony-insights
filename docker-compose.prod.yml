@@ -41,7 +41,12 @@ services:
     image: ghcr.io/aardskelige/starpony-backend:latest
     restart: unless-stopped
     env_file:
-      - backend/.env.prod
+      # format: raw отключает подстановку переменных внутри файла. Без него
+      # compose видит в значении $ и подставляет «переменную», которой нет:
+      # SECRET_KEY молча обрезается с 50 символов до 23, а токен МойСклада
+      # приедет покалеченным. Проверено на первом же деплое.
+      - path: backend/.env.prod
+        format: raw
     environment:
       POSTGRES_HOST: db
       POSTGRES_PORT: "5432"
@@ -87,28 +92,17 @@ services:
     mem_limit: 384m
     logging: *logging
 
-  # Не сервис, а одноразовая задача: выкладывает собранную статику в том,
-  # который читает Caddy, и завершается. Своего веб-сервера у фронтенда нет.
-  frontend:
-    container_name: starpony-frontend
-    image: ghcr.io/aardskelige/starpony-frontend:latest
-    restart: "no"
-    volumes:
-      - static_frontend:/target
-    # Сеть не нужна: задача копирует файлы в том и завершается. Отсутствие
-    # доступа к сети — не педантизм, а сужение того, что скомпрометированный
-    # образ сборки может сделать на боевом сервере.
-    network_mode: none
-    logging: *logging
-
 volumes:
   pgdata:
-  # Имена заданы явно: их монтирует Caddy, живущий в другом compose-файле,
+  # Имя задано явно: том монтирует Caddy, живущий в другом compose-файле,
   # и он должен знать имя, а не угадывать префикс проекта.
-  static_frontend:
-    name: starpony_static
   static_admin:
     name: starpony_admin_static
+
+# Тома starpony_static здесь нет намеренно. Статику фронтенда выкладывает
+# отдельный шаг деплоя (docker run с образом фронтенда), и том создаётся им.
+# Описывать здесь сервис, который никто не запускает, — значит держать в файле
+# то, что расходится с действительностью.
 
 networks:
   # Django и Postgres. Имя задано явно: без него compose собирает его из имени

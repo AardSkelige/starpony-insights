@@ -146,11 +146,11 @@ jobs:
             set -e
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             cd /root/starpony
-            docker compose -f docker-compose.prod.yml pull backend db
+            docker compose -f docker-compose.prod.yml pull
             # --force-recreate, а не restart: перезапуск не перечитывает env_file,
             # и контейнер поднимется со старыми переменными. А после перезагрузки
             # сервера сеть Docker получает новый идентификатор, и старый контейнер
             # к ней уже не подключится. Обе грабли проверены на Horse Bio.
             docker compose -f docker-compose.prod.yml up -d --force-recreate --remove-orphans \
-              --wait --wait-timeout 180 backend db
+              --wait --wait-timeout 180
             docker image prune -f
