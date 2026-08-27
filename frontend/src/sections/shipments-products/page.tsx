@@ -178,7 +178,12 @@ export function ShipmentProductsPage() {
         rows={rows}
         rowKey={(row) => row.product_id}
         loading={query.isPending}
-        refreshing={query.isFetching && !query.isPending}
+        // Приглушаются только устаревшие данные — те, что показаны, пока
+        // едут новые после смены фильтра или страницы. Любая загрузка
+        // подряд не годится: React Query перечитывает данные при возврате
+        // на вкладку, и таблица темнела каждый раз, когда человек
+        // переключался в другое окно и обратно, хотя числа не менялись.
+        refreshing={query.isPlaceholderData}
         error={query.isError}
         onRetry={() => query.refetch()}
         emptyTitle="За этот период ничего не продано"
