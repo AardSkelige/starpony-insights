@@ -67,7 +67,10 @@ export function Filters({ value, onChange, onReset, channels, stacked = false }:
           aria-label="Канал продаж"
           className={cn(
             "justify-start gap-2 font-normal *:data-[slot=select-value]:flex-1",
-            stacked ? "h-10 w-full" : "w-44"
+            // Высота задаётся тем же вариантом, что и в компоненте, —
+            // иначе `h-10` проигрывает по специфичности и поле остаётся
+            // ниже соседних.
+            stacked ? "w-full data-[size=default]:h-10" : "w-44"
           )}
         >
           {/* Подпись собирается сама: `SelectValue` без детей показывает

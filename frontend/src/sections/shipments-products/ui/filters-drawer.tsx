@@ -31,7 +31,7 @@ export function FiltersDrawer({
   activeCount: number
 }) {
   return (
-    <Drawer>
+    <Drawer showSwipeHandle>
       <DrawerTrigger
         render={
           <Button variant="outline" className="h-10 w-full sm:hidden">

@@ -32,7 +32,13 @@ export function DetailPanel({
   const screen = useScreen()
 
   return (
-    <Drawer open={row !== null} onOpenChange={(open: boolean) => !open && onClose()}>
+    // `showSwipeHandle` — полоска сверху, за которую панель тянут вниз.
+    // Без неё непонятно, что панель вообще двигается пальцем.
+    <Drawer
+      open={row !== null}
+      onOpenChange={(open: boolean) => !open && onClose()}
+      showSwipeHandle
+    >
       <DrawerContent>
         {row ? (
           <>

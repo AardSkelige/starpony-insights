@@ -122,12 +122,20 @@
     --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* `position: relative` у body — не украшение.
+
+   Затемнение выдвижной панели на iOS переключается с `fixed` на `absolute`
+   (так в компоненте реестра: `fixed` там воюет со сворачивающейся адресной
+   строкой). Абсолютный элемент без позиционированного предка меряется от
+   первого экрана, поэтому при прокрутке низ списка оставался незатемнённым
+   и карточки читались сквозь панель. С `relative` у body он растягивается
+   на всю высоту документа. */
 @layer base {
   * {
     @apply border-border outline-ring/50;
     }
   body {
-    @apply bg-background text-foreground;
+    @apply relative bg-background text-foreground;
     }
   html {
     @apply font-sans;
