@@ -56,6 +56,9 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "core",
     "api",
+    # Своих моделей нет — зеркало живёт в core.models. Приложение нужно, чтобы
+    # Django нашёл management-команды синхронизации.
+    "moysklad",
 ]
 
 MIDDLEWARE = [

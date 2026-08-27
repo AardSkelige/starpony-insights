@@ -17,7 +17,7 @@ import { Separator } from "@/shared/ui/separator"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 
 /**
- * Шапка узкая и почти пустая: место отдано содержимому (DESIGN.md §4).
+ * Шапка узкая и почти пустая: место отдано содержимому.
  * Поля поиска здесь нет — только подсказка, открывающая палитру команд.
  */
 export function AppHeader({ profile }: { profile: Profile }) {

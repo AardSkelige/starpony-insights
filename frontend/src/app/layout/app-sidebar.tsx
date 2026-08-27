@@ -42,7 +42,7 @@ function PageLink({ page }: { page: Page }) {
         render={
           <NavLink to={page.route} end={page.route === "/"} viewTransition>
             {/* Развёрнутый сайдбар текстовый — читается как оглавление,
-                а не как панель инструментов (DESIGN.md §4). Иконка нужна
+                а не как панель инструментов. Иконка нужна
                 только в свёрнутом рельсе, где показывать больше нечего. */}
             <Icon className="hidden group-data-[collapsible=icon]:block" />
             <span>{page.label}</span>

@@ -96,7 +96,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = React.useCallback(
     (next: Theme) => {
-      // Плавный переход — тот же механизм, что между страницами (DESIGN.md §3).
+      // Плавный переход — тот же механизм, что между страницами.
       // Резкая смена всей палитры бьёт по глазам сильнее, чем кажется,
       // особенно при переходе в светлую в тёмной комнате.
       const startViewTransition = document.startViewTransition?.bind(document)
