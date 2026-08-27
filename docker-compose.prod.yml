@@ -1,0 +1,114 @@
+# Боевая сборка StarPony Insights.
+#
+# Наружу не смотрит ни один порт: снаружи виден только общий Caddy, который
+# живёт отдельно и обслуживает оба проекта на сервере. Он же отдаёт статику
+# фронтенда из тома starpony_static и проксирует /api на gunicorn.
+
+name: starpony
+
+services:
+  db:
+    container_name: starpony-db
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-starpony}
+      POSTGRES_USER: ${POSTGRES_USER:-starpony}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD обязателен}
+    volumes:
+      # Без /data на конце: с 18-й версии образ сам кладёт кластер
+      # в подкаталог ради pg_upgrade --link.
+      - pgdata:/var/lib/postgresql
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-starpony} -d ${POSTGRES_DB:-starpony}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Без лимита OOM-killer выбирает процесс с наибольшим потреблением — то есть
+    # Postgres, возможно чужого проекта. На сервере живут две системы, и одна
+    # не должна ронять другую.
+    mem_limit: 256m
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    container_name: starpony-backend
+    image: ghcr.io/aardskelige/starpony-backend:latest
+    restart: unless-stopped
+    env_file:
+      - backend/.env.prod
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+    # Параметры проверены на практике в других проектах:
+    #   preload        — код читается один раз до форка, экономит память;
+    #   max-requests   — воркер перезапускается, чтобы утечки не копились;
+    #   worker-tmp-dir — heartbeat в память, а не на диск: на дисковой ФС он
+    #                    иногда блокирует воркеры, и сервис «зависает на ровном
+    #                    месте» без единой ошибки в логах.
+    command: >-
+      gunicorn config.wsgi:application
+      --bind 0.0.0.0:8000
+      --workers 2
+      --worker-class gthread
+      --threads 4
+      --timeout 60
+      --preload
+      --max-requests 1000
+      --max-requests-jitter 100
+      --worker-tmp-dir /dev/shm
+      --access-logfile -
+      --error-logfile -
+    volumes:
+      - static_admin:/app/staticfiles
+    networks:
+      - internal
+      - edge
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5).status == 200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    mem_limit: 384m
+    logging: *logging
+
+  # Не сервис, а одноразовая задача: выкладывает собранную статику в том,
+  # который читает Caddy, и завершается. Своего веб-сервера у фронтенда нет.
+  frontend:
+    container_name: starpony-frontend
+    image: ghcr.io/aardskelige/starpony-frontend:latest
+    restart: "no"
+    volumes:
+      - static_frontend:/target
+    # Сеть не нужна: задача копирует файлы в том и завершается. Отсутствие
+    # доступа к сети — не педантизм, а сужение того, что скомпрометированный
+    # образ сборки может сделать на боевом сервере.
+    network_mode: none
+    logging: *logging
+
+volumes:
+  pgdata:
+  # Имена заданы явно: их монтирует Caddy, живущий в другом compose-файле,
+  # и он должен знать имя, а не угадывать префикс проекта.
+  static_frontend:
+    name: starpony_static
+  static_admin:
+    name: starpony_admin_static
+
+networks:
+  internal:
+  # Caddy вынесен в отдельную сеть намеренно. Пока он сидел в сети приложения,
+  # `docker compose down` в соседнем проекте пересоздавал её — и прокси терял
+  # оба сайта разом.
+  edge:
+    external: true
+    name: edge

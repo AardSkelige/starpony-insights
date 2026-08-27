@@ -68,4 +68,35 @@ frontend/src/
 
 ---
 
+## Запуск
+
+Всё целиком, включая базу:
+
+```bash
+docker compose -f docker-compose.local.yml up --build
+```
+
+Фронтенд — `localhost:3002`, API — `localhost:8002`, база — `localhost:5433`.
+Миграции применяются при старте, отдельная команда не нужна.
+
+Можно и без контейнеров — тогда база всё равно берётся из compose:
+
+```bash
+docker compose -f docker-compose.local.yml up -d db
+
+cd backend && python manage.py runserver 127.0.0.1:8002
+cd frontend && npm run dev
+```
+
+Типы фронтенда генерируются из схемы Django, а не пишутся руками:
+
+```bash
+cd frontend && npm run api:types
+```
+
+Перед коммитом хуки сами гоняют сканер секретов, линтер, проверку типов
+и тесты бэкенда. Ставятся один раз: `pre-commit install`.
+
+---
+
 _Автор и единственный разработчик — Sergey Senkin._

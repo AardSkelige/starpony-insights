@@ -1,0 +1,77 @@
+# Локальная разработка целиком в контейнерах: docker compose -f docker-compose.local.yml up
+#
+# Переменные заданы здесь открытым текстом намеренно — это локальные значения,
+# доступные только с этой машины. Боевые живут в .env.prod, которого нет в git.
+
+name: starpony-local
+
+services:
+  db:
+    container_name: starpony-local-db
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: starpony
+      POSTGRES_USER: starpony
+      POSTGRES_PASSWORD: starpony-local
+    volumes:
+      # Именно /var/lib/postgresql, без /data: с 18-й версии образ кладёт
+      # кластер в подкаталог, чтобы pg_upgrade --link не упирался в границу
+      # точки монтирования. Том на /data образ считает чужими данными и падает.
+      - pgdata:/var/lib/postgresql
+    # Порт наружу — чтобы можно было работать и без контейнеров: запустить
+    # runserver с хоста, подключиться клиентом, снять дамп.
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U starpony -d starpony"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    container_name: starpony-local-backend
+    build: ./backend
+    # runserver, а не gunicorn: нужен автоперезапуск при правке кода.
+    # В проде обратное — там gunicorn, см. docker-compose.prod.yml.
+    command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      SECRET_KEY: local-development-only-not-a-secret
+      DEBUG: "True"
+      ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      POSTGRES_DB: starpony
+      POSTGRES_USER: starpony
+      POSTGRES_PASSWORD: starpony-local
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+    volumes:
+      - ./backend:/app
+    # От root только локально: код смонтирован с хоста, и пользователь внутри
+    # контейнера иначе не сможет записать миграции, которые сам же создаёт.
+    user: root
+    ports:
+      - "127.0.0.1:8002:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    container_name: starpony-local-frontend
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      # Внутри сети контейнеров бэкенд зовётся backend, а не 127.0.0.1.
+      VITE_API_TARGET: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      # Свой том для node_modules: пакеты собираются под Linux, и подсовывать
+      # им каталог, собранный на macOS, — источник неочевидных падений.
+      - frontend_modules:/app/node_modules
+    ports:
+      - "127.0.0.1:3002:3002"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  frontend_modules:
