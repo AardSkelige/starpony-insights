@@ -57,8 +57,12 @@ PUBLIC_PREFIXES: tuple[str, ...] = (
     "/api/auth/login/",
     "/api/auth/csrf/",
     "/healthz",
-    "/admin/login/",
     "/django-static/",
+    # Админка целиком: у неё собственная защита — Django пускает внутрь только
+    # активного пользователя с is_staff, а остальным показывает форму входа.
+    # Своей проверкой мы бы её дублировали, и первым делом сломали: middleware
+    # отдаёт JSON, а браузеру на /admin/ нужна страница.
+    "/admin/",
 )
 
 # Доступно любому вошедшему, независимо от выданных страниц.
@@ -66,7 +70,6 @@ SHARED_PREFIXES: tuple[str, ...] = (
     "/api/auth/logout/",
     "/api/auth/me/",
     "/api/schema/",
-    "/admin/",
 )
 
 PAGES_BY_KEY = {page.key: page for page in PAGES}
