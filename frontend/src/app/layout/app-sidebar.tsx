@@ -27,6 +27,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/shared/ui/sidebar"
 
 function initials(fullName: string): string {
@@ -37,6 +38,7 @@ function initials(fullName: string): string {
 function PageLink({ page }: { page: Page }) {
   const Icon = NAV_ICONS[page.key] ?? FALLBACK_ICON
   const { pathname } = useLocation()
+  const { isMobile, setOpenMobile } = useSidebar()
 
   // `NavLink` сам по себе пункт не подсветит: `SidebarMenuButton` красит
   // по своему пропу `isActive`, а не по `aria-current`, который ставит ссылка.
@@ -53,7 +55,15 @@ function PageLink({ page }: { page: Page }) {
         isActive={active}
         tooltip={{ children: page.label, sideOffset: 10 }}
         render={
-          <NavLink to={page.route} end={page.route === "/"} viewTransition>
+          <NavLink
+            to={page.route}
+            end={page.route === "/"}
+            viewTransition
+            // На телефоне меню выезжает поверх страницы. Оставить его
+            // открытым над только что выбранным разделом — значит закрыть
+            // собой то, ради чего по пункту и нажали.
+            onClick={() => isMobile && setOpenMobile(false)}
+          >
             {/* Развёрнутый сайдбар текстовый — читается как оглавление,
                 а не как панель инструментов. Иконка нужна
                 только в свёрнутом рельсе, где показывать больше нечего. */}

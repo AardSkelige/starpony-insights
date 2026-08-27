@@ -42,15 +42,21 @@ export function PageHeader({
   exporting = false,
 }: Props) {
   return (
-    <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
+    // На телефоне всё в столбик: название целиком, отметка свежести под ним,
+    // кнопки в ряд во всю ширину. Раньше название ужималось до «Товары в отгр…»
+    // ради двух кнопок, которые всё равно не помещались рядом с ним.
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:gap-x-4">
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="text-xl font-semibold tracking-tight sm:truncate">{title}</h1>
         {subtitle ? (
           <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
         ) : null}
+        <p className="mt-1 text-xs text-muted-foreground sm:hidden">
+          {refreshNote ?? formatSyncedAt(syncedAt)}
+        </p>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 max-sm:*:flex-1">
         <span className="hidden text-xs text-muted-foreground sm:inline">
           {refreshNote ?? formatSyncedAt(syncedAt)}
         </span>
@@ -64,6 +70,7 @@ export function PageHeader({
                   size="sm"
                   onClick={onExport}
                   disabled={exporting}
+                  className="max-sm:h-10 max-sm:w-full max-sm:justify-center"
                 >
                   {exporting ? <Spinner data-icon="inline-start" /> : <Download data-icon="inline-start" />}
                   Экспорт
@@ -86,6 +93,7 @@ export function PageHeader({
                   size="sm"
                   onClick={onRefresh}
                   disabled={refreshing}
+                  className="max-sm:h-10 max-sm:w-full max-sm:justify-center"
                 >
                   {refreshing ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}
                   {refreshing ? "Обновляем…" : "Обновить"}

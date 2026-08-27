@@ -22,7 +22,12 @@ export const COLUMNS: Column<ShipmentProductRow>[] = [
     sortKey: "name",
     render: (row) => (
       <span className="flex min-w-0 flex-col">
-        <span className="truncate">{row.name}</span>
+        {/* В таблице название ужимается — там под него отведена колонка;
+            в карточке на телефоне переносится целиком, иначе «Кондиционер
+            для гривы и хвоста Сияющ…» не отличить от соседа. */}
+        <span className="truncate max-sm:whitespace-normal max-sm:font-medium">
+          {row.name}
+        </span>
         <span className="truncate font-mono text-xs text-muted-foreground">
           {[row.code, row.article].filter(Boolean).join(" · ")}
         </span>

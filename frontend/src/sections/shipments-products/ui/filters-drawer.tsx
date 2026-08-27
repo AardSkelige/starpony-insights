@@ -34,7 +34,7 @@ export function FiltersDrawer({
     <Drawer>
       <DrawerTrigger
         render={
-          <Button variant="outline" className="w-full sm:hidden">
+          <Button variant="outline" className="h-10 w-full sm:hidden">
             <SlidersHorizontal data-icon="inline-start" />
             Фильтры
             {activeCount > 0 ? ` · ${activeCount}` : ""}

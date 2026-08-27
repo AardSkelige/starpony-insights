@@ -41,7 +41,7 @@ export function Filters({ value, onChange, onReset, channels, stacked = false }:
 
   return (
     <>
-      <div className={stacked ? "w-full" : "relative w-full sm:w-56"}>
+      <div className={cn("relative w-full", !stacked && "sm:w-56")}>
         <Search
           aria-hidden
           className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
@@ -51,7 +51,7 @@ export function Filters({ value, onChange, onReset, channels, stacked = false }:
           onChange={(event) => onChange({ search: event.target.value })}
           placeholder="Название, артикул или код"
           aria-label="Поиск по товарам"
-          className="pl-8"
+          className={cn("pl-8", stacked && "h-10")}
         />
       </div>
 
@@ -67,7 +67,7 @@ export function Filters({ value, onChange, onReset, channels, stacked = false }:
           aria-label="Канал продаж"
           className={cn(
             "justify-start gap-2 font-normal *:data-[slot=select-value]:flex-1",
-            stacked ? "w-full" : "w-44"
+            stacked ? "h-10 w-full" : "w-44"
           )}
         >
           {/* Подпись собирается сама: `SelectValue` без детей показывает
@@ -103,10 +103,10 @@ export function Filters({ value, onChange, onReset, channels, stacked = false }:
 
       {dirty ? (
         <Button
-          variant="ghost"
+          variant="outline"
           size={stacked ? "default" : "sm"}
           onClick={onReset}
-          className={stacked ? "w-full" : undefined}
+          className={stacked ? "h-10 w-full" : undefined}
         >
           <X data-icon="inline-start" />
           Сбросить
@@ -138,7 +138,7 @@ function PeriodField({
             aria-label="Период"
             className={cn(
               "justify-start gap-2 font-normal",
-              stacked ? "w-full" : "w-44"
+              stacked ? "h-10 w-full" : "w-44"
             )}
           >
             <CalendarDays data-icon="inline-start" className="text-muted-foreground" />

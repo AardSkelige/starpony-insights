@@ -3,6 +3,7 @@ import type {
   ShipmentProductsQuery,
 } from "@/sections/shipments-products/api"
 import { RowDetail } from "@/sections/shipments-products/ui/row-detail"
+import { useScreen } from "@/shared/hooks/use-screen"
 import {
   Drawer,
   DrawerContent,
@@ -28,6 +29,8 @@ export function DetailPanel({
   query: Omit<ShipmentProductsQuery, "page">
   onClose: () => void
 }) {
+  const screen = useScreen()
+
   return (
     <Drawer open={row !== null} onOpenChange={(open: boolean) => !open && onClose()}>
       <DrawerContent>
@@ -39,8 +42,13 @@ export function DetailPanel({
                 {[row.code, row.article].filter(Boolean).join(" · ")}
               </DrawerDescription>
             </DrawerHeader>
-            <div className="overflow-y-auto pb-4">
-              <RowDetail row={row} query={query} repeatRowNumbers />
+            <div className="overflow-y-auto px-4 pb-6">
+              <RowDetail
+                row={row}
+                query={query}
+                repeatRowNumbers
+                tabbed={screen === "phone"}
+              />
             </div>
           </>
         ) : null}

@@ -13,12 +13,22 @@ type Props<Row> = {
 /**
  * Вид таблицы на телефоне: строка на карточку.
  *
- * Таблицу в пять колонок на экране шириной 390 точек читать нечем — она либо
- * уезжает вбок, либо схлопывается в нечитаемые столбцы. Карточка показывает
- * ту же строку сверху вниз: первая колонка заголовком, остальные парами
- * «подпись — значение».
+ * Всё в столбик — подпись слева, значение справа, каждое на своей строке.
+ * Две колонки пар не годятся: «Выручка 231 530,38 ₽» набрана неразрывными
+ * пробелами и не переносится, поэтому распирает ячейку и уезжает за край.
+ *
+ * Название переносится целиком, а не прячется за многоточие: в списке
+ * из шестидесяти шести позиций «Кондиционер для гривы и хвоста Сияющ…»
+ * не отличить от соседа, у которого те же первые сорок знаков.
  */
-export function CardView<Row>({ columns, rows, rowKey, onOpen, totals, muted = false }: Props<Row>) {
+export function CardView<Row>({
+  columns,
+  rows,
+  rowKey,
+  onOpen,
+  totals,
+  muted = false,
+}: Props<Row>) {
   const [title, ...rest] = columns
 
   return (
@@ -29,16 +39,21 @@ export function CardView<Row>({ columns, rows, rowKey, onOpen, totals, muted = f
           type="button"
           onClick={onOpen ? () => onOpen(row) : undefined}
           disabled={!onOpen}
-          className="flex flex-col gap-2 rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none"
+          className="flex flex-col gap-2.5 rounded-xl border bg-card p-3 text-left transition-colors active:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none"
         >
-          <div className="font-medium">{title.render(row)}</div>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+          <div className="min-w-0">{title.render(row)}</div>
+          <dl className="flex flex-col">
             {rest.map((column) => (
-              <div key={column.key} className="flex items-baseline justify-between gap-2">
-                <dt className="text-xs text-muted-foreground">
+              <div
+                key={column.key}
+                className="flex items-baseline justify-between gap-3 border-b py-1.5 text-sm last:border-b-0"
+              >
+                <dt className="min-w-0 text-muted-foreground">
                   {column.cardLabel ?? column.label}
                 </dt>
-                <dd className="text-sm tabular-nums">{column.render(row)}</dd>
+                {/* Число не переносится и не ужимается: подпись слева
+                    уступит место первой, ей есть куда. */}
+                <dd className="shrink-0 tabular-nums">{column.render(row)}</dd>
               </div>
             ))}
           </dl>
@@ -46,18 +61,19 @@ export function CardView<Row>({ columns, rows, rowKey, onOpen, totals, muted = f
       ))}
 
       {totals ? (
-        <div className="flex flex-col gap-2 rounded-lg border bg-muted/40 p-3">
+        <div className="flex flex-col gap-2.5 rounded-xl border bg-muted/40 p-3">
           <div className="text-sm font-medium">{totals.label}</div>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+          <dl className="flex flex-col">
             {rest.map((column) =>
               totals.values[column.key] ? (
-                <div key={column.key} className="flex items-baseline justify-between gap-2">
-                  <dt className="text-xs text-muted-foreground">
+                <div
+                  key={column.key}
+                  className="flex items-baseline justify-between gap-3 border-b py-1.5 text-sm last:border-b-0"
+                >
+                  <dt className="min-w-0 text-muted-foreground">
                     {column.cardLabel ?? column.label}
                   </dt>
-                  <dd className="text-sm tabular-nums">
-                    {totals.values[column.key]}
-                  </dd>
+                  <dd className="shrink-0 tabular-nums">{totals.values[column.key]}</dd>
                 </div>
               ) : null
             )}
