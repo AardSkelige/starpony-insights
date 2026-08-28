@@ -86,6 +86,257 @@ paths:
               schema:
                 $ref: '#/components/schemas/Profile'
           description: ''
+  /api/shipments/materials/:
+    get:
+      operationId: shipment_materials_list
+      description: Сколько сырья ушло вместе с проданной продукцией. Проданное разворачивается
+        по техкартам до того, что закупают.
+      summary: Материалы в отгрузках
+      parameters:
+      - in: query
+        name: channel_id
+        schema:
+          type: integer
+          nullable: true
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -cost
+          - -name
+          - -products
+          - -quantity
+          - -share
+          - cost
+          - name
+          - products
+          - quantity
+          - share
+          type: string
+          default: -cost
+          minLength: 1
+        description: |-
+          * `-cost` - -cost
+          * `-name` - -name
+          * `-products` - -products
+          * `-quantity` - -quantity
+          * `-share` - -share
+          * `cost` - cost
+          * `name` - name
+          * `products` - products
+          * `quantity` - quantity
+          * `share` - share
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShipmentMaterials'
+          description: ''
+  /api/shipments/materials/{material_id}/:
+    get:
+      operationId: shipment_material_detail
+      description: 'Из каких изделий материал пришёл и какими путями по техкартам.
+        Фильтры те же, что у таблицы: слагаемые обязаны сходиться с числом своей строки.'
+      summary: Материал в отгрузках — откуда взялось число
+      parameters:
+      - in: query
+        name: channel_id
+        schema:
+          type: integer
+          nullable: true
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: path
+        name: material_id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -cost
+          - -name
+          - -products
+          - -quantity
+          - -share
+          - cost
+          - name
+          - products
+          - quantity
+          - share
+          type: string
+          default: -cost
+          minLength: 1
+        description: |-
+          * `-cost` - -cost
+          * `-name` - -name
+          * `-products` - -products
+          * `-quantity` - -quantity
+          * `-share` - -share
+          * `cost` - cost
+          * `name` - name
+          * `products` - products
+          * `quantity` - quantity
+          * `share` - share
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShipmentMaterialDetail'
+          description: ''
+        '404':
+          description: No response body
+  /api/shipments/materials/xlsx/:
+    get:
+      operationId: shipment_materials_xlsx
+      description: 'Та же выборка, что на экране, целиком. Вторым листом — проданное
+        без техкарты: в сумму сырья оно не входит.'
+      summary: Материалы в отгрузках — выгрузка в Excel
+      parameters:
+      - in: query
+        name: channel_id
+        schema:
+          type: integer
+          nullable: true
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -cost
+          - -name
+          - -products
+          - -quantity
+          - -share
+          - cost
+          - name
+          - products
+          - quantity
+          - share
+          type: string
+          default: -cost
+          minLength: 1
+        description: |-
+          * `-cost` - -cost
+          * `-name` - -name
+          * `-products` - -products
+          * `-quantity` - -quantity
+          * `-share` - -share
+          * `cost` - cost
+          * `name` - name
+          * `products` - products
+          * `quantity` - quantity
+          * `share` - share
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+          description: ''
   /api/shipments/products/:
     get:
       operationId: shipment_products_list
@@ -465,6 +716,138 @@ components:
       required:
       - password
       - username
+    MaterialHead:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        article:
+          type: string
+        code:
+          type: string
+        uom:
+          type: string
+      required:
+      - article
+      - code
+      - id
+      - name
+      - uom
+    MaterialPath:
+      type: object
+      description: |-
+        Один путь по техкартам и то, сколько материала пришло именно им.
+
+        Количество обязательно: без него путь говорит «через замес и через
+        розлив», но не отвечает, чего сколько, — а объяснение, которое не
+        складывается обратно в объясняемое число, объяснением не является.
+      properties:
+        chain:
+          type: array
+          items:
+            type: string
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+      required:
+      - chain
+      - quantity
+    MaterialPrice:
+      type: object
+      description: |-
+        Откуда взялась цена: документ, дата, поставщик.
+
+        Число, посчитанное по цене, обязано назвать её источник. Иначе колонка
+        «Стоимость» остаётся суммой, за которую никто не отвечает.
+      properties:
+        price_kopecks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+        moment:
+          type: string
+          format: date-time
+        document_number:
+          type: string
+        supplier:
+          type: string
+      required:
+      - document_number
+      - moment
+      - price_kopecks
+      - supplier
+    MaterialRest:
+      type: object
+      description: |-
+        Свёрнутый хвост списка источников.
+
+        Без него показанные слагаемые не складывались бы в число, которое панель
+        объясняет: у воды пятьдесят девять изделий-источников, а видно двадцать.
+      properties:
+        products_count:
+          type: integer
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+      required:
+      - products_count
+      - quantity
+    MaterialSource:
+      type: object
+      description: Изделие, из-за продажи которого материал израсходован.
+      properties:
+        product_id:
+          type: integer
+        name:
+          type: string
+        sold_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        sold_uom:
+          type: string
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+        paths:
+          type: array
+          items:
+            $ref: '#/components/schemas/MaterialPath'
+      required:
+      - name
+      - paths
+      - product_id
+      - quantity
+      - sold_quantity
+      - sold_uom
+    MaterialStock:
+      type: object
+      properties:
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        reserved:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        available:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        stock_days:
+          type: integer
+          nullable: true
+      required:
+      - available
+      - quantity
+      - reserved
+      - stock_days
     Page:
       type: object
       description: Страница в меню. Префиксы API наружу не отдаются — это деталь защиты.
@@ -568,6 +951,196 @@ components:
       required:
       - id
       - name
+    ShipmentMaterialDetail:
+      type: object
+      properties:
+        material:
+          $ref: '#/components/schemas/MaterialHead'
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+        cost_kopecks:
+          type: integer
+          nullable: true
+        price:
+          allOf:
+          - $ref: '#/components/schemas/MaterialPrice'
+          nullable: true
+        stock:
+          allOf:
+          - $ref: '#/components/schemas/MaterialStock'
+          nullable: true
+        sources_count:
+          type: integer
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/MaterialSource'
+        rest:
+          allOf:
+          - $ref: '#/components/schemas/MaterialRest'
+          nullable: true
+      required:
+      - cost_kopecks
+      - material
+      - price
+      - quantity
+      - rest
+      - sources
+      - sources_count
+      - stock
+    ShipmentMaterialRow:
+      type: object
+      properties:
+        material_id:
+          type: integer
+        name:
+          type: string
+        article:
+          type: string
+        code:
+          type: string
+        uom:
+          type: string
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        products_count:
+          type: integer
+        price_kopecks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+          nullable: true
+        price_moment:
+          type: string
+          format: date-time
+          nullable: true
+        cost_kopecks:
+          type: integer
+          nullable: true
+        cost_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+      required:
+      - article
+      - code
+      - cost_kopecks
+      - cost_share
+      - material_id
+      - name
+      - price_kopecks
+      - price_moment
+      - products_count
+      - quantity
+      - uom
+    ShipmentMaterials:
+      type: object
+      properties:
+        synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        count:
+          type: integer
+        totals:
+          $ref: '#/components/schemas/ShipmentMaterialsTotals'
+        coverage:
+          $ref: '#/components/schemas/ShipmentMaterialsCoverage'
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShipmentMaterialRow'
+        without_plan:
+          type: array
+          items:
+            $ref: '#/components/schemas/WithoutPlanRow'
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesChannel'
+      required:
+      - channels
+      - count
+      - coverage
+      - results
+      - synced_at
+      - totals
+      - without_plan
+    ShipmentMaterialsCoverage:
+      type: object
+      description: |-
+        Насколько полное число видит человек — про выборку отгрузок целиком.
+
+        Поиск сюда не входит намеренно: он сужает список материалов, а не то,
+        что отгрузили. Возьми стоимость с учётом поиска, а выручку без —
+        получится дробь, которая выглядит обычным процентом и врёт молча.
+      properties:
+        materials_count:
+          type: integer
+        cost_kopecks:
+          type: integer
+        priced_count:
+          type: integer
+        unpriced_count:
+          type: integer
+        sold_products_count:
+          type: integer
+        exploded_products_count:
+          type: integer
+        without_plan_count:
+          type: integer
+        revenue_kopecks:
+          type: integer
+        documents_count:
+          type: integer
+        cost_share_of_revenue:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,8})?$
+          nullable: true
+      required:
+      - cost_kopecks
+      - cost_share_of_revenue
+      - documents_count
+      - exploded_products_count
+      - materials_count
+      - priced_count
+      - revenue_kopecks
+      - sold_products_count
+      - unpriced_count
+      - without_plan_count
+    ShipmentMaterialsTotals:
+      type: object
+      description: |-
+        Итог под таблицей — про то, что в ней видно, с учётом поиска.
+
+        Обязан сходиться со сложением колонки: файл и экран открывают затем,
+        чтобы складывать, и расхождение заметят раньше нас.
+      properties:
+        materials_count:
+          type: integer
+        cost_kopecks:
+          type: integer
+        cost_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+        priced_count:
+          type: integer
+        unpriced_count:
+          type: integer
+      required:
+      - cost_kopecks
+      - cost_share
+      - materials_count
+      - priced_count
+      - unpriced_count
     ShipmentProductDetail:
       type: object
       properties:
@@ -730,6 +1303,42 @@ components:
       required:
       - running
       - started_at
+    WithoutPlanRow:
+      type: object
+      description: |-
+        Проданное, чего техкарта не описывает: услуги и покупные товары.
+
+        Отдельным списком, а не строкой в таблице: доставка не сырьё, и в сумму
+        материалов она не входит. Спрятать её тоже нельзя — тогда «сырья на
+        399 686 ₽» читалось бы как расход по всей выручке.
+      properties:
+        product_id:
+          type: integer
+        name:
+          type: string
+        article:
+          type: string
+        code:
+          type: string
+        uom:
+          type: string
+        is_service:
+          type: boolean
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        revenue_kopecks:
+          type: integer
+      required:
+      - article
+      - code
+      - is_service
+      - name
+      - product_id
+      - quantity
+      - revenue_kopecks
+      - uom
   securitySchemes:
     cookieAuth:
       type: apiKey

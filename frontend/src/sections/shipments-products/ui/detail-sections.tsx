@@ -3,9 +3,18 @@ import type {
   useProductDetail,
 } from "@/sections/shipments-products/api"
 import { BarList, type Bar } from "@/shared/components/bar-list"
-import { formatMoney, formatQuantity, formatUnitPrice } from "@/shared/lib/format"
-import { Button } from "@/shared/ui/button"
-import { Skeleton } from "@/shared/ui/skeleton"
+import {
+  Fact,
+  Facts,
+  Failed,
+  Loading,
+  Section,
+} from "@/shared/components/detail"
+import {
+  formatMoney,
+  formatQuantity,
+  formatUnitPrice,
+} from "@/shared/lib/format"
 
 /**
  * Блоки деталей строки.
@@ -17,23 +26,37 @@ import { Skeleton } from "@/shared/ui/skeleton"
 type Detail = ReturnType<typeof useProductDetail>
 
 /** Числа самой строки — нужны там, где строка не видна. */
-export function PeriodSection({ row, always = false }: { row: ShipmentProductRow; always?: boolean }) {
+export function PeriodSection({
+  row,
+  always = false,
+}: {
+  row: ShipmentProductRow
+  always?: boolean
+}) {
   const free = Number(row.free_quantity)
 
   return (
     <Section title="За период" bare={always}>
-      <Line label="Продано" value={formatQuantity(row.quantity, row.uom)} />
-      {free > 0 ? (
-        <Line label="в том числе даром" value={formatQuantity(row.free_quantity)} />
-      ) : null}
-      <Line label="Выручка" value={formatMoney(row.revenue_kopecks)} />
-      <Line label="Средняя за штуку" value={formatUnitPrice(row.avg_price_kopecks)} />
-      {free > 0 ? (
-        <Line
-          label="Без учёта бесплатных"
-          value={formatUnitPrice(row.avg_price_paid_kopecks)}
+      <Facts>
+        <Fact label="Продано" value={formatQuantity(row.quantity, row.uom)} />
+        {free > 0 ? (
+          <Fact
+            label="в том числе даром"
+            value={formatQuantity(row.free_quantity)}
+          />
+        ) : null}
+        <Fact label="Выручка" value={formatMoney(row.revenue_kopecks)} />
+        <Fact
+          label="Средняя за штуку"
+          value={formatUnitPrice(row.avg_price_kopecks)}
         />
-      ) : null}
+        {free > 0 ? (
+          <Fact
+            label="Без учёта бесплатных"
+            value={formatUnitPrice(row.avg_price_paid_kopecks)}
+          />
+        ) : null}
+      </Facts>
     </Section>
   )
 }
@@ -44,13 +67,18 @@ export function PriceSection({ row }: { row: ShipmentProductRow }) {
 
   return (
     <Section title="Цена">
-      <Line label="Средняя за штуку" value={formatUnitPrice(row.avg_price_kopecks)} />
-      {free > 0 ? (
-        <Line
-          label="Без учёта бесплатных"
-          value={formatUnitPrice(row.avg_price_paid_kopecks)}
+      <Facts>
+        <Fact
+          label="Средняя за штуку"
+          value={formatUnitPrice(row.avg_price_kopecks)}
         />
-      ) : null}
+        {free > 0 ? (
+          <Fact
+            label="Без учёта бесплатных"
+            value={formatUnitPrice(row.avg_price_paid_kopecks)}
+          />
+        ) : null}
+      </Facts>
     </Section>
   )
 }
@@ -99,7 +127,7 @@ export function ChannelsSection({
 
   return (
     <Section title="По каналам продаж" bare={bare}>
-      {detail.isPending ? <Lines count={4} /> : <BarList bars={bars} />}
+      {detail.isPending ? <Loading count={4} /> : <BarList bars={bars} />}
     </Section>
   )
 }
@@ -120,7 +148,7 @@ export function DocumentsSection({
       {detail.isError ? (
         <Failed onRetry={() => detail.refetch()} />
       ) : detail.isPending ? (
-        <Lines count={3} />
+        <Loading count={3} />
       ) : (
         <div className="flex flex-col">
           {documents.map((document) => (
@@ -156,7 +184,7 @@ export function StockSection({ detail }: { detail: Detail }) {
   if (detail.isPending) {
     return (
       <Section title="Склад">
-        <Lines count={2} />
+        <Loading count={2} />
       </Section>
     )
   }
@@ -169,71 +197,15 @@ export function StockSection({ detail }: { detail: Detail }) {
 
   return (
     <Section title="Склад">
-      <Line label="Остаток" value={formatQuantity(stock.quantity)} />
-      <Line label="В резерве" value={formatQuantity(stock.reserved)} />
-      <Line label="Свободно" value={formatQuantity(stock.available)} />
-      {stock.stock_days !== null ? (
-        <Line label="Без движения" value={`${stock.stock_days} дн.`} />
-      ) : null}
+      <Facts>
+        <Fact label="Остаток" value={formatQuantity(stock.quantity)} />
+        <Fact label="В резерве" value={formatQuantity(stock.reserved)} />
+        <Fact label="Свободно" value={formatQuantity(stock.available)} />
+        {stock.stock_days !== null ? (
+          <Fact label="Без движения" value={`${stock.stock_days} дн.`} />
+        ) : null}
+      </Facts>
     </Section>
-  )
-}
-
-/** Данные не доехали. Кнопка повтора обязательна: иначе тупик. */
-function Failed({ onRetry }: { onRetry: () => void }) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-1.5 text-sm">
-      <span className="text-muted-foreground">Не удалось загрузить</span>
-      <Button variant="outline" size="xs" onClick={onRetry}>
-        Повторить
-      </Button>
-    </div>
-  )
-}
-
-function Section({
-  title,
-  children,
-  bare = false,
-}: {
-  title: string
-  children: React.ReactNode
-  bare?: boolean
-}) {
-  return (
-    <div className="min-w-0">
-      {/* За вкладкой заголовок лишний: его роль играет сама вкладка. */}
-      {bare ? null : (
-        <div className="mb-2 flex items-center gap-2">
-          <span className="text-xs tracking-wide text-muted-foreground uppercase">
-            {title}
-          </span>
-          <span className="h-px flex-1 bg-border" />
-        </div>
-      )}
-      <dl className="flex flex-col">{children}</dl>
-    </div>
-  )
-}
-
-function Line({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 border-b py-1.5 text-sm last:border-b-0">
-      <dt className="min-w-0 text-muted-foreground">{label}</dt>
-      {/* Число не ужимается и не переносится — уступает подпись. */}
-      <dd className="shrink-0 tabular-nums">{value}</dd>
-    </div>
-  )
-}
-
-/** Скелетон повторяет форму содержимого: строки той же высоты. */
-function Lines({ count }: { count: number }) {
-  return (
-    <div className="flex flex-col gap-2 py-1">
-      {Array.from({ length: count }).map((_, index) => (
-        <Skeleton key={index} className="h-4 w-full" />
-      ))}
-    </div>
   )
 }
 

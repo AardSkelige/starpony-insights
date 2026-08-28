@@ -12,4 +12,15 @@ urlpatterns = [
         views.shipment_product_detail,
         name="shipment-product-detail",
     ),
+    path("materials/", views.shipment_materials, name="shipment-materials"),
+    path(
+        "materials/xlsx/",
+        views.shipment_materials_xlsx,
+        name="shipment-materials-xlsx",
+    ),
+    path(
+        "materials/<int:material_id>/",
+        views.shipment_material_detail,
+        name="shipment-material-detail",
+    ),
 ]

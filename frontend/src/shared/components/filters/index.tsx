@@ -2,7 +2,7 @@ import { ru } from "date-fns/locale"
 import { CalendarDays, ChevronDown, Radio, Search, X } from "lucide-react"
 import type { DateRange } from "react-day-picker"
 
-import type { ShipmentProducts } from "@/sections/shipments-products/api"
+import type { SalesChannel } from "@/shared/api/types"
 import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
 import { Calendar } from "@/shared/ui/calendar"
@@ -17,6 +17,14 @@ import {
   SelectValue,
 } from "@/shared/ui/select"
 
+/**
+ * Фильтры выборки: период, канал, поиск.
+ *
+ * Живут в `shared/`, потому что понадобились второй странице — правило
+ * переезда из `CLAUDE.md`. Отличается у страниц только то, что ищут:
+ * у «Товаров» строка таблицы — проданный товар, у «Материалов» — сырьё,
+ * и подсказка в поле поиска обязана говорить, что именно вводить.
+ */
 export type FilterValue = {
   dateFrom: string | null
   dateTo: string | null
@@ -28,14 +36,25 @@ type Props = {
   value: FilterValue
   onChange: (patch: Partial<FilterValue>) => void
   onReset: () => void
-  channels: ShipmentProducts["channels"]
+  channels: SalesChannel[]
+  /** Что ищут на этой странице — подсказка в поле и подпись для чтения с экрана. */
+  searchPlaceholder: string
+  searchLabel: string
   /** В выдвижной панели поля идут в столбец и занимают всю ширину. */
   stacked?: boolean
 }
 
 const ALL_CHANNELS = "all"
 
-export function Filters({ value, onChange, onReset, channels, stacked = false }: Props) {
+export function Filters({
+  value,
+  onChange,
+  onReset,
+  channels,
+  searchPlaceholder,
+  searchLabel,
+  stacked = false,
+}: Props) {
   const dirty =
     Boolean(value.dateFrom || value.dateTo || value.channelId) || value.search !== ""
 
@@ -49,8 +68,8 @@ export function Filters({ value, onChange, onReset, channels, stacked = false }:
         <Input
           value={value.search}
           onChange={(event) => onChange({ search: event.target.value })}
-          placeholder="Название, артикул или код"
-          aria-label="Поиск по товарам"
+          placeholder={searchPlaceholder}
+          aria-label={searchLabel}
           className={cn("pl-8", stacked && "h-10")}
         />
       </div>

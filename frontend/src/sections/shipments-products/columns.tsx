@@ -1,6 +1,9 @@
 import { Explain } from "@/shared/components/explain"
-import type { Column } from "@/shared/components/data-table"
-import type { ShipmentProductRow } from "@/sections/shipments-products/api"
+import type { Column, Totals } from "@/shared/components/data-table"
+import type {
+  ShipmentProductRow,
+  ShipmentProducts,
+} from "@/sections/shipments-products/api"
 import {
   formatMoney,
   formatQuantity,
@@ -109,3 +112,46 @@ export const COLUMNS: Column<ShipmentProductRow>[] = [
     ),
   },
 ]
+
+/**
+ * По чему эта таблица умеет сортировать — выводится из самих колонок.
+ *
+ * Второй список неизбежно разъехался бы с первым: колонку добавляют,
+ * а перечень ключей забывают — и ссылка с новым порядком приходит
+ * к экрану ошибки вместо таблицы.
+ */
+export const SORT_KEYS: readonly string[] = COLUMNS.flatMap((column) =>
+  column.sortKey ? [column.sortKey] : []
+)
+
+
+/**
+ * Итог по всей выборке, а не по видимой странице.
+ *
+ * Живёт рядом с колонками, а не на странице: подвал задаётся **их ключами**,
+ * и опечатка в ключе даёт пустую ячейку молча — таблица не падает, просто
+ * итог не показывается.
+ *
+ * Средней цены в итоге нет намеренно: среднее по разным товарам — число,
+ * которое ничего не значит. Прочерк честнее.
+ */
+export function totalsFor(totals: ShipmentProducts["totals"]): Totals {
+  return {
+    label: `Итого за период · ${totals.products_count} наименований`,
+    values: {
+      quantity: formatQuantity(totals.quantity),
+      free: formatQuantity(totals.free_quantity),
+      revenue: formatMoney(totals.revenue_kopecks),
+      avg: <span className="text-muted-foreground">—</span>,
+      // Не строка «100 %»: когда выручка выборки нулевая, доли строк
+      // приходят пустыми, и подвал заявлял бы сто процентов над колонкой
+      // из прочерков.
+      share:
+        totals.revenue_kopecks > 0 ? (
+          "100 %"
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+  }
+}

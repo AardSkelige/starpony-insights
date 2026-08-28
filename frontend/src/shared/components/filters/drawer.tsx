@@ -1,7 +1,7 @@
 import { SlidersHorizontal } from "lucide-react"
 
-import { Filters, type FilterValue } from "@/sections/shipments-products/ui/filters"
-import type { ShipmentProducts } from "@/sections/shipments-products/api"
+import { Filters, type FilterValue } from "@/shared/components/filters"
+import type { SalesChannel } from "@/shared/api/types"
 import { DRAWER_HANDLE } from "@/shared/components/drawer-handle"
 import { Button } from "@/shared/ui/button"
 import {
@@ -23,12 +23,16 @@ export function FiltersDrawer({
   onChange,
   onReset,
   channels,
+  searchPlaceholder,
+  searchLabel,
   activeCount,
 }: {
   value: FilterValue
   onChange: (patch: Partial<FilterValue>) => void
   onReset: () => void
-  channels: ShipmentProducts["channels"]
+  channels: SalesChannel[]
+  searchPlaceholder: string
+  searchLabel: string
   activeCount: number
 }) {
   return (
@@ -52,6 +56,8 @@ export function FiltersDrawer({
             onChange={onChange}
             onReset={onReset}
             channels={channels}
+            searchPlaceholder={searchPlaceholder}
+            searchLabel={searchLabel}
             stacked
           />
         </div>

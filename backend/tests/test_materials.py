@@ -149,7 +149,8 @@ class TestExplode:
         make_plan("Розлив", final, output=1, materials=[(base, 1)])
 
         needs = explode(final, Decimal("1"))
-        assert needs[0].via == [["Розлив", "Замес основы"]]
+        assert [path.chain for path in needs[0].via] == [("Розлив", "Замес основы")]
+        assert needs[0].via[0].quantity == Decimal("10")
 
     def test_all_paths_are_explained(self, make_product, make_plan):
         """Материал из двух веток объясняет обе.
@@ -166,8 +167,42 @@ class TestExplode:
         need = explode(final, Decimal("1"))[0]
         assert need.quantity == Decimal("150")
         assert len(need.via) == 2, f"объяснён только один путь из двух: {need.via}"
-        assert ["Розлив", "Замес"] in need.via
-        assert ["Розлив"] in need.via
+
+        by_chain = {path.chain: path.quantity for path in need.via}
+        assert by_chain == {("Розлив", "Замес"): Decimal("100"), ("Розлив",): Decimal("50")}
+
+    def test_paths_add_up_to_the_number_they_explain(self, make_product, make_plan):
+        """Слагаемые обязаны складываться в объясняемое число.
+
+        Объяснение, которое не сходится с итогом, хуже отсутствующего:
+        по нему сверяют закупку, и расхождение спишут на итог, а не на путь.
+        """
+        final = make_product("Готовое")
+        base = make_product("Основа")
+        water = make_product("Вода")
+        make_plan("Замес", base, output=3, materials=[(water, "100.5")])
+        make_plan("Розлив", final, output=2, materials=[(base, 1), (water, "7.25")])
+
+        for need in explode(final, Decimal("13")):
+            assert sum(path.quantity for path in need.via) == need.quantity
+
+    def test_material_named_twice_in_one_plan_is_one_path(self, make_product, make_plan):
+        """Материал, названный в составе дважды, — одно объяснение, а не два.
+
+        Иначе в панели два одинаковых пути с разными числами, и человек
+        решает, какому верить.
+        """
+        item = make_product("Изделие")
+        stuff = make_product("Материал")
+        plan = make_plan("Замес", item, output=1, materials=[(stuff, 10)])
+        ProcessingPlanMaterial.objects.create(
+            plan=plan, product=stuff, quantity=Decimal("5")
+        )
+
+        need = explode(item, Decimal("1"))[0]
+        assert need.quantity == Decimal("15")
+        assert len(need.via) == 1, f"путь задвоился: {need.via}"
+        assert need.via[0].quantity == Decimal("15")
 
     def test_circular_plans_raise_instead_of_hanging(self, make_product, make_plan):
         """Круговая ссылка — понятная ошибка, а не зависание.

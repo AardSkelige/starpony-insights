@@ -14,6 +14,7 @@ import { CloudOff } from "lucide-react"
 
 import { AppShell } from "@/app/layout/app-shell"
 import { LoginPage } from "@/sections/login/page"
+import { ShipmentMaterialsPage } from "@/sections/shipments-materials/page"
 import { ShipmentProductsPage } from "@/sections/shipments-products/page"
 import { ApiError } from "@/shared/api/client"
 import { fetchProfile, sessionKeys } from "@/shared/auth/session"
@@ -170,6 +171,7 @@ const router = createBrowserRouter([
           // Путь совпадает с полем `route` в реестре `api/access.py`:
           // второго списка страниц в проекте нет намеренно.
           { path: "shipments/products", element: <ShipmentProductsPage /> },
+          { path: "shipments/materials", element: <ShipmentMaterialsPage /> },
           { path: "*", element: <Placeholder title="Раздел" /> },
         ],
       },

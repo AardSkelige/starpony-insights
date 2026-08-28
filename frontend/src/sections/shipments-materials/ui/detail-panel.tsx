@@ -1,26 +1,24 @@
 import type {
-  ShipmentProductRow,
-  ShipmentProductsQuery,
-} from "@/sections/shipments-products/api"
-import { RowDetail } from "@/sections/shipments-products/ui/row-detail"
+  ShipmentMaterialRow,
+  ShipmentMaterialsQuery,
+} from "@/sections/shipments-materials/api"
+import { RowDetail } from "@/sections/shipments-materials/ui/row-detail"
 import { DetailDrawer } from "@/shared/components/detail-drawer"
 import { useScreen } from "@/shared/hooks/use-screen"
 
 /**
- * Детали строки для узкого экрана и телефона.
+ * Разбор материала для узкого экрана и телефона.
  *
  * Панель выезжает поверх списка, поэтому числа самой строки в ней
  * повторяются: строка закрыта затемнением, свериться с ней нельзя.
- * На широком экране те же детали раскрываются прямо в строке — и там
- * повтор не нужен.
  */
 export function DetailPanel({
   row,
   query,
   onClose,
 }: {
-  row: ShipmentProductRow | null
-  query: Omit<ShipmentProductsQuery, "page">
+  row: ShipmentMaterialRow | null
+  query: Omit<ShipmentMaterialsQuery, "page">
   onClose: () => void
 }) {
   const screen = useScreen()
@@ -29,7 +27,9 @@ export function DetailPanel({
     <DetailDrawer
       open={row !== null}
       title={row?.name ?? ""}
-      subtitle={row ? [row.code, row.article].filter(Boolean).join(" · ") : undefined}
+      subtitle={
+        row ? [row.code, row.article, row.uom].filter(Boolean).join(" · ") : undefined
+      }
       onClose={onClose}
     >
       {row ? (

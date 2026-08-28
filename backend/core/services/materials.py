@@ -28,17 +28,32 @@ class CircularBillOfMaterials(RuntimeError):
     """Техкарты ссылаются друг на друга по кругу."""
 
 
+@dataclass(frozen=True)
+class MaterialPath:
+    """Один путь до материала и то, сколько пришло именно им.
+
+    Количество здесь не для красоты: без него путь говорит «через замес
+    и через розлив», но не отвечает, чего сколько, — а объяснение, которое
+    не складывается обратно в объясняемое число, объяснением не является.
+    """
+
+    # Названия техкарт от изделия к материалу. Кортеж, а не список: путь —
+    # ключ, по которому слагаемые складываются, и меняться он не должен.
+    chain: tuple[str, ...]
+    quantity: Decimal
+
+
 @dataclass
 class MaterialNeed:
     """Сколько одного материала нужно и откуда это следует."""
 
     product: Product
     quantity: Decimal
-    # Пути, по которым пришли к материалу, — список цепочек техкарт.
-    # Именно список: один материал попадает в изделие несколькими путями
-    # (вода входит и в замес, и в розлив), и показать только первый значит
-    # объяснить лишь часть числа.
-    via: list[list[str]] = field(default_factory=list)
+    # Пути, по которым пришли к материалу. Именно список: один материал
+    # попадает в изделие несколькими путями — отдушка входит и в замес основы,
+    # и напрямую при розливе, — и показать только первый значит объяснить
+    # лишь часть числа. Сумма количеств по путям равна `quantity`.
+    via: list[MaterialPath] = field(default_factory=list)
 
 
 def plans_by_product() -> dict[int, ProcessingPlan]:
@@ -55,7 +70,10 @@ def plans_by_product() -> dict[int, ProcessingPlan]:
         ProcessingPlan.objects.alive()
         .filter(archived=False)
         .select_related("product")
-        .prefetch_related("materials__product", "materials__uom")
+        # Единица подтягивается вместе с товаром, а не по запросу на каждый:
+        # без неё страница материалов делала 162 запроса на 161 строку —
+        # не падение, а тихая трата, которую видно только в счётчике.
+        .prefetch_related("materials__product__uom", "materials__uom")
         .order_by("product_id", "-ms_updated")
     )
 
@@ -98,11 +116,10 @@ def explode(
             # Товар ничем не производится — это и есть то, что закупают.
             entry = collected.get(current.pk)
             if entry is None:
-                collected[current.pk] = MaterialNeed(current, needed, [list(trail)])
-            else:
-                entry.quantity += needed
-                if trail and list(trail) not in entry.via:
-                    entry.via.append(list(trail))
+                entry = MaterialNeed(current, Decimal(0))
+                collected[current.pk] = entry
+            entry.quantity += needed
+            _add_path(entry, tuple(trail), needed)
             return
 
         # Расход на единицу продукции: техкарта описывает объём выпуска,
@@ -118,6 +135,20 @@ def explode(
 
     walk(product, quantity, 0, [])
     return sorted(collected.values(), key=lambda need: need.product.name)
+
+
+def _add_path(entry: MaterialNeed, chain: tuple[str, ...], quantity: Decimal) -> None:
+    """Прибавить слагаемое к пути, а не завести второй такой же.
+
+    Один и тот же путь встречается дважды, когда техкарта называет материал
+    в двух строках состава. Хранить их порознь значит показать человеку два
+    одинаковых объяснения вместо одного числа.
+    """
+    for index, path in enumerate(entry.via):
+        if path.chain == chain:
+            entry.via[index] = MaterialPath(chain, path.quantity + quantity)
+            return
+    entry.via.append(MaterialPath(chain, quantity))
 
 
 def direct_materials(
@@ -136,7 +167,7 @@ def direct_materials(
         MaterialNeed(
             material.product,
             material.quantity / plan.output_quantity,
-            [[plan.name]],
+            [MaterialPath((plan.name,), material.quantity / plan.output_quantity)],
         )
         for material in plan.materials.all()
     ]

@@ -74,6 +74,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/shipments/materials/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Материалы в отгрузках
+         * @description Сколько сырья ушло вместе с проданной продукцией. Проданное разворачивается по техкартам до того, что закупают.
+         */
+        get: operations["shipment_materials_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shipments/materials/{material_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Материал в отгрузках — откуда взялось число
+         * @description Из каких изделий материал пришёл и какими путями по техкартам. Фильтры те же, что у таблицы: слагаемые обязаны сходиться с числом своей строки.
+         */
+        get: operations["shipment_material_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shipments/materials/xlsx/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Материалы в отгрузках — выгрузка в Excel
+         * @description Та же выборка, что на экране, целиком. Вторым листом — проданное без техкарты: в сумму сырья оно не входит.
+         */
+        get: operations["shipment_materials_xlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/shipments/products/": {
         parameters: {
             query?: never;
@@ -216,6 +276,70 @@ export interface components {
             username: string;
             password: string;
         };
+        MaterialHead: {
+            id: number;
+            name: string;
+            article: string;
+            code: string;
+            uom: string;
+        };
+        /**
+         * @description Один путь по техкартам и то, сколько материала пришло именно им.
+         *
+         *     Количество обязательно: без него путь говорит «через замес и через
+         *     розлив», но не отвечает, чего сколько, — а объяснение, которое не
+         *     складывается обратно в объясняемое число, объяснением не является.
+         */
+        MaterialPath: {
+            chain: string[];
+            /** Format: decimal */
+            quantity: string;
+        };
+        /**
+         * @description Откуда взялась цена: документ, дата, поставщик.
+         *
+         *     Число, посчитанное по цене, обязано назвать её источник. Иначе колонка
+         *     «Стоимость» остаётся суммой, за которую никто не отвечает.
+         */
+        MaterialPrice: {
+            /** Format: decimal */
+            price_kopecks: string;
+            /** Format: date-time */
+            moment: string;
+            document_number: string;
+            supplier: string;
+        };
+        /**
+         * @description Свёрнутый хвост списка источников.
+         *
+         *     Без него показанные слагаемые не складывались бы в число, которое панель
+         *     объясняет: у воды пятьдесят девять изделий-источников, а видно двадцать.
+         */
+        MaterialRest: {
+            products_count: number;
+            /** Format: decimal */
+            quantity: string;
+        };
+        /** @description Изделие, из-за продажи которого материал израсходован. */
+        MaterialSource: {
+            product_id: number;
+            name: string;
+            /** Format: decimal */
+            sold_quantity: string;
+            sold_uom: string;
+            /** Format: decimal */
+            quantity: string;
+            paths: components["schemas"]["MaterialPath"][];
+        };
+        MaterialStock: {
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            reserved: string;
+            /** Format: decimal */
+            available: string;
+            stock_days: number | null;
+        };
         /** @description Страница в меню. Префиксы API наружу не отдаются — это деталь защиты. */
         Page: {
             key: string;
@@ -255,6 +379,78 @@ export interface components {
         SalesChannel: {
             id: number;
             name: string;
+        };
+        ShipmentMaterialDetail: {
+            material: components["schemas"]["MaterialHead"];
+            /** Format: decimal */
+            quantity: string;
+            cost_kopecks: number | null;
+            price: components["schemas"]["MaterialPrice"] | null;
+            stock: components["schemas"]["MaterialStock"] | null;
+            sources_count: number;
+            sources: components["schemas"]["MaterialSource"][];
+            rest: components["schemas"]["MaterialRest"] | null;
+        };
+        ShipmentMaterialRow: {
+            material_id: number;
+            name: string;
+            article: string;
+            code: string;
+            uom: string;
+            /** Format: decimal */
+            quantity: string;
+            products_count: number;
+            /** Format: decimal */
+            price_kopecks: string | null;
+            /** Format: date-time */
+            price_moment: string | null;
+            cost_kopecks: number | null;
+            /** Format: decimal */
+            cost_share: string | null;
+        };
+        ShipmentMaterials: {
+            /** Format: date-time */
+            synced_at: string | null;
+            count: number;
+            totals: components["schemas"]["ShipmentMaterialsTotals"];
+            coverage: components["schemas"]["ShipmentMaterialsCoverage"];
+            results: components["schemas"]["ShipmentMaterialRow"][];
+            without_plan: components["schemas"]["WithoutPlanRow"][];
+            channels: components["schemas"]["SalesChannel"][];
+        };
+        /**
+         * @description Насколько полное число видит человек — про выборку отгрузок целиком.
+         *
+         *     Поиск сюда не входит намеренно: он сужает список материалов, а не то,
+         *     что отгрузили. Возьми стоимость с учётом поиска, а выручку без —
+         *     получится дробь, которая выглядит обычным процентом и врёт молча.
+         */
+        ShipmentMaterialsCoverage: {
+            materials_count: number;
+            cost_kopecks: number;
+            priced_count: number;
+            unpriced_count: number;
+            sold_products_count: number;
+            exploded_products_count: number;
+            without_plan_count: number;
+            revenue_kopecks: number;
+            documents_count: number;
+            /** Format: decimal */
+            cost_share_of_revenue: string | null;
+        };
+        /**
+         * @description Итог под таблицей — про то, что в ней видно, с учётом поиска.
+         *
+         *     Обязан сходиться со сложением колонки: файл и экран открывают затем,
+         *     чтобы складывать, и расхождение заметят раньше нас.
+         */
+        ShipmentMaterialsTotals: {
+            materials_count: number;
+            cost_kopecks: number;
+            /** Format: decimal */
+            cost_share: string | null;
+            priced_count: number;
+            unpriced_count: number;
         };
         ShipmentProductDetail: {
             channels: components["schemas"]["ChannelShare"][];
@@ -313,6 +509,24 @@ export interface components {
             running: boolean;
             /** Format: date-time */
             started_at: string | null;
+        };
+        /**
+         * @description Проданное, чего техкарта не описывает: услуги и покупные товары.
+         *
+         *     Отдельным списком, а не строкой в таблице: доставка не сырьё, и в сумму
+         *     материалов она не входит. Спрятать её тоже нельзя — тогда «сырья на
+         *     399 686 ₽» читалось бы как расход по всей выручке.
+         */
+        WithoutPlanRow: {
+            product_id: number;
+            name: string;
+            article: string;
+            code: string;
+            uom: string;
+            is_service: boolean;
+            /** Format: decimal */
+            quantity: string;
+            revenue_kopecks: number;
         };
     };
     responses: never;
@@ -416,6 +630,132 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Profile"];
+                };
+            };
+        };
+    };
+    shipment_materials_list: {
+        parameters: {
+            query?: {
+                channel_id?: number | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-cost` - -cost
+                 *     * `-name` - -name
+                 *     * `-products` - -products
+                 *     * `-quantity` - -quantity
+                 *     * `-share` - -share
+                 *     * `cost` - cost
+                 *     * `name` - name
+                 *     * `products` - products
+                 *     * `quantity` - quantity
+                 *     * `share` - share
+                 */
+                ordering?: "-cost" | "-name" | "-products" | "-quantity" | "-share" | "cost" | "name" | "products" | "quantity" | "share";
+                page?: number;
+                page_size?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentMaterials"];
+                };
+            };
+        };
+    };
+    shipment_material_detail: {
+        parameters: {
+            query?: {
+                channel_id?: number | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-cost` - -cost
+                 *     * `-name` - -name
+                 *     * `-products` - -products
+                 *     * `-quantity` - -quantity
+                 *     * `-share` - -share
+                 *     * `cost` - cost
+                 *     * `name` - name
+                 *     * `products` - products
+                 *     * `quantity` - quantity
+                 *     * `share` - share
+                 */
+                ordering?: "-cost" | "-name" | "-products" | "-quantity" | "-share" | "cost" | "name" | "products" | "quantity" | "share";
+                page?: number;
+                page_size?: number;
+                search?: string;
+            };
+            header?: never;
+            path: {
+                material_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentMaterialDetail"];
+                };
+            };
+            /** @description No response body */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    shipment_materials_xlsx: {
+        parameters: {
+            query?: {
+                channel_id?: number | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-cost` - -cost
+                 *     * `-name` - -name
+                 *     * `-products` - -products
+                 *     * `-quantity` - -quantity
+                 *     * `-share` - -share
+                 *     * `cost` - cost
+                 *     * `name` - name
+                 *     * `products` - products
+                 *     * `quantity` - quantity
+                 *     * `share` - share
+                 */
+                ordering?: "-cost" | "-name" | "-products" | "-quantity" | "-share" | "cost" | "name" | "products" | "quantity" | "share";
+                page?: number;
+                page_size?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
                 };
             };
         };

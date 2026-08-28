@@ -1,17 +1,11 @@
-"""Контракт страницы «Товары в отгрузках».
-
-Сериализаторы ответов нужны не для валидации, а для схемы: из неё
-генерируются типы фронтенда, и без них расхождение фронта с бэком
-перестаёт ловиться на сборке.
-
-Деньги уходят целыми копейками, удельные величины — строкой Decimal.
-Рубли и проценты появляются только на экране: перевести их здесь значило бы
-потерять знаки ровно там, где они значат разницу между «сошлось с учётом»
-и «почти сошлось».
-"""
+"""Контракт страницы «Товары в отгрузках»."""
 
 from rest_framework import serializers
 
+from api.shipments.serializers.common import (
+    SalesChannelSerializer,
+    SelectionQuerySerializer,
+)
 from api.shipments.services.products import (
     DEFAULT_ORDERING,
     DEFAULT_PAGE_SIZE,
@@ -20,28 +14,13 @@ from api.shipments.services.products import (
 )
 
 
-class ShipmentProductsQuerySerializer(serializers.Serializer):
-    """Фильтры страницы. Они же живут в адресной строке — ссылку можно переслать."""
-
-    date_from = serializers.DateField(required=False, allow_null=True)
-    date_to = serializers.DateField(required=False, allow_null=True)
-    channel_id = serializers.IntegerField(required=False, allow_null=True)
-    search = serializers.CharField(required=False, allow_blank=True, default="")
+class ShipmentProductsQuerySerializer(SelectionQuerySerializer):
     ordering = serializers.ChoiceField(
         choices=sorted(ORDERING), required=False, default=DEFAULT_ORDERING
     )
-    page = serializers.IntegerField(required=False, min_value=1, default=1)
     page_size = serializers.IntegerField(
         required=False, min_value=1, max_value=MAX_PAGE_SIZE, default=DEFAULT_PAGE_SIZE
     )
-
-    def validate(self, attrs):
-        start, end = attrs.get("date_from"), attrs.get("date_to")
-        if start and end and start > end:
-            raise serializers.ValidationError(
-                {"date_from": "Начало периода позже его конца."}
-            )
-        return attrs
 
 
 class ShipmentProductRowSerializer(serializers.Serializer):
@@ -75,11 +54,6 @@ class ShipmentProductsTotalsSerializer(serializers.Serializer):
     revenue_kopecks = serializers.IntegerField()
     documents_count = serializers.IntegerField()
     products_count = serializers.IntegerField()
-
-
-class SalesChannelSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    name = serializers.CharField()
 
 
 class ChannelShareSerializer(serializers.Serializer):

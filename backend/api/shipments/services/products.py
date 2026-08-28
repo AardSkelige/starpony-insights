@@ -11,8 +11,8 @@
 отображение.
 """
 
-from dataclasses import dataclass, replace
-from datetime import date, datetime, time, timedelta
+from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 
 from django.db.models import (
@@ -26,9 +26,9 @@ from django.db.models import (
     Value,
 )
 from django.db.models.functions import Coalesce, NullIf
-from django.utils import timezone
 
-from core.models import DocumentKind, DocumentPosition
+from api.shipments.services import selection
+from core.models import DocumentPosition
 
 # Имена аннотаций намеренно не совпадают с именами полей. `annotate(quantity=…)`
 # перекрывает поле `quantity`, и следующая же агрегация по нему падает
@@ -128,50 +128,21 @@ def _average_price():
 
 
 def positions(filters: Filters) -> QuerySet[DocumentPosition]:
-    """Позиции отгрузок, попавшие под фильтры.
+    """Позиции отгрузок, попавшие под фильтры страницы.
 
-    Удалённые документы исключаются: строка не удаляется физически, но
-    исчезнувший из учёта документ не должен попадать ни в одну сумму.
+    Отбор по периоду и каналу — общий с «Материалами в отгрузках», поиск
+    свой: здесь строка таблицы это проданный товар, и искать надо его.
     """
-    queryset = DocumentPosition.objects.filter(
-        document__kind=DocumentKind.DEMAND,
-        document__deleted_at__isnull=True,
-        # Только проведённые: черновик отгрузки лежит в той же таблице,
-        # но товар по нему со склада не ушёл и денег не принёс. Сейчас таких
-        # нет ни одного, и именно поэтому фильтр нужен сегодня — когда
-        # появится первый, расхождение с учётом никто не заметит.
-        document__applicable=True,
+    queryset = selection.shipment_positions(
+        date_from=filters.date_from,
+        date_to=filters.date_to,
+        channel_id=filters.channel_id,
     )
 
-    if filters.date_from:
-        queryset = queryset.filter(document__moment__gte=_day_start(filters.date_from))
-    if filters.date_to:
-        queryset = queryset.filter(document__moment__lt=_day_after(filters.date_to))
-    if filters.channel_id:
-        queryset = queryset.filter(document__sales_channel_id=filters.channel_id)
     if filters.search:
-        term = filters.search.strip()
-        queryset = queryset.filter(
-            Q(product__name__icontains=term)
-            | Q(product__article__icontains=term)
-            | Q(product__code__icontains=term)
-        )
+        queryset = queryset.filter(selection.matching(filters.search.strip()))
 
     return queryset
-
-
-def _day_start(day: date) -> datetime:
-    """Начало дня в текущем поясе: граница периода — про календарь, не про UTC."""
-    return timezone.make_aware(datetime.combine(day, time.min))
-
-
-def _day_after(day: date) -> datetime:
-    """Начало следующего дня: верхняя граница строгая, чтобы день вошёл целиком.
-
-    Сравнивать с концом дня нельзя: `moment` хранит секунды, и документ,
-    проведённый в 23:59:59.5, выпал бы из периода без единого признака.
-    """
-    return _day_start(day) + timedelta(days=1)
 
 
 def summary(filters: Filters) -> dict:
@@ -190,30 +161,8 @@ def summary(filters: Filters) -> dict:
 
 
 def channels(filters: Filters) -> list[dict]:
-    """Каналы, встречающиеся в отгрузках периода, — для выпадающего списка.
-
-    Фильтр по каналу при этом снимается намеренно. Оставь мы его — после выбора
-    «Озон» в списке остался бы один «Озон», и переключиться на другой канал
-    было бы нечем, кроме сброса всех фильтров.
-
-    Отдаётся вместе со страницей, а не отдельным справочником: девять значений
-    не стоят своей строки в реестре прав, а «Прибыльность» и «Каналы продаж»
-    возьмут их так же — из своего ответа.
-    """
-    rows = (
-        # Поиск снимается вместе с фильтром канала: иначе набранное слово
-        # может выкинуть выбранный канал из списка, и поле покажет «Канал»,
-        # хотя фильтр по нему всё ещё действует.
-        positions(replace(filters, channel_id=None, search=""))
-        .exclude(document__sales_channel=None)
-        .values("document__sales_channel_id", "document__sales_channel__name")
-        .distinct()
-        .order_by("document__sales_channel__name")
-    )
-    return [
-        {"id": row["document__sales_channel_id"], "name": row["document__sales_channel__name"]}
-        for row in rows
-    ]
+    """Каналы для выпадающего списка. Общий для раздела код — в `selection`."""
+    return selection.channels(date_from=filters.date_from, date_to=filters.date_to)
 
 
 def grouped(filters: Filters) -> QuerySet:
@@ -243,15 +192,17 @@ def page(filters: Filters) -> dict:
     иначе при фильтре по каналу доли строк не сложились бы в сто процентов,
     и число, показанное рядом с ними, перестало бы значить то, что написано.
     """
-    selection = grouped(filters)
+    # Не `selection`: так называется модуль общего отбора, который этот файл
+    # импортирует, — и локальное имя перекрыло бы его внутри функции.
+    chosen = grouped(filters)
     totals = summary(filters)
 
     page_size = max(1, min(filters.page_size, MAX_PAGE_SIZE))
     start = max(0, (filters.page - 1) * page_size)
-    visible = list(selection[start : start + page_size])
+    visible = list(chosen[start : start + page_size])
 
     return {
-        "count": selection.count(),
+        "count": chosen.count(),
         "totals": totals,
         "results": [row_of(item, totals["revenue_kopecks"]) for item in visible],
     }

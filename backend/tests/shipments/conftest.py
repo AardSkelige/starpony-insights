@@ -120,3 +120,70 @@ def make_demand(run, agent):
         )
 
     return _make
+
+
+@pytest.fixture
+def make_plan(run):
+    """Техкарта с составом. Объём выпуска по умолчанию единица."""
+    from core.models import ProcessingPlan, ProcessingPlanMaterial
+
+    counter = {"n": 0}
+
+    def _make(name, product, output=1, materials=()):
+        counter["n"] += 1
+        plan = ProcessingPlan.objects.create(
+            ms_id=f"30000000-0000-0000-0000-{counter['n']:012d}",
+            name=name,
+            product=product,
+            output_quantity=Decimal(str(output)),
+            last_seen_run=run,
+        )
+        for material, quantity in materials:
+            ProcessingPlanMaterial.objects.create(
+                plan=plan, product=material, quantity=Decimal(str(quantity))
+            )
+        return plan
+
+    return _make
+
+
+@pytest.fixture
+def make_supply(run, agent):
+    """Приёмка с одной позицией — источник цены закупки."""
+    counter = {"n": 500}
+
+    def _make(product, price_kopecks, quantity=1, moment=None, supplier=None):
+        counter["n"] += 1
+        document = Document.objects.create(
+            ms_id=f"40000000-0000-0000-0000-{counter['n']:012d}",
+            kind=DocumentKind.SUPPLY,
+            number=f"{counter['n']:05d}",
+            moment=moment or moscow(2026, 5, 1),
+            agent=supplier or agent,
+            last_seen_run=run,
+        )
+        DocumentPosition.objects.create(
+            document=document,
+            product=product,
+            quantity=Decimal(str(quantity)),
+            price_kopecks=Decimal(str(price_kopecks)),
+            total_kopecks=int(Decimal(str(price_kopecks)) * Decimal(str(quantity))),
+        )
+        return document
+
+    return _make
+
+
+@pytest.fixture
+def make_counterparty(run):
+    counter = {"n": 0}
+
+    def _make(name):
+        counter["n"] += 1
+        return Counterparty.objects.create(
+            ms_id=f"50000000-0000-0000-0000-{counter['n']:012d}",
+            name=name,
+            last_seen_run=run,
+        )
+
+    return _make

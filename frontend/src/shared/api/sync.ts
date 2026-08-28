@@ -75,3 +75,42 @@ export function refusalText(error: unknown): string | null {
   }
   return null
 }
+
+/**
+ * Что сказать про последнее нажатие «Обновить».
+ *
+ * Показывать это обязательно: прогон почти всегда заканчивается теми же
+ * числами на экране, и без явного ответа кнопка выглядит сломанной.
+ *
+ * Живёт рядом с самой кнопкой, а не на странице: текст один и тот же
+ * на всех десяти разделах, а разойдись он — человек по формулировке решал бы,
+ * что разделы обновляются по-разному.
+ */
+export function refreshNote(
+  refresh: ReturnType<typeof useRefresh>,
+  running: boolean
+): string | null {
+  // `running` покрывает и чужой прогон, и свой после перезагрузки страницы,
+  // когда состояние мутации уже потеряно.
+  if (refresh.isPending || running) return "идёт обновление из МойСклада…"
+
+  const refusal = refusalText(refresh.error)
+  if (refusal) return refusal
+
+  if (refresh.isError) return "обновить не удалось"
+
+  if (refresh.isSuccess) {
+    const run = refresh.data
+    // Прогон отвечает двухсотым и когда часть сущностей не доехала:
+    // предохранитель мог остановить его после двух справочников из семи.
+    // Сказать «обновлено» в этом случае — соврать ровно там, где человек
+    // решает, доверять ли числам на экране.
+    if (run.status !== "success") {
+      return `${run.status_label.toLowerCase()} — часть данных могла не обновиться`
+    }
+    const seconds = run.duration_seconds
+    return seconds ? `обновлено за ${seconds.toFixed(0)} с` : "обновлено"
+  }
+
+  return null
+}
