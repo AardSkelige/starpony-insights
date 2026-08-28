@@ -3,7 +3,8 @@ import { CalendarDays, ChevronDown, Radio, Search, X } from "lucide-react"
 import type { DateRange } from "react-day-picker"
 
 import type { SalesChannel } from "@/shared/api/types"
-import { formatDayMonth } from "@/shared/lib/format"
+import { formatDate, formatDayMonth } from "@/shared/lib/format"
+import { useScreen, type Screen } from "@/shared/hooks/use-screen"
 import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
 import { Calendar } from "@/shared/ui/calendar"
@@ -25,6 +26,12 @@ import {
  * переезда из `CLAUDE.md`. Отличается у страниц только то, что ищут:
  * у «Товаров» строка таблицы — проданный товар, у «Материалов» — сырьё,
  * и подсказка в поле поиска обязана говорить, что именно вводить.
+ *
+ * **На телефоне поля стоят в столбик прямо на странице, а не в выдвижной
+ * панели.** Панель была ошибкой: чтобы найти позицию, приходилось нажать
+ * «Фильтры», дождаться анимации, ввести запрос и закрыть панель — четыре
+ * действия там, где ожидается одно. Три поля во всю ширину занимают
+ * на 48 точек больше, и это честная плата.
  */
 export type FilterValue = {
   dateFrom: string | null
@@ -41,11 +48,13 @@ type Props = {
   /** Что ищут на этой странице — подсказка в поле и подпись для чтения с экрана. */
   searchPlaceholder: string
   searchLabel: string
-  /** В выдвижной панели поля идут в столбец и занимают всю ширину. */
-  stacked?: boolean
 }
 
 const ALL_CHANNELS = "all"
+
+// Высота поля на телефоне. 40 точек — минимум, под который попадает палец
+// (DESIGN §15); на большом экране поля ниже, там мышь.
+const PHONE_HEIGHT = "max-sm:h-10"
 
 export function Filters({
   value,
@@ -54,14 +63,13 @@ export function Filters({
   channels,
   searchPlaceholder,
   searchLabel,
-  stacked = false,
 }: Props) {
   const dirty =
     Boolean(value.dateFrom || value.dateTo || value.channelId) || value.search !== ""
 
   return (
     <>
-      <div className={cn("relative w-full", !stacked && "sm:w-56")}>
+      <div className="relative w-full sm:w-56">
         <Search
           aria-hidden
           className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
@@ -71,11 +79,11 @@ export function Filters({
           onChange={(event) => onChange({ search: event.target.value })}
           placeholder={searchPlaceholder}
           aria-label={searchLabel}
-          className={cn("pl-8", stacked && "h-10")}
+          className={cn("pl-8", PHONE_HEIGHT)}
         />
       </div>
 
-      <PeriodField value={value} onChange={onChange} stacked={stacked} />
+      <PeriodField value={value} onChange={onChange} />
 
       <Select
         value={value.channelId ? String(value.channelId) : ALL_CHANNELS}
@@ -86,15 +94,13 @@ export function Filters({
         <SelectTrigger
           aria-label="Канал продаж"
           className={cn(
-            "justify-start gap-2 font-normal *:data-[slot=select-value]:flex-1",
+            "w-full justify-start gap-2 font-normal *:data-[slot=select-value]:flex-1 sm:w-44",
             // Высота задаётся тем же вариантом, что и в компоненте, —
             // иначе `h-10` проигрывает по специфичности и поле остаётся
             // ниже соседних.
-            stacked ? "w-full data-[size=default]:h-10" : "w-44"
+            "max-sm:data-[size=default]:h-10"
           )}
         >
-          {/* Подпись собирается сама: `SelectValue` без детей показывает
-              значение — то есть «all» или числовой идентификатор канала. */}
           {/* Иконка слева — чтобы поле выглядело так же, как соседний
               «Период»: два равноправных фильтра, набранные по-разному,
               читаются как разные по важности. */}
@@ -127,9 +133,9 @@ export function Filters({
       {dirty ? (
         <Button
           variant="outline"
-          size={stacked ? "default" : "sm"}
+          size="sm"
           onClick={onReset}
-          className={stacked ? "h-10 w-full" : undefined}
+          className={cn("max-sm:w-full", PHONE_HEIGHT)}
         >
           <X data-icon="inline-start" />
           Сбросить
@@ -142,12 +148,14 @@ export function Filters({
 function PeriodField({
   value,
   onChange,
-  stacked,
 }: {
   value: FilterValue
   onChange: (patch: Partial<FilterValue>) => void
-  stacked: boolean
 }) {
+  // Календарь на телефоне помещается только в один месяц — это про
+  // содержимое, а не про оформление, и классами не задаётся.
+  const screen = useScreen()
+
   const range: DateRange | undefined = value.dateFrom
     ? { from: parseDay(value.dateFrom), to: value.dateTo ? parseDay(value.dateTo) : undefined }
     : undefined
@@ -159,13 +167,10 @@ function PeriodField({
           <Button
             variant="outline"
             aria-label="Период"
-            className={cn(
-              "justify-start gap-2 font-normal",
-              stacked ? "h-10 w-full" : "w-44"
-            )}
+            className={cn("w-full justify-start gap-2 font-normal sm:w-44", PHONE_HEIGHT)}
           >
             <CalendarDays data-icon="inline-start" className="text-muted-foreground" />
-            <span className="flex-1 text-left">{label(value)}</span>
+            <span className="flex-1 truncate text-left">{label(value, screen)}</span>
             <ChevronDown className="text-muted-foreground" />
           </Button>
         }
@@ -176,7 +181,7 @@ function PeriodField({
           locale={ru}
           selected={range}
           defaultMonth={range?.from}
-          numberOfMonths={stacked ? 1 : 2}
+          numberOfMonths={screen === "phone" ? 1 : 2}
           onSelect={(next: DateRange | undefined) =>
             onChange({
               dateFrom: next?.from ? toDay(next.from) : null,
@@ -189,10 +194,19 @@ function PeriodField({
   )
 }
 
-function label(value: FilterValue): string {
+/**
+ * Подпись периода. На телефоне — с годом, на большом экране — без него.
+ *
+ * Это не описка: на телефоне поле занимает всю ширину, год помещается
+ * и снимает вопрос «апрель какого года». В ряду фильтров на большом экране
+ * поле узкое, а год виден в календаре по нажатию.
+ */
+function label(value: FilterValue, screen: Screen): string {
   if (!value.dateFrom && !value.dateTo) return "Период"
-  const from = value.dateFrom ? formatDayMonth(value.dateFrom) : "…"
-  const to = value.dateTo ? formatDayMonth(value.dateTo) : "…"
+
+  const format = screen === "phone" ? formatDate : formatDayMonth
+  const from = value.dateFrom ? format(value.dateFrom) : "…"
+  const to = value.dateTo ? format(value.dateTo) : "…"
   return `${from} — ${to}`
 }
 

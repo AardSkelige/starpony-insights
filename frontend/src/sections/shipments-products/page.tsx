@@ -62,7 +62,6 @@ export function ShipmentProductsPage() {
         channels={data?.channels ?? []}
         searchPlaceholder="Название, артикул или код"
         searchLabel="Поиск по товарам"
-        activeCount={table.activeCount}
       />
 
       <DataTable

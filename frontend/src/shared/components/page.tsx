@@ -12,13 +12,19 @@ export function Page({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Ряд фильтров.
+ * Фильтры страницы.
  *
- * На телефоне фильтры переезжают в выдвижную панель — здесь их просто нет,
- * поэтому ряд скрыт целиком, а не пытается ужаться в две строки.
+ * На телефоне — столбиком во всю ширину, прямо на странице. Раньше они
+ * прятались в выдвижную панель по кнопке «Фильтры», и это оказалось ошибкой:
+ * чтобы найти позицию, приходилось нажать кнопку, дождаться панели, ввести
+ * запрос и закрыть её — четыре действия там, где ожидается одно.
+ *
+ * На узком и широком экранах — ряд, как было.
  */
 export function Toolbar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="hidden flex-wrap items-center gap-2 sm:flex">{children}</div>
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      {children}
+    </div>
   )
 }

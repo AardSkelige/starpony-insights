@@ -68,7 +68,6 @@ export function ShipmentMaterialsPage() {
         channels={data?.channels ?? []}
         searchPlaceholder={SEARCH_PLACEHOLDER}
         searchLabel={SEARCH_LABEL}
-        activeCount={table.activeCount}
       />
 
       <DataTable

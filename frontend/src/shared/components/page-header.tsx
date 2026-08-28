@@ -42,10 +42,9 @@ export function PageHeader({
   exporting = false,
 }: Props) {
   return (
-    // На телефоне всё в столбик: название целиком, отметка свежести под ним,
-    // кнопки в ряд во всю ширину. Раньше название ужималось до «Товары в отгр…»
-    // ради двух кнопок, которые всё равно не помещались рядом с ним.
-    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:gap-x-4">
+    // На телефоне кнопки сжаты до иконок и стоят рядом с названием: нажимают
+    // их заметно реже, чем ищут, а всю ширину они занимали как раз у поиска.
+    <div className="flex flex-wrap items-start gap-3 sm:gap-x-4">
       <div className="min-w-0 flex-1">
         <h1 className="text-xl font-semibold tracking-tight sm:truncate">{title}</h1>
         {subtitle ? (
@@ -56,7 +55,7 @@ export function PageHeader({
         </p>
       </div>
 
-      <div className="flex items-center gap-2 max-sm:*:flex-1">
+      <div className="flex items-center gap-2">
         <span className="hidden text-xs text-muted-foreground sm:inline">
           {refreshNote ?? formatSyncedAt(syncedAt)}
         </span>
@@ -70,10 +69,14 @@ export function PageHeader({
                   size="sm"
                   onClick={onExport}
                   disabled={exporting}
-                  className="max-sm:h-10 max-sm:w-full max-sm:justify-center"
+                  // На телефоне — квадрат 40×40 без подписи: под палец
+                  // попадает так же, а места занимает вчетверо меньше.
+                  className="max-sm:size-10 max-sm:px-0"
                 >
                   {exporting ? <Spinner data-icon="inline-start" /> : <Download data-icon="inline-start" />}
-                  Экспорт
+                  {/* Подпись не удаляется, а прячется: экранному диктору
+                      она нужна, а `aria-label` дублировал бы её третьей копией. */}
+                  <span className="max-sm:sr-only">Экспорт</span>
                 </Button>
               }
             />
@@ -93,10 +96,12 @@ export function PageHeader({
                   size="sm"
                   onClick={onRefresh}
                   disabled={refreshing}
-                  className="max-sm:h-10 max-sm:w-full max-sm:justify-center"
+                  className="max-sm:size-10 max-sm:px-0"
                 >
                   {refreshing ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}
-                  {refreshing ? "Обновляем…" : "Обновить"}
+                  <span className="max-sm:sr-only">
+                    {refreshing ? "Обновляем…" : "Обновить"}
+                  </span>
                 </Button>
               }
             />
