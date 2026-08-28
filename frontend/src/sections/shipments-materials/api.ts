@@ -2,50 +2,30 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 
 import { api } from "@/shared/api/client"
 import type { components } from "@/shared/api/schema"
+import {
+  withQuery,
+  withSelection,
+  type TableQuery,
+  type TableSelection,
+} from "@/shared/api/table-query"
 
 export type ShipmentMaterials = components["schemas"]["ShipmentMaterials"]
 export type ShipmentMaterialRow = components["schemas"]["ShipmentMaterialRow"]
 export type ShipmentMaterialDetail = components["schemas"]["ShipmentMaterialDetail"]
 export type WithoutPlanRow = components["schemas"]["WithoutPlanRow"]
 
-/** Что человек выбрал в фильтрах. Всё это живёт в адресной строке. */
-export type ShipmentMaterialsQuery = {
-  dateFrom: string | null
-  dateTo: string | null
-  channelId: number | null
-  search: string
-  page: number
-  ordering?: string
-  pageSize?: number
-}
+const PATH = "/api/shipments/materials/"
 
-export const shipmentMaterialsKeys = {
-  list: (query: ShipmentMaterialsQuery) => ["shipments", "materials", query] as const,
-  detail: (id: number, query: Omit<ShipmentMaterialsQuery, "page">) =>
+const shipmentMaterialsKeys = {
+  list: (query: TableQuery) => ["shipments", "materials", query] as const,
+  detail: (id: number, query: TableSelection) =>
     ["shipments", "materials", id, query] as const,
 }
 
-function toParams(query: ShipmentMaterialsQuery): string {
-  const params = new URLSearchParams()
-  if (query.dateFrom) params.set("date_from", query.dateFrom)
-  if (query.dateTo) params.set("date_to", query.dateTo)
-  if (query.channelId) params.set("channel_id", String(query.channelId))
-  if (query.search) params.set("search", query.search)
-  if (query.page > 1) params.set("page", String(query.page))
-  if (query.ordering) params.set("ordering", query.ordering)
-  if (query.pageSize) params.set("page_size", String(query.pageSize))
-  return params.toString()
-}
-
-export function useShipmentMaterials(query: ShipmentMaterialsQuery) {
+export function useShipmentMaterials(query: TableQuery) {
   return useQuery({
     queryKey: shipmentMaterialsKeys.list(query),
-    queryFn: () => {
-      const params = toParams(query)
-      return api.get<ShipmentMaterials>(
-        `/api/shipments/materials/${params ? `?${params}` : ""}`
-      )
-    },
+    queryFn: () => api.get<ShipmentMaterials>(withQuery(PATH, query)),
     // Смена фильтра не должна опустошать экран: старые строки остаются
     // и приглушаются, пока едут новые.
     placeholderData: keepPreviousData,
@@ -58,18 +38,11 @@ export function useShipmentMaterials(query: ShipmentMaterialsQuery) {
  * У воды пятьдесят девять изделий-источников, и на сто шестьдесят одну строку
  * это девять тысяч лишних строк в ответе, из которых человек посмотрит одну.
  */
-export function useMaterialDetail(
-  materialId: number | null,
-  query: Omit<ShipmentMaterialsQuery, "page">
-) {
+export function useMaterialDetail(materialId: number | null, query: TableSelection) {
   return useQuery({
     queryKey: shipmentMaterialsKeys.detail(materialId ?? 0, query),
-    queryFn: () => {
-      const params = toParams({ ...query, page: 1 })
-      return api.get<ShipmentMaterialDetail>(
-        `/api/shipments/materials/${materialId}/${params ? `?${params}` : ""}`
-      )
-    },
+    queryFn: () =>
+      api.get<ShipmentMaterialDetail>(withSelection(`${PATH}${materialId}/`, query)),
     enabled: materialId !== null,
   })
 }
@@ -81,7 +54,6 @@ export function useMaterialDetail(
  * прогресс и папка «Загрузки» — всё, что пришлось бы писать самим,
  * складывая ответ в Blob.
  */
-export function exportUrl(query: Omit<ShipmentMaterialsQuery, "page">): string {
-  const params = toParams({ ...query, page: 1 })
-  return `/api/shipments/materials/xlsx/${params ? `?${params}` : ""}`
+export function exportUrl(query: TableSelection): string {
+  return withSelection(`${PATH}xlsx/`, query)
 }

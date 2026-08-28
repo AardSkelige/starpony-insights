@@ -4,8 +4,12 @@ import type {
 } from "@/sections/shipments-materials/api"
 import { ExplainTree } from "@/sections/shipments-materials/ui/explain-tree"
 import { Fact, Facts, Failed, Loading, Section } from "@/shared/components/detail"
-import { formatMoney, formatQuantity, formatUnitPrice } from "@/shared/lib/format"
-import { withPlural } from "@/shared/lib/plural"
+import {
+  formatDate,
+  formatMoney,
+  formatQuantity,
+  formatUnitPrice,
+} from "@/shared/lib/format"
 
 /**
  * Блоки разбора материала.
@@ -142,7 +146,7 @@ export function PriceSection({
           value={`${formatUnitPrice(price.price_kopecks)}${row.uom ? ` / ${row.uom}` : ""}`}
         />
         <Fact label="Документ" value={`Приёмка №${price.document_number}`} />
-        <Fact label="Дата" value={fullDate(price.moment)} />
+        <Fact label="Дата" value={formatDate(price.moment)} />
         <Fact label="Поставщик" value={price.supplier} />
         {cost !== null && cost !== undefined ? (
           <Fact label="Стоимость израсходованного" value={formatMoney(cost)} />
@@ -150,78 +154,4 @@ export function PriceSection({
       </Facts>
     </Section>
   )
-}
-
-export function StockSection({
-  detail,
-  uom,
-  bare = false,
-}: {
-  detail: Detail
-  uom: string
-  bare?: boolean
-}) {
-  // Та же ловушка: «остатка нет в отчёте» — утверждение об учёте,
-  // а не о нашей неудаче его прочитать.
-  if (detail.isError) {
-    return (
-      <Section title="Склад" bare={bare}>
-        <Failed onRetry={() => detail.refetch()} />
-      </Section>
-    )
-  }
-
-  if (detail.isPending) {
-    return (
-      <Section title="Склад" bare={bare}>
-        <Loading count={2} />
-      </Section>
-    )
-  }
-
-  const stock = detail.data?.stock
-
-  if (!stock) {
-    // Остаток известен по 125 материалам из 161. Молчать нельзя: за вкладкой
-    // пустота читается как поломка, а не как «в отчёте его нет».
-    if (!bare) return null
-    return (
-      <Section title="Склад" bare>
-        <p className="py-1.5 text-sm text-muted-foreground">
-          Остатка по этому материалу в отчёте МойСклада нет.
-        </p>
-      </Section>
-    )
-  }
-
-  return (
-    <Section title="Склад" bare={bare}>
-      <Facts>
-        <Fact label="Остаток" value={formatQuantity(stock.quantity, uom)} />
-        <Fact label="В резерве" value={formatQuantity(stock.reserved)} />
-        <Fact label="Свободно" value={formatQuantity(stock.available)} />
-        {stock.stock_days !== null ? (
-          <Fact
-            label="Без движения"
-            value={withPlural(stock.stock_days, "день", "дня", "дней")}
-          />
-        ) : null}
-      </Facts>
-    </Section>
-  )
-}
-
-/**
- * Дата документа целиком, а не «17.08».
- *
- * Цена могла быть зафиксирована в прошлом году, и «17.08» не отличить
- * от «17.08 этого года» — а от этого зависит, верить ли числу.
- */
-function fullDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "Europe/Moscow",
-  })
 }

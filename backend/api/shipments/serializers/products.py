@@ -5,21 +5,14 @@ from rest_framework import serializers
 from api.shipments.serializers.common import (
     SalesChannelSerializer,
     SelectionQuerySerializer,
+    StockSerializer,
 )
-from api.shipments.services.products import (
-    DEFAULT_ORDERING,
-    DEFAULT_PAGE_SIZE,
-    MAX_PAGE_SIZE,
-    ORDERING,
-)
+from api.shipments.services.products import DEFAULT_ORDERING, ORDERING
 
 
 class ShipmentProductsQuerySerializer(SelectionQuerySerializer):
     ordering = serializers.ChoiceField(
         choices=sorted(ORDERING), required=False, default=DEFAULT_ORDERING
-    )
-    page_size = serializers.IntegerField(
-        required=False, min_value=1, max_value=MAX_PAGE_SIZE, default=DEFAULT_PAGE_SIZE
     )
 
 
@@ -73,19 +66,12 @@ class ProductDocumentSerializer(serializers.Serializer):
     total_kopecks = serializers.IntegerField()
 
 
-class ProductStockSerializer(serializers.Serializer):
-    quantity = serializers.DecimalField(max_digits=18, decimal_places=3)
-    reserved = serializers.DecimalField(max_digits=18, decimal_places=3)
-    available = serializers.DecimalField(max_digits=18, decimal_places=3)
-    stock_days = serializers.IntegerField(allow_null=True)
-
-
 class ShipmentProductDetailSerializer(serializers.Serializer):
     channels = ChannelShareSerializer(many=True)
     documents = ProductDocumentSerializer(many=True)
     # Остаток известен не по всем товарам: в отчёте МойСклада его может
     # не быть вовсе. `null` честнее нуля, который читается как «кончился».
-    stock = ProductStockSerializer(allow_null=True)
+    stock = StockSerializer(allow_null=True)
 
 
 class ShipmentProductsSerializer(serializers.Serializer):

@@ -8,6 +8,7 @@
 from api.shipments.serializers.common import (
     SalesChannelSerializer,
     SelectionQuerySerializer,
+    StockSerializer,
 )
 from api.shipments.serializers.materials import (
     ShipmentMaterialDetailSerializer,
@@ -23,6 +24,7 @@ from api.shipments.serializers.products import (
 __all__ = [
     "SalesChannelSerializer",
     "SelectionQuerySerializer",
+    "StockSerializer",
     "ShipmentMaterialDetailSerializer",
     "ShipmentMaterialsQuerySerializer",
     "ShipmentMaterialsSerializer",

@@ -150,7 +150,7 @@ paths:
           type: integer
           maximum: 200
           minimum: 1
-          default: 50
+          default: 10
       - in: query
         name: search
         schema:
@@ -236,7 +236,7 @@ paths:
           type: integer
           maximum: 200
           minimum: 1
-          default: 50
+          default: 10
       - in: query
         name: search
         schema:
@@ -319,7 +319,7 @@ paths:
           type: integer
           maximum: 200
           minimum: 1
-          default: 50
+          default: 10
       - in: query
         name: search
         schema:
@@ -404,7 +404,7 @@ paths:
           type: integer
           maximum: 200
           minimum: 1
-          default: 50
+          default: 10
       - in: query
         name: search
         schema:
@@ -489,7 +489,7 @@ paths:
           type: integer
           maximum: 200
           minimum: 1
-          default: 50
+          default: 10
       - in: path
         name: product_id
         schema:
@@ -580,7 +580,7 @@ paths:
           type: integer
           maximum: 200
           minimum: 1
-          default: 50
+          default: 10
       - in: query
         name: search
         schema:
@@ -825,29 +825,6 @@ components:
       - quantity
       - sold_quantity
       - sold_uom
-    MaterialStock:
-      type: object
-      properties:
-        quantity:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
-        reserved:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
-        available:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
-        stock_days:
-          type: integer
-          nullable: true
-      required:
-      - available
-      - quantity
-      - reserved
-      - stock_days
     Page:
       type: object
       description: Страница в меню. Префиксы API наружу не отдаются — это деталь защиты.
@@ -887,29 +864,6 @@ components:
       - number
       - quantity
       - total_kopecks
-    ProductStock:
-      type: object
-      properties:
-        quantity:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
-        reserved:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
-        available:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
-        stock_days:
-          type: integer
-          nullable: true
-      required:
-      - available
-      - quantity
-      - reserved
-      - stock_days
     Profile:
       type: object
       properties:
@@ -969,7 +923,7 @@ components:
           nullable: true
         stock:
           allOf:
-          - $ref: '#/components/schemas/MaterialStock'
+          - $ref: '#/components/schemas/Stock'
           nullable: true
         sources_count:
           type: integer
@@ -1154,7 +1108,7 @@ components:
             $ref: '#/components/schemas/ProductDocument'
         stock:
           allOf:
-          - $ref: '#/components/schemas/ProductStock'
+          - $ref: '#/components/schemas/Stock'
           nullable: true
       required:
       - channels
@@ -1261,6 +1215,36 @@ components:
       - products_count
       - quantity
       - revenue_kopecks
+    Stock:
+      type: object
+      description: |-
+        Что лежит на складе сейчас — одинаково для товара и для материала.
+
+        Один сериализатор, а не два одинаковых: из схемы генерируются типы
+        фронтенда, и два близнеца дают два типа, под которые пишутся два
+        компонента. Так и вышло — блок «Склад» разошёлся между страницами
+        и на одной из них перестал отличать сбой связи от «остатка нет».
+      properties:
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        reserved:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        available:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        stock_days:
+          type: integer
+          nullable: true
+      required:
+      - available
+      - quantity
+      - reserved
+      - stock_days
     SyncRun:
       type: object
       properties:

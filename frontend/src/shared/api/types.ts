@@ -11,3 +11,6 @@ import type { components } from "@/shared/api/schema"
 
 /** Канал продаж в выпадающем списке фильтров. */
 export type SalesChannel = components["schemas"]["SalesChannel"]
+
+/** Остаток на складе. Один тип на все разделы — так же, как на сервере. */
+export type Stock = components["schemas"]["Stock"]

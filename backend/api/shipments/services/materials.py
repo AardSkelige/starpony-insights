@@ -13,11 +13,11 @@
 """
 
 from dataclasses import dataclass
-from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
-from api.shipments.services import consumption
+from api.shipments.services import consumption, selection
 from api.shipments.services.consumption import Consumed
+from core.money import share
 from core.services.purchase_prices import PurchasePrice, last_purchase_prices
 
 # Сортировки, разрешённые снаружи. Список закрытый — как у соседней страницы.
@@ -31,15 +31,12 @@ ORDERING = (
 )
 DEFAULT_ORDERING = "-cost"
 
-MAX_PAGE_SIZE = 200
-DEFAULT_PAGE_SIZE = 50
-
 _KOPECK = Decimal("1")
 
 
 @dataclass(frozen=True)
-class Filters:
-    """Что человек выбрал в панели фильтров.
+class Filters(selection.Filters):
+    """Фильтры страницы. Общее — в `selection.Filters`, своё — порядок строк.
 
     Период и канал отбирают отгрузки, поиск — материалы. Это разные вещи,
     и поиск поэтому применяется после разворачивания: строка таблицы здесь —
@@ -47,13 +44,7 @@ class Filters:
     её не продают.
     """
 
-    date_from: date | None = None
-    date_to: date | None = None
-    channel_id: int | None = None
-    search: str = ""
     ordering: str = DEFAULT_ORDERING
-    page: int = 1
-    page_size: int = DEFAULT_PAGE_SIZE
 
 
 def rows_of(materials: list[Consumed], prices: dict[int, PurchasePrice]) -> list[dict]:
@@ -166,7 +157,7 @@ def prepared(filters: Filters) -> dict:
     # восемь процентов.
     selection_cost = _sum_cost(everything)
     for row in everything:
-        row["cost_share"] = _share(row["cost_kopecks"], selection_cost)
+        row["cost_share"] = share(row["cost_kopecks"], selection_cost)
 
     rows = everything
     if filters.search:
@@ -193,14 +184,13 @@ def page(filters: Filters) -> dict:
     whole = prepared(filters)
     rows = whole["rows"]
 
-    page_size = max(1, min(filters.page_size, MAX_PAGE_SIZE))
-    start = max(0, (filters.page - 1) * page_size)
+    start, end = selection.page_bounds(filters.page, filters.page_size)
 
     return {
         "count": len(rows),
         "totals": whole["totals"],
         "coverage": whole["coverage"],
-        "results": rows[start : start + page_size],
+        "results": rows[start:end],
         "without_plan": whole["without_plan"],
     }
 
@@ -222,7 +212,7 @@ def _table_totals(rows: list[dict], selection_cost: int) -> dict:
     return {
         "materials_count": len(rows),
         "cost_kopecks": cost,
-        "cost_share": _share(cost, selection_cost),
+        "cost_share": share(cost, selection_cost),
         "priced_count": len(priced),
         "unpriced_count": len(rows) - len(priced),
     }
@@ -251,12 +241,5 @@ def _coverage(
         # Может быть больше единицы, и это не ошибка: 6 июля 2026 выручка
         # 7,13 ₽ против сырья на 290,91 ₽ — товар отгружали за 0 ₽, а сырьё
         # на него потрачено. Поле обязано вместить такое число, а не упасть.
-        "cost_share_of_revenue": _share(selection_cost, result.revenue_kopecks),
+        "cost_share_of_revenue": share(selection_cost, result.revenue_kopecks),
     }
-
-
-def _share(part: int | None, whole: int) -> Decimal | None:
-    """Доля, долей единицы. None — делить не на что."""
-    if part is None or whole <= 0:
-        return None
-    return Decimal(part) / Decimal(whole)

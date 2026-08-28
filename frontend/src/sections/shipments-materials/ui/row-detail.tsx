@@ -1,19 +1,23 @@
 import {
   useMaterialDetail,
   type ShipmentMaterialRow,
-  type ShipmentMaterialsQuery,
 } from "@/sections/shipments-materials/api"
 import {
   BreakdownSection,
   PriceSection,
-  StockSection,
   TotalsSection,
 } from "@/sections/shipments-materials/ui/detail-sections"
+import type { TableSelection } from "@/shared/api/table-query"
+import { StockSection } from "@/shared/components/detail/stock"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
+
+// Остаток известен по 125 материалам из 161. За вкладкой пустота читается
+// как поломка, поэтому отсутствие остатка говорится словами.
+const NO_STOCK = "Остатка по этому материалу в отчёте МойСклада нет."
 
 type Props = {
   row: ShipmentMaterialRow
-  query: Omit<ShipmentMaterialsQuery, "page">
+  query: TableSelection
   /** В выдвижной панели строка закрыта затемнением — её числа надо повторить. */
   repeatRowNumbers?: boolean
   /**
@@ -55,7 +59,7 @@ export function RowDetail({
         </TabsContent>
 
         <TabsContent value="stock">
-          <StockSection detail={detail} uom={row.uom} bare />
+          <StockSection detail={detail} uom={row.uom} bare emptyNote={NO_STOCK} />
         </TabsContent>
       </Tabs>
     )

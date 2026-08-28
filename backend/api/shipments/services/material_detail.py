@@ -14,8 +14,9 @@ from decimal import Decimal
 
 from api.shipments.services import consumption
 from api.shipments.services.materials import Filters, cost_of
-from core.models import Product, Stock
+from core.models import Product
 from core.services.materials import explode, plans_by_product
+from core.services.stock import stock_of
 from core.services.purchase_prices import last_purchase_prices
 
 # Сколько изделий показать. У воды их пятьдесят девять, и панель с таким
@@ -106,7 +107,7 @@ def detail(filters: Filters, material_id: int) -> dict:
             if price
             else None
         ),
-        "stock": _stock(material_id),
+        "stock": stock_of(material_id),
         "sources_count": len(sources),
         "sources": shown,
         "rest": (
@@ -117,22 +118,4 @@ def detail(filters: Filters, material_id: int) -> dict:
             if hidden
             else None
         ),
-    }
-
-
-def _stock(material_id: int) -> dict | None:
-    """Что на складе сейчас — без учёта фильтров.
-
-    Остаток это «сегодня», а не «за апрель»: он отвечает на вопрос
-    «хватит ли на следующую партию», который к периоду отношения не имеет.
-    Есть не у всех: у ста двадцати пяти материалов из ста шестидесяти одного.
-    """
-    row = Stock.objects.filter(product_id=material_id).first()
-    if row is None:
-        return None
-    return {
-        "quantity": row.quantity,
-        "reserved": row.reserved,
-        "available": row.available,
-        "stock_days": row.stock_days,
     }

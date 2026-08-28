@@ -12,7 +12,6 @@
 """
 
 from dataclasses import dataclass
-from datetime import date
 from decimal import Decimal
 
 from django.db.models import (
@@ -29,6 +28,7 @@ from django.db.models.functions import Coalesce, NullIf
 
 from api.shipments.services import selection
 from core.models import DocumentPosition
+from core.money import share
 
 # Имена аннотаций намеренно не совпадают с именами полей. `annotate(quantity=…)`
 # перекрывает поле `quantity`, и следующая же агрегация по нему падает
@@ -74,23 +74,14 @@ DEFAULT_ORDERING = "-revenue"
 # нельзя, а инвариант «порядок определён полностью» — можно.
 TIE_BREAKER = "product_id"
 
-MAX_PAGE_SIZE = 200
-DEFAULT_PAGE_SIZE = 50
-
 _QUANTITY = DecimalField(max_digits=18, decimal_places=3)
 
 
 @dataclass(frozen=True)
-class Filters:
-    """Что человек выбрал в панели фильтров."""
+class Filters(selection.Filters):
+    """Фильтры страницы. Общее — в `selection.Filters`, своё — порядок строк."""
 
-    date_from: date | None = None
-    date_to: date | None = None
-    channel_id: int | None = None
-    search: str = ""
     ordering: str = DEFAULT_ORDERING
-    page: int = 1
-    page_size: int = DEFAULT_PAGE_SIZE
 
 
 def _sums() -> dict:
@@ -197,9 +188,8 @@ def page(filters: Filters) -> dict:
     chosen = grouped(filters)
     totals = summary(filters)
 
-    page_size = max(1, min(filters.page_size, MAX_PAGE_SIZE))
-    start = max(0, (filters.page - 1) * page_size)
-    visible = list(chosen[start : start + page_size])
+    start, end = selection.page_bounds(filters.page, filters.page_size)
+    visible = list(chosen[start:end])
 
     return {
         "count": chosen.count(),
@@ -234,15 +224,11 @@ def row_of(item: dict, total_revenue: int) -> dict:
         # как «товар отдавали бесплатно», а на деле цены просто нет.
         "avg_price_kopecks": _divide(revenue, quantity),
         "avg_price_paid_kopecks": _divide(revenue, quantity - free),
-        "revenue_share": _share(revenue, total_revenue),
+        # Доля от выручки **этой же выборки**: при фильтре по каналу доли
+        # строк обязаны складываться в сто процентов, иначе число рядом
+        # с ними перестаёт значить то, что написано.
+        "revenue_share": share(revenue, total_revenue),
     }
-
-
-def _share(revenue: int, total_revenue: int) -> Decimal | None:
-    """Доля позиции в выручке выборки, долей единицы. None — делить не на что."""
-    if total_revenue <= 0:
-        return None
-    return Decimal(revenue) / Decimal(total_revenue)
 
 
 def _divide(revenue: int, quantity: Decimal) -> Decimal | None:

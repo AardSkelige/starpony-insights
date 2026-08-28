@@ -3,6 +3,7 @@ import { CalendarDays, ChevronDown, Radio, Search, X } from "lucide-react"
 import type { DateRange } from "react-day-picker"
 
 import type { SalesChannel } from "@/shared/api/types"
+import { formatDayMonth } from "@/shared/lib/format"
 import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
 import { Calendar } from "@/shared/ui/calendar"
@@ -190,8 +191,8 @@ function PeriodField({
 
 function label(value: FilterValue): string {
   if (!value.dateFrom && !value.dateTo) return "Период"
-  const from = value.dateFrom ? short(value.dateFrom) : "…"
-  const to = value.dateTo ? short(value.dateTo) : "…"
+  const from = value.dateFrom ? formatDayMonth(value.dateFrom) : "…"
+  const to = value.dateTo ? formatDayMonth(value.dateTo) : "…"
   return `${from} — ${to}`
 }
 
@@ -211,9 +212,4 @@ function toDay(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0")
   const day = String(date.getDate()).padStart(2, "0")
   return `${date.getFullYear()}-${month}-${day}`
-}
-
-function short(iso: string): string {
-  const date = parseDay(iso)
-  return `${String(date.getDate()).padStart(2, "0")}.${String(date.getMonth() + 1).padStart(2, "0")}`
 }

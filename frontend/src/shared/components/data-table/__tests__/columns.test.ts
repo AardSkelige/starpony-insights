@@ -79,3 +79,35 @@ describe.each(TABLES)("$name", ({ columns, totals, computed }) => {
     expect(columns[0].numeric).toBeFalsy()
   })
 })
+
+/**
+ * Число в подвале приходит из выборки и бывает любым, поэтому слово рядом
+ * с ним обязано склоняться. Проверяется на единице: «1 наименований» —
+ * самая заметная ошибка русского интерфейса, и появляется она молча,
+ * стоит собрать подпись обычной подстановкой.
+ */
+describe("подвал склоняет существительное при числе", () => {
+  it("товары — «1 наименование»", () => {
+    const totals = productTotals({
+      quantity: "1.000",
+      free_quantity: "0.000",
+      revenue_kopecks: 10000,
+      documents_count: 1,
+      products_count: 1,
+    })
+
+    expect(String(totals.label)).toContain("1 наименование")
+  })
+
+  it("материалы — «1 материал»", () => {
+    const totals = materialTotals({
+      materials_count: 1,
+      cost_kopecks: 1250,
+      cost_share: "1.00000000",
+      priced_count: 1,
+      unpriced_count: 0,
+    })
+
+    expect(String(totals.label)).toContain("1 материал")
+  })
+})

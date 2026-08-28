@@ -1,20 +1,20 @@
 import {
   useProductDetail,
   type ShipmentProductRow,
-  type ShipmentProductsQuery,
 } from "@/sections/shipments-products/api"
 import {
   ChannelsSection,
   DocumentsSection,
   PeriodSection,
   PriceSection,
-  StockSection,
 } from "@/sections/shipments-products/ui/detail-sections"
+import type { TableSelection } from "@/shared/api/table-query"
+import { StockSection } from "@/shared/components/detail/stock"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
 
 type Props = {
   row: ShipmentProductRow
-  query: Omit<ShipmentProductsQuery, "page">
+  query: TableSelection
   /** В выдвижной панели строка закрыта затемнением — её числа надо повторить. */
   repeatRowNumbers?: boolean
   /**
@@ -42,7 +42,7 @@ export function RowDetail({ row, query, repeatRowNumbers = false, tabbed = false
 
         <TabsContent value="totals" className="flex flex-col gap-5">
           <PeriodSection row={row} always />
-          <StockSection detail={detail} />
+          <StockSection detail={detail} uom={row.uom} />
         </TabsContent>
 
         <TabsContent value="channels">
@@ -60,7 +60,7 @@ export function RowDetail({ row, query, repeatRowNumbers = false, tabbed = false
     <div className="grid gap-x-8 gap-y-5 p-4 lg:grid-cols-2">
       <div className="flex flex-col gap-5">
         {repeatRowNumbers ? <PeriodSection row={row} always /> : <PriceSection row={row} />}
-        <StockSection detail={detail} />
+        <StockSection detail={detail} uom={row.uom} />
       </div>
       <div className="flex flex-col gap-5">
         <ChannelsSection detail={detail} uom={row.uom} />

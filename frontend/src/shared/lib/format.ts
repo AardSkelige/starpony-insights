@@ -105,12 +105,32 @@ function moscowDay(date: Date): string {
   return date.toLocaleDateString("en-CA", { timeZone: TIMEZONE })
 }
 
-/** Дата для полей периода: «01.04.2026». */
+/**
+ * Дата целиком: «17.08.2026».
+ *
+ * Нужна там, где год решает, верить ли числу: цена закупки могла быть
+ * зафиксирована в прошлом году, и «17.08» от «17.08 этого года» не отличить.
+ */
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(RU, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    timeZone: TIMEZONE,
+  })
+}
+
+/**
+ * День и месяц: «17.08». Для списков, где год очевиден из выбранного периода.
+ *
+ * Пояс задан, как и везде здесь: без него дата документа, снятая в 23:40
+ * по Москве, у человека западнее показалась бы предыдущим днём — и строка
+ * в списке отгрузок не сошлась бы с самим документом в учёте.
+ */
+export function formatDayMonth(iso: string): string {
+  return new Date(iso).toLocaleDateString(RU, {
+    day: "2-digit",
+    month: "2-digit",
     timeZone: TIMEZONE,
   })
 }

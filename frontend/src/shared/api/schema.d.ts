@@ -331,15 +331,6 @@ export interface components {
             quantity: string;
             paths: components["schemas"]["MaterialPath"][];
         };
-        MaterialStock: {
-            /** Format: decimal */
-            quantity: string;
-            /** Format: decimal */
-            reserved: string;
-            /** Format: decimal */
-            available: string;
-            stock_days: number | null;
-        };
         /** @description Страница в меню. Префиксы API наружу не отдаются — это деталь защиты. */
         Page: {
             key: string;
@@ -355,15 +346,6 @@ export interface components {
             /** Format: decimal */
             quantity: string;
             total_kopecks: number;
-        };
-        ProductStock: {
-            /** Format: decimal */
-            quantity: string;
-            /** Format: decimal */
-            reserved: string;
-            /** Format: decimal */
-            available: string;
-            stock_days: number | null;
         };
         Profile: {
             id: number;
@@ -386,7 +368,7 @@ export interface components {
             quantity: string;
             cost_kopecks: number | null;
             price: components["schemas"]["MaterialPrice"] | null;
-            stock: components["schemas"]["MaterialStock"] | null;
+            stock: components["schemas"]["Stock"] | null;
             sources_count: number;
             sources: components["schemas"]["MaterialSource"][];
             rest: components["schemas"]["MaterialRest"] | null;
@@ -455,7 +437,7 @@ export interface components {
         ShipmentProductDetail: {
             channels: components["schemas"]["ChannelShare"][];
             documents: components["schemas"]["ProductDocument"][];
-            stock: components["schemas"]["ProductStock"] | null;
+            stock: components["schemas"]["Stock"] | null;
         };
         ShipmentProductRow: {
             product_id: number;
@@ -492,6 +474,23 @@ export interface components {
             revenue_kopecks: number;
             documents_count: number;
             products_count: number;
+        };
+        /**
+         * @description Что лежит на складе сейчас — одинаково для товара и для материала.
+         *
+         *     Один сериализатор, а не два одинаковых: из схемы генерируются типы
+         *     фронтенда, и два близнеца дают два типа, под которые пишутся два
+         *     компонента. Так и вышло — блок «Склад» разошёлся между страницами
+         *     и на одной из них перестал отличать сбой связи от «остатка нет».
+         */
+        Stock: {
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            reserved: string;
+            /** Format: decimal */
+            available: string;
+            stock_days: number | null;
         };
         SyncRun: {
             status: string;

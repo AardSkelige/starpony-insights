@@ -5,6 +5,7 @@ from decimal import Decimal
 import pytest
 
 from core.models import Product, Stock, SyncKind, SyncRun
+from core.services.stock import stock_of
 
 pytestmark = pytest.mark.django_db
 
@@ -213,3 +214,37 @@ class TestPartialReport:
 
         assert outcome.extra["zeroed"] == 0
         assert Stock.objects.filter(quantity=Decimal("100")).count() == 10
+
+
+class TestStockOf:
+    """Остаток для разбора строки — общий для всех разделов сервис.
+
+    Живёт здесь, а не у страницы: раньше этот же запрос стоял по копии
+    в деталях товара и в деталях материала, и копии разъехались.
+    """
+
+    def test_reports_what_lies_on_the_shelf(self, product):
+        Stock.objects.create(
+            product=product,
+            quantity=Decimal("12.000"),
+            reserved=Decimal("2.000"),
+            stock_days=7,
+        )
+
+        row = stock_of(product.pk)
+
+        assert row["quantity"] == Decimal("12.000")
+        # Свободное считается моделью, а не переписывается в сервисе:
+        # два места вычитания — два ответа на вопрос «сколько можно продать».
+        assert row["available"] == Decimal("10.000")
+        assert row["stock_days"] == 7
+
+    def test_unknown_stock_is_none_not_zero(self, product):
+        """Ноль читался бы как «кончился». Остатка просто нет в отчёте."""
+        assert stock_of(product.pk) is None
+
+    def test_days_without_movement_may_be_unknown(self, product):
+        """МойСклад отдаёт дни не всегда — поле обязано вместить пустоту."""
+        Stock.objects.create(product=product, quantity=Decimal("1.000"))
+
+        assert stock_of(product.pk)["stock_days"] is None

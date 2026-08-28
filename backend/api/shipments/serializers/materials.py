@@ -11,21 +11,14 @@ from rest_framework import serializers
 from api.shipments.serializers.common import (
     SalesChannelSerializer,
     SelectionQuerySerializer,
+    StockSerializer,
 )
-from api.shipments.services.materials import (
-    DEFAULT_ORDERING,
-    DEFAULT_PAGE_SIZE,
-    MAX_PAGE_SIZE,
-    ORDERING,
-)
+from api.shipments.services.materials import DEFAULT_ORDERING, ORDERING
 
 
 class ShipmentMaterialsQuerySerializer(SelectionQuerySerializer):
     ordering = serializers.ChoiceField(
         choices=sorted(ORDERING), required=False, default=DEFAULT_ORDERING
-    )
-    page_size = serializers.IntegerField(
-        required=False, min_value=1, max_value=MAX_PAGE_SIZE, default=DEFAULT_PAGE_SIZE
     )
 
 
@@ -165,13 +158,6 @@ class MaterialPriceSerializer(serializers.Serializer):
     supplier = serializers.CharField()
 
 
-class MaterialStockSerializer(serializers.Serializer):
-    quantity = serializers.DecimalField(max_digits=18, decimal_places=3)
-    reserved = serializers.DecimalField(max_digits=18, decimal_places=3)
-    available = serializers.DecimalField(max_digits=18, decimal_places=3)
-    stock_days = serializers.IntegerField(allow_null=True)
-
-
 class MaterialHeadSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
@@ -198,7 +184,7 @@ class ShipmentMaterialDetailSerializer(serializers.Serializer):
     price = MaterialPriceSerializer(allow_null=True)
     # Остаток известен не по всем материалам. `null` честнее нуля,
     # который читается как «кончился».
-    stock = MaterialStockSerializer(allow_null=True)
+    stock = StockSerializer(allow_null=True)
     # Сколько изделий-источников всего и первые из них. Число рядом со
     # списком: у воды источников пятьдесят девять, показаны двадцать.
     sources_count = serializers.IntegerField()

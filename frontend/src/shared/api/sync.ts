@@ -5,8 +5,8 @@ import * as React from "react"
 import { api, ApiError } from "@/shared/api/client"
 import type { components } from "@/shared/api/schema"
 
-export type SyncRun = components["schemas"]["SyncRun"]
-export type SyncStatus = components["schemas"]["SyncStatus"]
+type SyncRun = components["schemas"]["SyncRun"]
+type SyncStatus = components["schemas"]["SyncStatus"]
 
 /** Как часто спрашивать, не закончился ли прогон. */
 const POLL_MS = 3000
@@ -69,7 +69,7 @@ export function useRefresh() {
 }
 
 /** Текст отказа — он приходит с сервера и уже написан для человека. */
-export function refusalText(error: unknown): string | null {
+function refusalText(error: unknown): string | null {
   if (error instanceof ApiError && [409, 429].includes(error.status)) {
     return error.message
   }

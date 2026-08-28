@@ -2,7 +2,7 @@
 import * as React from "react"
 
 export type Theme = "light" | "dark" | "system"
-export type ResolvedTheme = "light" | "dark"
+type ResolvedTheme = "light" | "dark"
 
 type ThemeContextValue = {
   /** Что выбрал человек: может быть «как в системе». */

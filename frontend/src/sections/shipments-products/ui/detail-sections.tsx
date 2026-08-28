@@ -11,6 +11,7 @@ import {
   Section,
 } from "@/shared/components/detail"
 import {
+  formatDayMonth,
   formatMoney,
   formatQuantity,
   formatUnitPrice,
@@ -160,7 +161,7 @@ export function DocumentsSection({
                 {document.number}
               </span>
               <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                {shortDate(document.moment)}
+                {formatDayMonth(document.moment)}
               </span>
               {/* Имя контрагента — единственное, чем можно пожертвовать:
                   числа не переносятся, а «ООО „Коноспортивный центр…“»
@@ -178,38 +179,4 @@ export function DocumentsSection({
       )}
     </Section>
   )
-}
-
-export function StockSection({ detail }: { detail: Detail }) {
-  if (detail.isPending) {
-    return (
-      <Section title="Склад">
-        <Loading count={2} />
-      </Section>
-    )
-  }
-
-  // Молчать об ошибке здесь безопаснее: остаток известен не по всем товарам,
-  // и его отсутствие — обычное дело. Ошибку уже показали соседние блоки.
-  const stock = detail.data?.stock
-  // Нули вместо остатка читались бы как «кончился», поэтому блока просто нет.
-  if (!stock) return null
-
-  return (
-    <Section title="Склад">
-      <Facts>
-        <Fact label="Остаток" value={formatQuantity(stock.quantity)} />
-        <Fact label="В резерве" value={formatQuantity(stock.reserved)} />
-        <Fact label="Свободно" value={formatQuantity(stock.available)} />
-        {stock.stock_days !== null ? (
-          <Fact label="Без движения" value={`${stock.stock_days} дн.`} />
-        ) : null}
-      </Facts>
-    </Section>
-  )
-}
-
-function shortDate(iso: string): string {
-  const date = new Date(iso)
-  return `${String(date.getDate()).padStart(2, "0")}.${String(date.getMonth() + 1).padStart(2, "0")}`
 }

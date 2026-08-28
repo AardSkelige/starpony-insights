@@ -6,7 +6,6 @@ from decimal import Decimal
 import pytest
 
 from api.shipments.services import product_detail, products
-from core.models import Stock
 from tests.shipments.conftest import moscow, position
 
 pytestmark = pytest.mark.django_db
@@ -101,29 +100,6 @@ def test_documents_are_capped(make_product, make_demand):
     rows = product_detail.documents(products.Filters(), product.id)
 
     assert len(rows) == product_detail.DOCUMENT_LIMIT
-
-
-def test_stock_ignores_the_period(make_product, make_demand):
-    """Остаток — это «сегодня», а не «за апрель»."""
-    product = make_product()
-    position(make_demand(moment=moscow(2026, 6, 15)), product, "1.000", 10000)
-    Stock.objects.create(
-        product=product, quantity=Decimal("12.000"), reserved=Decimal("2.000"), stock_days=7
-    )
-
-    row = product_detail.stock(product.id)
-
-    assert row["quantity"] == Decimal("12.000")
-    assert row["available"] == Decimal("10.000")
-    assert row["stock_days"] == 7
-
-
-def test_stock_is_none_when_unknown(make_product, make_demand):
-    """Ноль читался бы как «кончился». Остатка просто нет в отчёте."""
-    product = make_product()
-    position(make_demand(), product, "1.000", 10000)
-
-    assert product_detail.stock(product.id) is None
 
 
 def test_detail_refuses_a_product_outside_the_selection(make_product, make_demand, channel):

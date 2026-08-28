@@ -6,11 +6,12 @@
 обязательно сложит вместе с остальным.
 """
 
-from decimal import Decimal
 from io import BytesIO
 
 from api.shipments.services import materials, workbook
 from api.shipments.services.workbook import MONEY, QUANTITY, SHARE, UNIT_PRICE
+from core.money import rubles
+from core.text import with_plural
 
 # Порядок и подписи совпадают с экраном: файл, где колонки идут иначе,
 # заставляет сверять их глазами.
@@ -85,11 +86,11 @@ def _cells(row: dict) -> dict:
         "name": row["name"],
         "uom": row["uom"],
         "quantity": float(row["quantity"]),
-        "price": _rubles(row["price_kopecks"]),
+        "price": rubles(row["price_kopecks"]),
         # Дата строкой, а не датой Excel: в ячейке она читается одинаково
         # в любой локали, а сортировать файл по ней никто не станет.
         "price_date": row["price_moment"].strftime("%d.%m.%Y") if row["price_moment"] else "",
-        "cost": _rubles(row["cost_kopecks"]),
+        "cost": rubles(row["cost_kopecks"]),
         "share": float(row["cost_share"]) if row["cost_share"] is not None else None,
         "products_count": row["products_count"],
     }
@@ -103,12 +104,8 @@ def _without_plan_cells(row: dict) -> dict:
         "kind": "Услуга" if row["is_service"] else "Товар",
         "uom": row["uom"],
         "quantity": float(row["quantity"]),
-        "revenue": float(Decimal(row["revenue_kopecks"]) / 100),
+        "revenue": rubles(row["revenue_kopecks"]),
     }
-
-
-def _rubles(kopecks) -> float | None:
-    return float(Decimal(kopecks) / 100) if kopecks is not None else None
 
 
 def _totals_row(totals: dict, coverage: dict) -> dict:
@@ -118,7 +115,10 @@ def _totals_row(totals: dict, coverage: dict) -> dict:
     колонки — а файл открывают именно для того, чтобы складывать.
     """
     return {
-        "name": f"Итого · {totals['materials_count']} материалов",
-        "cost": float(Decimal(totals["cost_kopecks"]) / 100),
+        "name": "Итого · "
+        + with_plural(
+            totals["materials_count"], "материал", "материала", "материалов"
+        ),
+        "cost": rubles(totals["cost_kopecks"]),
         "products_count": coverage["exploded_products_count"],
     }

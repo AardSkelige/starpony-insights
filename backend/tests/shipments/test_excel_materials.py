@@ -129,3 +129,11 @@ def test_file_name_says_the_period(client, make_user, sold):
     assert response.status_code == 200
     disposition = response.headers["Content-Disposition"]
     assert "01.06.2026" in disposition and "30.06.2026" in disposition
+
+
+def test_totals_row_declines_the_noun(sold):
+    """«1 материал», а не «1 материалов» — как и на экране."""
+    sheet = book_of(materials.Filters())["Материалы в отгрузках"]
+    name = column_of("name", excel_materials.COLUMNS)
+
+    assert sheet.cell(row=sheet.max_row, column=name).value == "Итого · 1 материал"

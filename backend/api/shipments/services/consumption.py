@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
-from django.db.models import Count, DecimalField, Sum, Value
+from django.db.models import DecimalField, Sum, Value
 from django.db.models.functions import Coalesce
 
 from api.shipments.services import selection

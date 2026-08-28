@@ -10,6 +10,7 @@ import {
   formatShare,
   formatUnitPrice,
 } from "@/shared/lib/format"
+import { withPlural } from "@/shared/lib/plural"
 
 /**
  * Колонки таблицы «Товары в отгрузках».
@@ -137,7 +138,7 @@ export const SORT_KEYS: readonly string[] = COLUMNS.flatMap((column) =>
  */
 export function totalsFor(totals: ShipmentProducts["totals"]): Totals {
   return {
-    label: `Итого за период · ${totals.products_count} наименований`,
+    label: `Итого за период · ${withPlural(totals.products_count, "наименование", "наименования", "наименований")}`,
     values: {
       quantity: formatQuantity(totals.quantity),
       free: formatQuantity(totals.free_quantity),

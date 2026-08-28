@@ -2,12 +2,11 @@ import * as React from "react"
 
 import { exportUrl, useShipmentProducts } from "@/sections/shipments-products/api"
 import { COLUMNS, SORT_KEYS, totalsFor } from "@/sections/shipments-products/columns"
-import { DetailPanel } from "@/sections/shipments-products/ui/detail-panel"
-import { Filters } from "@/shared/components/filters"
-import { FiltersDrawer } from "@/shared/components/filters/drawer"
 import { RowDetail } from "@/sections/shipments-products/ui/row-detail"
 import { DataTable } from "@/shared/components/data-table"
-import { Page, Toolbar } from "@/shared/components/page"
+import { DetailDrawer } from "@/shared/components/detail-drawer"
+import { FiltersBar } from "@/shared/components/filters/bar"
+import { Page } from "@/shared/components/page"
 import { PageHeader } from "@/shared/components/page-header"
 import { refreshNote, useRefresh, useSyncStatus } from "@/shared/api/sync"
 import { TableFooter } from "@/shared/components/table-footer"
@@ -39,6 +38,7 @@ export function ShipmentProductsPage() {
   const [pickedId, setPickedId] = React.useState<number | null>(null)
 
   const rows = data?.results ?? []
+  const picked = rows.find((row) => row.product_id === pickedId) ?? null
   const pageCount = data ? Math.max(1, Math.ceil(data.count / table.pageSize)) : 1
 
   return (
@@ -55,18 +55,7 @@ export function ShipmentProductsPage() {
         }}
       />
 
-      <Toolbar>
-        <Filters
-          value={table.filters}
-          onChange={table.changeFilters}
-          onReset={table.resetFilters}
-          channels={data?.channels ?? []}
-          searchPlaceholder="Название, артикул или код"
-          searchLabel="Поиск по товарам"
-        />
-      </Toolbar>
-
-      <FiltersDrawer
+      <FiltersBar
         value={table.filters}
         onChange={table.changeFilters}
         onReset={table.resetFilters}
@@ -120,13 +109,28 @@ export function ShipmentProductsPage() {
       ) : null}
 
       {/* Панель деталей — для узкого экрана и телефона. На широком те же
-          детали раскрываются прямо в строке. */}
+          детали раскрываются прямо в строке.
+
+          Числа самой строки в панели повторяются (`repeatRowNumbers`):
+          строка закрыта затемнением, свериться с ней нельзя. */}
       {screen !== "wide" ? (
-        <DetailPanel
-          row={rows.find((row) => row.product_id === pickedId) ?? null}
-          query={table.applied}
+        <DetailDrawer
+          open={picked !== null}
+          title={picked?.name ?? ""}
+          subtitle={
+            picked ? [picked.code, picked.article].filter(Boolean).join(" · ") : undefined
+          }
           onClose={() => setPickedId(null)}
-        />
+        >
+          {picked ? (
+            <RowDetail
+              row={picked}
+              query={table.applied}
+              repeatRowNumbers
+              tabbed={screen === "phone"}
+            />
+          ) : null}
+        </DetailDrawer>
       ) : null}
     </Page>
   )

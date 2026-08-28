@@ -3,13 +3,12 @@ import * as React from "react"
 import { exportUrl, useShipmentMaterials } from "@/sections/shipments-materials/api"
 import { COLUMNS, SORT_KEYS, totalsFor } from "@/sections/shipments-materials/columns"
 import { Coverage } from "@/sections/shipments-materials/ui/coverage"
-import { DetailPanel } from "@/sections/shipments-materials/ui/detail-panel"
 import { RowDetail } from "@/sections/shipments-materials/ui/row-detail"
 import { refreshNote, useRefresh, useSyncStatus } from "@/shared/api/sync"
 import { DataTable } from "@/shared/components/data-table"
-import { Filters } from "@/shared/components/filters"
-import { FiltersDrawer } from "@/shared/components/filters/drawer"
-import { Page, Toolbar } from "@/shared/components/page"
+import { DetailDrawer } from "@/shared/components/detail-drawer"
+import { FiltersBar } from "@/shared/components/filters/bar"
+import { Page } from "@/shared/components/page"
 import { PageHeader } from "@/shared/components/page-header"
 import { TableFooter } from "@/shared/components/table-footer"
 import { useScreen } from "@/shared/hooks/use-screen"
@@ -43,6 +42,7 @@ export function ShipmentMaterialsPage() {
   const [pickedId, setPickedId] = React.useState<number | null>(null)
 
   const rows = data?.results ?? []
+  const picked = rows.find((row) => row.material_id === pickedId) ?? null
   const pageCount = data ? Math.max(1, Math.ceil(data.count / table.pageSize)) : 1
 
   return (
@@ -61,18 +61,7 @@ export function ShipmentMaterialsPage() {
         }}
       />
 
-      <Toolbar>
-        <Filters
-          value={table.filters}
-          onChange={table.changeFilters}
-          onReset={table.resetFilters}
-          channels={data?.channels ?? []}
-          searchPlaceholder={SEARCH_PLACEHOLDER}
-          searchLabel={SEARCH_LABEL}
-        />
-      </Toolbar>
-
-      <FiltersDrawer
+      <FiltersBar
         value={table.filters}
         onChange={table.changeFilters}
         onReset={table.resetFilters}
@@ -134,13 +123,30 @@ export function ShipmentMaterialsPage() {
       ) : null}
 
       {/* Разбор — для узкого экрана и телефона. На широком он раскрывается
-          прямо в строке. */}
+          прямо в строке.
+
+          Числа самой строки в панели повторяются (`repeatRowNumbers`):
+          строка закрыта затемнением, свериться с ней нельзя. */}
       {screen !== "wide" ? (
-        <DetailPanel
-          row={rows.find((row) => row.material_id === pickedId) ?? null}
-          query={table.applied}
+        <DetailDrawer
+          open={picked !== null}
+          title={picked?.name ?? ""}
+          subtitle={
+            picked
+              ? [picked.code, picked.article, picked.uom].filter(Boolean).join(" · ")
+              : undefined
+          }
           onClose={() => setPickedId(null)}
-        />
+        >
+          {picked ? (
+            <RowDetail
+              row={picked}
+              query={table.applied}
+              repeatRowNumbers
+              tabbed={screen === "phone"}
+            />
+          ) : null}
+        </DetailDrawer>
       ) : null}
     </Page>
   )

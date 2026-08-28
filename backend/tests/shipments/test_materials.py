@@ -9,7 +9,7 @@ from decimal import Decimal
 
 import pytest
 
-from api.shipments.services import materials
+from api.shipments.services import materials, selection
 from core.models import ProductKind
 from tests.shipments.conftest import moscow, position
 
@@ -298,7 +298,7 @@ class TestPagination:
     def test_page_size_is_capped(self, shampoo, sold_ten):
         """Ссылка с огромной высотой страницы не должна уводить в долгий обход."""
         page = materials.page(materials.Filters(page_size=100_000))
-        assert len(page["results"]) <= materials.MAX_PAGE_SIZE
+        assert len(page["results"]) <= selection.MAX_PAGE_SIZE
 
     def test_count_is_of_selection_not_page(self, shampoo, sold_ten):
         page = materials.page(materials.Filters(page_size=1))
@@ -334,12 +334,15 @@ class TestCost:
 
         sell(3)
         with django_assert_max_num_queries(12) as small:
-            materials.page(materials.Filters())
+            materials.page(materials.Filters(page_size=100))
 
         sell(30)
         with django_assert_max_num_queries(12):
-            page = materials.page(materials.Filters())
+            page = materials.page(materials.Filters(page_size=100))
 
+        # Высота страницы задана явно: проверяется рост числа запросов
+        # со строками, и все строки должны попасть в ответ независимо
+        # от того, сколько их показывает страница по умолчанию.
         assert len(page["results"]) == 33
         assert len(small.captured_queries) <= 12
 

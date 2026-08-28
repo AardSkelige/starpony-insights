@@ -5,11 +5,12 @@
 сама книга — в `workbook.py`, общем для выгрузок раздела.
 """
 
-from decimal import Decimal
 from io import BytesIO
 
 from api.shipments.services import products, workbook
 from api.shipments.services.workbook import MONEY, QUANTITY, SHARE
+from core.money import rubles
+from core.text import with_plural
 
 # Порядок и подписи совпадают с экраном: файл, где колонки идут иначе,
 # заставляет сверять их глазами.
@@ -26,6 +27,11 @@ COLUMNS: tuple[tuple[str, int, str], ...] = (
     ("Доля в выручке", 15, "share"),
     ("Отгрузок", 10, "documents_count"),
 )
+
+# Сколько строк тянуть из базы за раз. Своя мера, а не высота страницы:
+# совпадение чисел здесь ничего не значит, а связь заставила бы менять
+# запрос к базе всякий раз, когда меняют вид таблицы на экране.
+CHUNK = 200
 
 # Excel считает в числах с плавающей точкой, и точность Decimal ему не
 # передать. Поэтому в файл уходят рубли числом: он для чтения и сводных
@@ -62,16 +68,12 @@ def _cells(row: dict) -> dict:
         "uom": row["uom"],
         "quantity": float(row["quantity"]),
         "free_quantity": float(row["free_quantity"]),
-        "revenue": float(Decimal(row["revenue_kopecks"]) / 100),
-        "avg_price": _rubles(row["avg_price_kopecks"]),
-        "avg_price_paid": _rubles(row["avg_price_paid_kopecks"]),
+        "revenue": rubles(row["revenue_kopecks"]),
+        "avg_price": rubles(row["avg_price_kopecks"]),
+        "avg_price_paid": rubles(row["avg_price_paid_kopecks"]),
         "share": float(row["revenue_share"]) if row["revenue_share"] is not None else None,
         "documents_count": row["documents_count"],
     }
-
-
-def _rubles(kopecks: Decimal | None) -> float | None:
-    return float(kopecks / 100) if kopecks is not None else None
 
 
 def _every_row(filters: products.Filters, total_revenue: int):
@@ -84,21 +86,24 @@ def _every_row(filters: products.Filters, total_revenue: int):
     chosen = products.grouped(filters)
     start = 0
     while True:
-        chunk = list(chosen[start : start + products.MAX_PAGE_SIZE])
+        chunk = list(chosen[start : start + CHUNK])
         if not chunk:
             return
         for item in chunk:
             yield products.row_of(item, total_revenue)
-        if len(chunk) < products.MAX_PAGE_SIZE:
+        if len(chunk) < CHUNK:
             return
-        start += products.MAX_PAGE_SIZE
+        start += CHUNK
 
 
 def _totals_row(totals: dict) -> dict:
     return {
-        "name": f"Итого · {totals['products_count']} наименований",
+        "name": "Итого · "
+        + with_plural(
+            totals["products_count"], "наименование", "наименования", "наименований"
+        ),
         "quantity": float(totals["quantity"]),
         "free_quantity": float(totals["free_quantity"]),
-        "revenue": float(Decimal(totals["revenue_kopecks"]) / 100),
+        "revenue": rubles(totals["revenue_kopecks"]),
         "documents_count": totals["documents_count"],
     }

@@ -13,8 +13,8 @@ from decimal import Decimal
 from django.db.models import DecimalField, Sum, Value
 from django.db.models.functions import Coalesce
 
-from core.models import Stock
 from api.shipments.services.products import Filters, positions
+from core.services.stock import stock_of
 
 # Сколько документов показать. Полный список — отдельная задача со своей
 # страницей: десять последних отвечают на вопрос «кому и когда», а тысяча
@@ -78,24 +78,6 @@ def documents(filters: Filters, product_id: int) -> list[dict]:
     ]
 
 
-def stock(product_id: int) -> dict | None:
-    """Что на складе сейчас.
-
-    Без учёта фильтров: остаток — это «сегодня», а не «за апрель».
-    Есть не у всех: на боевых данных остаток известен по 27 из 66 проданных
-    позиций, у остальных его в отчёте просто нет.
-    """
-    row = Stock.objects.filter(product_id=product_id).first()
-    if row is None:
-        return None
-    return {
-        "quantity": row.quantity,
-        "reserved": row.reserved,
-        "available": row.available,
-        "stock_days": row.stock_days,
-    }
-
-
 def detail(filters: Filters, product_id: int) -> dict:
     """Всё про товар в контексте выбранных фильтров."""
     if not positions(filters).filter(product_id=product_id).exists():
@@ -104,5 +86,5 @@ def detail(filters: Filters, product_id: int) -> dict:
     return {
         "channels": channels(filters, product_id),
         "documents": documents(filters, product_id),
-        "stock": stock(product_id),
+        "stock": stock_of(product_id),
     }

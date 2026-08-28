@@ -32,7 +32,7 @@ def test_export_covers_every_page_not_just_the_first(make_product, make_demand):
     Человек отбирает период и жмёт «Экспорт», ожидая получить отобранное.
     Пятьдесят строк вместо трёхсот — потеря, которую он заметит не сразу.
     """
-    count = products.MAX_PAGE_SIZE + 5
+    count = excel.CHUNK + 5
     for index in range(count):
         position(make_demand(), make_product(code=f"2-{index:04d}"), "1.000", 10000)
 
@@ -168,3 +168,18 @@ def test_file_name_says_when_no_period_is_chosen(client, make_user, make_product
     client.force_login(make_user(pages=[PAGE_KEY]))
 
     assert "%D0%B2%D0%B5%D1%81%D1%8C" in client.get(URL)["Content-Disposition"]
+
+
+def test_totals_row_declines_the_noun(make_product, make_demand):
+    """«1 наименование», а не «1 наименований».
+
+    Число в итоге приходит из выборки и бывает любым, поэтому слово рядом
+    с ним обязано склоняться. Фраза собирается один раз — и ошибка в ней
+    видна человеку в каждой выгрузке.
+    """
+    position(make_demand(), make_product(), "1.000", 10000)
+
+    sheet = sheet_of(products.Filters())
+    last = sheet.max_row
+
+    assert sheet.cell(row=last, column=column_of("name")).value == "Итого · 1 наименование"
