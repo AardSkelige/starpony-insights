@@ -1,5 +1,6 @@
 import { Download, RefreshCw } from "lucide-react"
 
+import { useScreen } from "@/shared/hooks/use-screen"
 import { formatSyncedAt } from "@/shared/lib/format"
 import { Button } from "@/shared/ui/button"
 import { Spinner } from "@/shared/ui/spinner"
@@ -61,59 +62,88 @@ export function PageHeader({
         </span>
 
         {onExport ? (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onExport}
-                  disabled={exporting}
-                  // На телефоне — квадрат 40×40 без подписи: под палец
-                  // попадает так же, а места занимает вчетверо меньше.
-                  className="max-sm:size-10 max-sm:px-0"
-                >
-                  {exporting ? <Spinner data-icon="inline-start" /> : <Download data-icon="inline-start" />}
-                  {/* Подпись не удаляется, а прячется: экранному диктору
-                      она нужна, а `aria-label` дублировал бы её третьей копией. */}
-                  <span className="max-sm:sr-only">Экспорт</span>
-                </Button>
-              }
-            />
-            <TooltipContent>
-              Выгрузит то, что сейчас на экране, — с учётом фильтров и сортировки.
-              Формат XLSX.
-            </TooltipContent>
-          </Tooltip>
+          <HeaderAction
+            icon={Download}
+            label="Экспорт"
+            onClick={onExport}
+            busy={exporting}
+            hint="Выгрузит то, что сейчас на экране, — с учётом фильтров и сортировки. Формат XLSX."
+          />
         ) : null}
 
         {onRefresh ? (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onRefresh}
-                  disabled={refreshing}
-                  className="max-sm:size-10 max-sm:px-0"
-                >
-                  {refreshing ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}
-                  <span className="max-sm:sr-only">
-                    {refreshing ? "Обновляем…" : "Обновить"}
-                  </span>
-                </Button>
-              }
-            />
-            <TooltipContent>
-              Перетянет данные из МойСклада прямо сейчас, не дожидаясь ночного
-              расписания. Занимает около двадцати секунд. Чаще раза в три
-              минуты запускать нельзя: лимит запросов общий с ботом,
-              который проверяет учёт круглосуточно.
-            </TooltipContent>
-          </Tooltip>
+          <HeaderAction
+            icon={RefreshCw}
+            label={refreshing ? "Обновляем…" : "Обновить"}
+            onClick={onRefresh}
+            busy={refreshing}
+            hint="Перетянет данные из МойСклада прямо сейчас, не дожидаясь ночного расписания. Занимает около двадцати секунд. Чаще раза в три минуты запускать нельзя: лимит запросов общий с ботом, который проверяет учёт круглосуточно."
+          />
         ) : null}
+
       </div>
     </div>
+  )
+}
+
+/**
+ * Действие в шапке: кнопка с подписью на большом экране, иконка на телефоне.
+ *
+ * Два разных рендера, а не один с погашенной подписью. Погасить не выходит:
+ * вариант `sm` объявляет `has-data-[icon=inline-start]:pl-1.5`, и этот отступ
+ * перебивает `px-0` снаружи — селектор с `:has()` специфичнее обычного класса.
+ * Плюс `gap-1` продолжает отделять иконку от спрятанного текста. Кнопка
+ * получалась не квадратной, а вытянутой, с иконкой, сдвинутой влево.
+ *
+ * Это тот же случай, что с `SelectTrigger` и `Separator` из §15: подгонять
+ * чужой компонент снаружи бесполезно, надо посмотреть, **чем** он рисует
+ * то, что вы меняете, и повторить этот способ. Здесь способ — вариант
+ * `size="icon"`, который для того и существует.
+ */
+function HeaderAction({
+  icon: Icon,
+  label,
+  onClick,
+  busy,
+  hint,
+}: {
+  icon: typeof Download
+  label: string
+  onClick: () => void
+  busy: boolean
+  hint: string
+}) {
+  const screen = useScreen()
+
+  if (screen === "phone") {
+    return (
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={onClick}
+        disabled={busy}
+        // Подпись уходит в `aria-label`: без неё кнопка немая для экранного
+        // диктора, а подсказка по наведению на телефоне не показывается.
+        aria-label={label}
+        // 40 точек — минимум под палец (§15), у варианта `icon` их 32.
+        className="size-10"
+      >
+        {busy ? <Spinner /> : <Icon />}
+      </Button>
+    )
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button variant="outline" size="sm" onClick={onClick} disabled={busy}>
+            {busy ? <Spinner data-icon="inline-start" /> : <Icon data-icon="inline-start" />}
+            {label}
+          </Button>
+        }
+      />
+      <TooltipContent>{hint}</TooltipContent>
+    </Tooltip>
   )
 }
