@@ -8,8 +8,9 @@
 
 from io import BytesIO
 
-from api.shipments.services import materials, workbook
-from api.shipments.services.workbook import MONEY, QUANTITY, SHARE, UNIT_PRICE
+from api.common import workbook
+from api.common.workbook import MONEY, QUANTITY, SHARE, UNIT_PRICE
+from api.shipments.services import materials
 from core.money import rubles
 from core.text import with_plural
 
@@ -66,7 +67,7 @@ def build(filters: materials.Filters) -> BytesIO:
             COLUMNS,
             [_cells(row) for row in whole["rows"]],
             FORMATS,
-            _totals_row(whole["totals"], whole["coverage"]),
+            _totals_row(whole["totals"]),
         ),
         # Лист создаётся всегда, даже пустым: его отсутствие человек прочтёт
         # как «всё развернулось», а это разные вещи — и проверить их нечем.
@@ -108,11 +109,17 @@ def _without_plan_cells(row: dict) -> dict:
     }
 
 
-def _totals_row(totals: dict, coverage: dict) -> dict:
+def _totals_row(totals: dict) -> dict:
     """Итог по строкам файла, а не по всей выборке.
 
     Иначе при выгрузке с поиском сумма в подвале не сойдётся со сложением
     колонки — а файл открывают именно для того, чтобы складывать.
+
+    **У колонки «Изделий» итога нет намеренно.** Сложить её нельзя: одно
+    изделие даёт несколько материалов и было бы посчитано столько раз,
+    сколько в нём сырья. А число развёрнутых изделий из охвата описывает
+    всю выборку — при выгрузке с поиском оно оказалось бы подписью
+    к восьми показанным строкам.
     """
     return {
         "name": "Итого · "
@@ -120,5 +127,4 @@ def _totals_row(totals: dict, coverage: dict) -> dict:
             totals["materials_count"], "материал", "материала", "материалов"
         ),
         "cost": rubles(totals["cost_kopecks"]),
-        "products_count": coverage["exploded_products_count"],
     }

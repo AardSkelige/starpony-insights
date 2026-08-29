@@ -23,6 +23,7 @@ import { useDebounced } from "@/shared/hooks/use-debounced"
 export function useTableParams({
   defaultSort,
   sortKeys,
+  pickerKey,
 }: {
   defaultSort: string
   /**
@@ -34,11 +35,20 @@ export function useTableParams({
    * порядок `-revenue`, у «Материалов» такого ключа нет вовсе.
    */
   sortKeys: readonly string[]
+  /**
+   * Имя справочника этой страницы: `channel` у отгрузок, `supplier`
+   * у приёмок. В адрес уходит как есть, в запрос — с `_id`.
+   *
+   * Общего имени у них нет намеренно. Назови мы параметр `pick`, и ссылка
+   * «pick=3» со страницы отгрузок открыла бы на приёмках поставщика номер
+   * три — фильтр, выглядящий выбранным, но означающий не то.
+   */
+  pickerKey: string
 }) {
   const [params, setParams] = useQueryStates({
     from: parseAsString,
     to: parseAsString,
-    channel: parseAsInteger,
+    [pickerKey]: parseAsInteger,
     q: parseAsString.withDefault(""),
     page: parseAsInteger.withDefault(1),
     // Минус обязателен: без него «revenue» значит «по возрастанию», и страница
@@ -50,7 +60,7 @@ export function useTableParams({
   const filters: FilterValue = {
     dateFrom: params.from,
     dateTo: params.to,
-    channelId: params.channel,
+    pickId: (params[pickerKey] as number | null) ?? null,
     search: params.q,
   }
 
@@ -86,19 +96,19 @@ export function useTableParams({
       setParams({
         ...(patch.dateFrom !== undefined ? { from: patch.dateFrom } : {}),
         ...(patch.dateTo !== undefined ? { to: patch.dateTo } : {}),
-        ...(patch.channelId !== undefined ? { channel: patch.channelId } : {}),
+        ...(patch.pickId !== undefined ? { [pickerKey]: patch.pickId } : {}),
         ...(patch.search !== undefined ? { q: patch.search } : {}),
         page: 1,
       })
       setExpanded(null)
     },
-    [setParams]
+    [setParams, pickerKey]
   )
 
   const resetFilters = React.useCallback(() => {
-    setParams({ from: null, to: null, channel: null, q: "", page: 1 })
+    setParams({ from: null, to: null, [pickerKey]: null, q: "", page: 1 })
     setExpanded(null)
-  }, [setParams])
+  }, [setParams, pickerKey])
 
   const changeSort = React.useCallback(
     (key: string, numeric: boolean) => {
@@ -124,8 +134,16 @@ export function useTableParams({
   return {
     /** Что показывать в полях фильтров — набранное, без задержки. */
     filters,
-    /** Что отправлять в запрос — с осевшим поиском. */
-    applied: { ...filters, search: settledSearch },
+    /**
+     * Что отправлять в запрос — с осевшим поиском и с именем параметра,
+     * которое понимает сервер: `channel_id` на отгрузках, `supplier_id`
+     * на приёмках.
+     */
+    applied: {
+      ...filters,
+      search: settledSearch,
+      pickParam: `${pickerKey}_id`,
+    },
     /** Как сейчас отсортировано. Минус — убывание, как в SQL. */
     sort: {
       key: ordering.replace(/^-/, ""),
@@ -137,7 +155,7 @@ export function useTableParams({
     /** Сколько фильтров применено — число на кнопке «Фильтры» на телефоне. */
     activeCount: [
       filters.dateFrom || filters.dateTo,
-      filters.channelId,
+      filters.pickId,
       filters.search,
     ].filter(Boolean).length,
 

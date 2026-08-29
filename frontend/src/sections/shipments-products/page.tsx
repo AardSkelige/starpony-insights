@@ -1,4 +1,5 @@
 import * as React from "react"
+import { Radio } from "lucide-react"
 
 import { exportUrl, useShipmentProducts } from "@/sections/shipments-products/api"
 import { COLUMNS, SORT_KEYS, totalsFor } from "@/sections/shipments-products/columns"
@@ -18,7 +19,11 @@ export function ShipmentProductsPage() {
   const screen = useScreen()
   // Минус обязателен: «revenue» значит «по возрастанию», и страница
   // открывалась бы с позиций, не принесших ничего.
-  const table = useTableParams({ defaultSort: "-revenue", sortKeys: SORT_KEYS })
+  const table = useTableParams({
+    defaultSort: "-revenue",
+    sortKeys: SORT_KEYS,
+    pickerKey: "channel",
+  })
 
   const refresh = useRefresh()
   // Прогон могли запустить в другой вкладке или вовсе не вы — кнопка обязана
@@ -59,7 +64,12 @@ export function ShipmentProductsPage() {
         value={table.filters}
         onChange={table.changeFilters}
         onReset={table.resetFilters}
-        channels={data?.channels ?? []}
+        picker={{
+          key: "channel",
+          label: "Канал",
+          icon: Radio,
+          options: data?.channels ?? [],
+        }}
         searchPlaceholder="Название, артикул или код"
         searchLabel="Поиск по товарам"
       />

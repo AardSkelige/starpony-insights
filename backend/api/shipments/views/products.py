@@ -16,7 +16,7 @@ from api.shipments.serializers import (
     ShipmentProductsSerializer,
 )
 from api.shipments.services import excel, product_detail, products
-from api.shipments.views.common import XLSX, export_name
+from api.common.export import XLSX, export_name
 from core.services.freshness import documents_synced_at
 
 

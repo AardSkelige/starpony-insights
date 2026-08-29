@@ -9,6 +9,7 @@ import {
   PriceSection,
 } from "@/sections/shipments-products/ui/detail-sections"
 import type { TableSelection } from "@/shared/api/table-query"
+import { FailedPanel } from "@/shared/components/detail/failed-panel"
 import { StockSection } from "@/shared/components/detail/stock"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
 
@@ -54,6 +55,13 @@ export function RowDetail({ row, query, repeatRowNumbers = false, tabbed = false
         </TabsContent>
       </Tabs>
     )
+  }
+
+  // На широком экране блоки лежат рядом, и сообщение об ошибке нужно одно:
+  // несколько одинаковых «Не удалось» с несколькими кнопками повторяют
+  // один и тот же запрос.
+  if (detail.isError) {
+    return <FailedPanel onRetry={() => detail.refetch()} />
   }
 
   return (

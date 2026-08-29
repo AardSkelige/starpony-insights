@@ -1,8 +1,9 @@
 import { ru } from "date-fns/locale"
-import { CalendarDays, ChevronDown, Radio, Search, X } from "lucide-react"
+import { CalendarDays, ChevronDown, Search, X } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import type { DateRange } from "react-day-picker"
 
-import type { SalesChannel } from "@/shared/api/types"
+import type { FilterOption } from "@/shared/api/types"
 import { formatDate, formatDayMonth } from "@/shared/lib/format"
 import { useScreen, type Screen } from "@/shared/hooks/use-screen"
 import { cn } from "@/shared/lib/utils"
@@ -20,12 +21,18 @@ import {
 } from "@/shared/ui/select"
 
 /**
- * Фильтры выборки: период, канал, поиск.
+ * Фильтры выборки: период, справочник, поиск.
  *
  * Живут в `shared/`, потому что понадобились второй странице — правило
- * переезда из `CLAUDE.md`. Отличается у страниц только то, что ищут:
- * у «Товаров» строка таблицы — проданный товар, у «Материалов» — сырьё,
- * и подсказка в поле поиска обязана говорить, что именно вводить.
+ * переезда из `CLAUDE.md`. Отличается у страниц два места: что ищут
+ * (у «Товаров» строка таблицы — проданный товар, у «Материалов» — сырьё)
+ * и **чем сужают выборку**.
+ *
+ * **Справочник настраивается страницей, а не зашит.** Сначала здесь был
+ * «Канал продаж». У приёмки канала не существует — товар приходит
+ * от контрагента, а не через Озон, — и вместо второго почти такого же
+ * компонента страница передаёт подпись, иконку и список: `?channel=7`
+ * у отгрузок, `?supplier=7` у приёмок.
  *
  * **На телефоне поля стоят в столбик прямо на странице, а не в выдвижной
  * панели.** Панель была ошибкой: чтобы найти позицию, приходилось нажать
@@ -36,21 +43,37 @@ import {
 export type FilterValue = {
   dateFrom: string | null
   dateTo: string | null
-  channelId: number | null
+  /** Что выбрано в справочнике страницы: канал или поставщик. */
+  pickId: number | null
   search: string
+}
+
+/** Чем эта страница сужает выборку. */
+export type Picker = {
+  /**
+   * Имя в адресной строке; в запрос уходит как `<key>_id`.
+   *
+   * Своё у каждой страницы намеренно: ссылка «канал 3», открытая
+   * на приёмках, иначе выбрала бы поставщика с идентификатором 3.
+   */
+  key: string
+  /** Подпись поля и то, что читает экранный диктор: «Канал», «Поставщик». */
+  label: string
+  icon: LucideIcon
+  options: FilterOption[]
 }
 
 type Props = {
   value: FilterValue
   onChange: (patch: Partial<FilterValue>) => void
   onReset: () => void
-  channels: SalesChannel[]
+  picker: Picker
   /** Что ищут на этой странице — подсказка в поле и подпись для чтения с экрана. */
   searchPlaceholder: string
   searchLabel: string
 }
 
-const ALL_CHANNELS = "all"
+const ALL = "all"
 
 // Высота поля на телефоне. 40 точек — минимум, под который попадает палец
 // (DESIGN §15); на большом экране поля ниже, там мышь.
@@ -60,12 +83,14 @@ export function Filters({
   value,
   onChange,
   onReset,
-  channels,
+  picker,
   searchPlaceholder,
   searchLabel,
 }: Props) {
   const dirty =
-    Boolean(value.dateFrom || value.dateTo || value.channelId) || value.search !== ""
+    Boolean(value.dateFrom || value.dateTo || value.pickId) || value.search !== ""
+
+  const PickIcon = picker.icon
 
   return (
     <>
@@ -86,13 +111,13 @@ export function Filters({
       <PeriodField value={value} onChange={onChange} />
 
       <Select
-        value={value.channelId ? String(value.channelId) : ALL_CHANNELS}
+        value={value.pickId ? String(value.pickId) : ALL}
         onValueChange={(next: string | null) =>
-          onChange({ channelId: !next || next === ALL_CHANNELS ? null : Number(next) })
+          onChange({ pickId: !next || next === ALL ? null : Number(next) })
         }
       >
         <SelectTrigger
-          aria-label="Канал продаж"
+          aria-label={picker.label}
           className={cn(
             "w-full justify-start gap-2 font-normal *:data-[slot=select-value]:flex-1 sm:w-44",
             // Высота задаётся тем же вариантом, что и в компоненте, —
@@ -104,12 +129,12 @@ export function Filters({
           {/* Иконка слева — чтобы поле выглядело так же, как соседний
               «Период»: два равноправных фильтра, набранные по-разному,
               читаются как разные по важности. */}
-          <Radio className="text-muted-foreground" />
+          <PickIcon className="text-muted-foreground" />
           <SelectValue>
-            {value.channelId
-              ? (channels.find((channel) => channel.id === value.channelId)?.name ??
-                "Канал")
-              : "Канал"}
+            {value.pickId
+              ? (picker.options.find((option) => option.id === value.pickId)?.name ??
+                picker.label)
+              : picker.label}
           </SelectValue>
         </SelectTrigger>
         {/* Список раскрывается под полем, а не поверх него. По умолчанию
@@ -118,12 +143,12 @@ export function Filters({
             сверху и дёргается при открытии. */}
         <SelectContent alignItemWithTrigger={false}>
           <SelectGroup>
-            {/* В раскрытом списке слово «Канал» лишнее: заголовок уже
+            {/* В раскрытом списке подпись поля лишняя: заголовок уже
                 сказал, из чего выбирают. */}
-            <SelectItem value={ALL_CHANNELS}>Все</SelectItem>
-            {channels.map((channel) => (
-              <SelectItem key={channel.id} value={String(channel.id)}>
-                {channel.name}
+            <SelectItem value={ALL}>Все</SelectItem>
+            {picker.options.map((option) => (
+              <SelectItem key={option.id} value={String(option.id)}>
+                {option.name}
               </SelectItem>
             ))}
           </SelectGroup>

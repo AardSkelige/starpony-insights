@@ -8,6 +8,10 @@ import {
   COLUMNS as PRODUCT_COLUMNS,
   totalsFor as productTotals,
 } from "@/sections/shipments-products/columns"
+import {
+  COLUMNS as SUPPLY_COLUMNS,
+  totalsFor as supplyTotals,
+} from "@/sections/supplies-materials/columns"
 import type { Column } from "@/shared/components/data-table"
 
 /**
@@ -27,6 +31,7 @@ const TABLES = [
       revenue_kopecks: 122265995,
       documents_count: 294,
       products_count: 66,
+      revenue_share: "1.00000000",
     }),
     /** Расчётные колонки — те, что посчитаны, а не взяты из учёта как есть. */
     computed: ["avg", "share"],
@@ -42,6 +47,23 @@ const TABLES = [
       unpriced_count: 27,
     }),
     computed: ["quantity", "cost", "share"],
+  },
+  {
+    name: "Материалы в приёмках",
+    columns: SUPPLY_COLUMNS as Column<unknown>[],
+    totals: supplyTotals({
+      materials_count: 212,
+      amount_kopecks: 87971611,
+      amount_share: "1.00000000",
+      priced_count: 188,
+      unpriced_count: 24,
+      documents_count: 93,
+      suppliers_count: 22,
+    }),
+    // «Закуплено» здесь взято из учёта как есть, а не посчитано, — но
+    // подстрочник «в т.ч. даром» требует объяснения не меньше: без него
+    // разница между количеством и оплаченным количеством не читается.
+    computed: ["quantity", "amount", "price", "change", "supplies"],
   },
 ]
 
@@ -85,6 +107,10 @@ describe.each(TABLES)("$name", ({ columns, totals, computed }) => {
  * с ним обязано склоняться. Проверяется на единице: «1 наименований» —
  * самая заметная ошибка русского интерфейса, и появляется она молча,
  * стоит собрать подпись обычной подстановкой.
+ *
+ * Сверяется **конец строки**, а не вхождение. `toContain("1 материал")`
+ * проходил и на «1 материалов» — тест был зелёным при ровно той ошибке,
+ * которую сторожил. Вскрыто проверкой внесёнными дефектами.
  */
 describe("подвал склоняет существительное при числе", () => {
   it("товары — «1 наименование»", () => {
@@ -94,9 +120,24 @@ describe("подвал склоняет существительное при ч
       revenue_kopecks: 10000,
       documents_count: 1,
       products_count: 1,
+      revenue_share: "1.00000000",
     })
 
-    expect(String(totals.label)).toContain("1 наименование")
+    expect(String(totals.label)).toMatch(/· 1 наименование$/)
+  })
+
+  it("приёмки — «1 материал»", () => {
+    const totals = supplyTotals({
+      materials_count: 1,
+      amount_kopecks: 250500,
+      amount_share: "1.00000000",
+      priced_count: 1,
+      unpriced_count: 0,
+      documents_count: 1,
+      suppliers_count: 1,
+    })
+
+    expect(String(totals.label)).toMatch(/· 1 материал$/)
   })
 
   it("материалы — «1 материал»", () => {
@@ -108,6 +149,6 @@ describe("подвал склоняет существительное при ч
       unpriced_count: 0,
     })
 
-    expect(String(totals.label)).toContain("1 материал")
+    expect(String(totals.label)).toMatch(/· 1 материал$/)
   })
 })

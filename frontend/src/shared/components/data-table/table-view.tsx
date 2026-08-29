@@ -12,6 +12,21 @@ import {
   TableRow,
 } from "@/shared/ui/table"
 
+/**
+ * Первая колонка берёт всю оставшуюся ширину и **отдаёт** её остальным.
+ *
+ * `max-w-0` вместе с `w-full` — единственный способ заставить обрезку
+ * и перенос работать внутри `table-layout: auto`. Без него браузер считает
+ * предпочтительную ширину колонки по самому длинному названию и растягивает
+ * таблицу за край экрана: «Этикетка | Задняя | Кондиционер для гривы
+ * и хвоста Peachy Banana 500 мл (Старое)» уводила колонку «Закупок»
+ * в горизонтальную прокрутку, хотя места на экране было вдвое больше нужного.
+ *
+ * Применяется и к шапке, и к строкам, и к подвалу: хватит одной ячейки
+ * без ограничения, чтобы колонка снова растянулась.
+ */
+const NAME_CELL = "w-full max-w-0"
+
 type Props<Row> = {
   columns: Column<Row>[]
   rows: Row[]
@@ -47,7 +62,7 @@ export function TableView<Row>({
       <Table className={cn(muted && "opacity-60 transition-opacity")}>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            {columns.map((column) => {
+            {columns.map((column, index) => {
               const sortable = Boolean(column.sortKey && onSort)
               const active = sortable && sort?.key === column.sortKey
 
@@ -56,7 +71,8 @@ export function TableView<Row>({
                   key={column.key}
                   className={cn(
                     "text-xs font-normal tracking-wide text-muted-foreground uppercase",
-                    column.numeric && "text-right"
+                    column.numeric && "text-right",
+                    index === 0 && NAME_CELL
                   )}
                   aria-sort={
                     active ? (sort?.desc ? "descending" : "ascending") : undefined
@@ -132,7 +148,8 @@ export function TableView<Row>({
                     key={column.key}
                     className={cn(
                       column.numeric && "text-right tabular-nums",
-                      column.strong && "font-medium"
+                      column.strong && "font-medium",
+                      index === 0 && NAME_CELL
                     )}
                   >
                     {index === 0 && expandable ? (
@@ -155,7 +172,15 @@ export function TableView<Row>({
 
               open ? (
                 <TableRow key={`${key}-detail`} className="hover:bg-transparent">
-                  <TableCell colSpan={columns.length} className="bg-accent/40 p-0">
+                  {/* `whitespace-normal` обязателен: `TableCell` из реестра
+                      объявляет `whitespace-nowrap`, и разбор строки это
+                      наследует — абзацы внутри идут одной строкой и уползают
+                      за край экрана. Правило верно для ячейки с числом
+                      и неверно для ячейки с текстом. */}
+                  <TableCell
+                    colSpan={columns.length}
+                    className="bg-accent/40 p-0 whitespace-normal"
+                  >
                     {renderDetail?.(row)}
                   </TableCell>
                 </TableRow>
@@ -170,7 +195,10 @@ export function TableView<Row>({
               {columns.map((column, index) => (
                 <TableCell
                   key={column.key}
-                  className={cn(column.numeric && "text-right tabular-nums")}
+                  className={cn(
+                    column.numeric && "text-right tabular-nums",
+                    index === 0 && NAME_CELL
+                  )}
                 >
                   {index === 0 ? totals.label : (totals.values[column.key] ?? null)}
                 </TableCell>

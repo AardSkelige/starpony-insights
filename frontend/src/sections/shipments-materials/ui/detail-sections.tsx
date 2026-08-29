@@ -4,6 +4,7 @@ import type {
 } from "@/sections/shipments-materials/api"
 import { ExplainTree } from "@/sections/shipments-materials/ui/explain-tree"
 import { Fact, Facts, Failed, Loading, Section } from "@/shared/components/detail"
+import { Explain } from "@/shared/components/explain"
 import {
   formatDate,
   formatMoney,
@@ -139,7 +140,18 @@ export function PriceSection({
   const cost = detail.data?.cost_kopecks
 
   return (
-    <Section title="Цена закупки" bare={bare}>
+    <Section
+      title="Цена закупки"
+      bare={bare}
+      explain={
+        <Explain>
+          Цена из <b>последней приёмки</b> этого материала — с номером
+          документа, датой и поставщиком. Не из карточки товара: там она
+          заполнена у 42 материалов из 161 и часто расходится с тем,
+          что заплатили.
+        </Explain>
+      }
+    >
       <Facts>
         <Fact
           label="Цена за единицу"
@@ -149,7 +161,24 @@ export function PriceSection({
         <Fact label="Дата" value={formatDate(price.moment)} />
         <Fact label="Поставщик" value={price.supplier} />
         {cost !== null && cost !== undefined ? (
-          <Fact label="Стоимость израсходованного" value={formatMoney(cost)} />
+          <Fact
+            label={
+              <span className="inline-flex items-center gap-1.5">
+                Стоимость израсходованного
+                <Explain>
+                  <b>
+                    {formatQuantity(row.quantity, row.uom)} ×{" "}
+                    {formatUnitPrice(price.price_kopecks)} ={" "}
+                    {formatMoney(cost)}.
+                  </b>{" "}
+                  Стоимость замещения — во что обойдётся закупить столько же
+                  сегодня. Не себестоимость проданного: себестоимости на дату
+                  отгрузки в учёте нет.
+                </Explain>
+              </span>
+            }
+            value={formatMoney(cost)}
+          />
         ) : null}
       </Facts>
     </Section>

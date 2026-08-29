@@ -598,6 +598,293 @@ paths:
                 type: string
                 format: binary
           description: ''
+  /api/supplies/materials/:
+    get:
+      operationId: supply_materials_list
+      description: 'Что и почём закупали за период: количества, суммы, средняя цена,
+        последняя цена и её изменение к предыдущей закупке.'
+      summary: Материалы в приёмках
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -amount
+          - -avg_price
+          - -change
+          - -last_price
+          - -name
+          - -quantity
+          - -suppliers
+          - -supplies
+          - amount
+          - avg_price
+          - change
+          - last_price
+          - name
+          - quantity
+          - suppliers
+          - supplies
+          type: string
+          default: -amount
+          minLength: 1
+        description: |-
+          * `-amount` - -amount
+          * `-avg_price` - -avg_price
+          * `-change` - -change
+          * `-last_price` - -last_price
+          * `-name` - -name
+          * `-quantity` - -quantity
+          * `-suppliers` - -suppliers
+          * `-supplies` - -supplies
+          * `amount` - amount
+          * `avg_price` - avg_price
+          * `change` - change
+          * `last_price` - last_price
+          * `name` - name
+          * `quantity` - quantity
+          * `suppliers` - suppliers
+          * `supplies` - supplies
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 10
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      - in: query
+        name: supplier_id
+        schema:
+          type: integer
+          nullable: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplyMaterials'
+          description: ''
+  /api/supplies/materials/{material_id}/:
+    get:
+      operationId: supply_material_detail
+      description: 'История закупок и сравнение поставщиков. Фильтры те же, что у
+        таблицы: слагаемые обязаны сходиться с числом своей строки.'
+      summary: Материал в приёмках — откуда взялось число
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: path
+        name: material_id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -amount
+          - -avg_price
+          - -change
+          - -last_price
+          - -name
+          - -quantity
+          - -suppliers
+          - -supplies
+          - amount
+          - avg_price
+          - change
+          - last_price
+          - name
+          - quantity
+          - suppliers
+          - supplies
+          type: string
+          default: -amount
+          minLength: 1
+        description: |-
+          * `-amount` - -amount
+          * `-avg_price` - -avg_price
+          * `-change` - -change
+          * `-last_price` - -last_price
+          * `-name` - -name
+          * `-quantity` - -quantity
+          * `-suppliers` - -suppliers
+          * `-supplies` - -supplies
+          * `amount` - amount
+          * `avg_price` - avg_price
+          * `change` - change
+          * `last_price` - last_price
+          * `name` - name
+          * `quantity` - quantity
+          * `suppliers` - suppliers
+          * `supplies` - supplies
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 10
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      - in: query
+        name: supplier_id
+        schema:
+          type: integer
+          nullable: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplyMaterialDetail'
+          description: ''
+        '404':
+          description: No response body
+  /api/supplies/materials/xlsx/:
+    get:
+      operationId: supply_materials_xlsx
+      description: Та же выборка, что на экране, целиком. Вторым листом — каждая закупка
+        отдельной строкой.
+      summary: Материалы в приёмках — выгрузка в Excel
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -amount
+          - -avg_price
+          - -change
+          - -last_price
+          - -name
+          - -quantity
+          - -suppliers
+          - -supplies
+          - amount
+          - avg_price
+          - change
+          - last_price
+          - name
+          - quantity
+          - suppliers
+          - supplies
+          type: string
+          default: -amount
+          minLength: 1
+        description: |-
+          * `-amount` - -amount
+          * `-avg_price` - -avg_price
+          * `-change` - -change
+          * `-last_price` - -last_price
+          * `-name` - -name
+          * `-quantity` - -quantity
+          * `-suppliers` - -suppliers
+          * `-supplies` - -supplies
+          * `amount` - amount
+          * `avg_price` - avg_price
+          * `change` - change
+          * `last_price` - last_price
+          * `name` - name
+          * `quantity` - quantity
+          * `suppliers` - suppliers
+          * `supplies` - supplies
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 10
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      - in: query
+        name: supplier_id
+        schema:
+          type: integer
+          nullable: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+          description: ''
   /api/sync/refresh/:
     post:
       operationId: sync_refresh
@@ -696,6 +983,22 @@ components:
           type: string
       required:
       - detail
+    FilterOption:
+      type: object
+      description: |-
+        Значение справочника в выпадающем списке фильтров.
+
+        Один тип на канал продаж и на поставщика: в списке они устроены
+        одинаково — идентификатор и подпись, — а два одинаковых типа в схеме
+        дали бы фронтенду два компонента вместо одного поля фильтра.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
     Health:
       type: object
       properties:
@@ -716,8 +1019,57 @@ components:
       required:
       - password
       - username
+    MaterialCoverage:
+      type: object
+      description: |-
+        На сколько хватит остатка при нынешнем расходе.
+
+        Первая половина порога закупки (`PRD.md` §5.9): `minimumBalance` пуст
+        у всех 314 позиций, а расход за период против свободного остатка
+        берётся из фактов учёта.
+
+        **Это не прогноз**, и подсказка на экране обязана это сказать: средний
+        расход выбранного периода, а не тренд. Меняешь период — меняется число.
+      properties:
+        per_day:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        days_of_period:
+          type: integer
+        days_left:
+          type: integer
+          nullable: true
+        level:
+          type: string
+      required:
+      - days_left
+      - days_of_period
+      - level
+      - per_day
+    MaterialDistribution:
+      type: object
+      properties:
+        top:
+          type: array
+          items:
+            $ref: '#/components/schemas/MaterialShare'
+        rest:
+          allOf:
+          - $ref: '#/components/schemas/MaterialShareRest'
+          nullable: true
+      required:
+      - rest
+      - top
     MaterialHead:
       type: object
+      description: |-
+        Шапка разбора строки: чем именно является материал.
+
+        Один сериализатор на оба раздела. Поля у них совпадали до буквы, и схема
+        из-за двойника выдавала предупреждение «два компонента с одним именем
+        и разными телами» — то есть фронтенд получил бы неверные типы, ничего
+        об этом не узнав.
       properties:
         id:
           type: integer
@@ -779,6 +1131,30 @@ components:
       - moment
       - price_kopecks
       - supplier
+    MaterialRate:
+      type: object
+      description: |-
+        Норма расхода: сколько материала уходит на одно изделие.
+
+        Группой, а не по изделию: у 121 материала из 161 норма одна на все,
+        и шестнадцать одинаковых строк не сообщают ничего сверх одной. У 40
+        норма различается — у диметикона 200 г против 20 г, разница в десять
+        раз, и увидеть её больше негде.
+      properties:
+        rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+        products_count:
+          type: integer
+        examples:
+          type: array
+          items:
+            type: string
+      required:
+      - examples
+      - products_count
+      - rate
     MaterialRest:
       type: object
       description: |-
@@ -796,6 +1172,51 @@ components:
       required:
       - products_count
       - quantity
+    MaterialShare:
+      type: object
+      description: Изделие и его доля в расходе материала.
+      properties:
+        product_id:
+          type: integer
+        name:
+          type: string
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+        share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+      required:
+      - name
+      - product_id
+      - quantity
+      - share
+    MaterialShareRest:
+      type: object
+      description: |-
+        Свёрнутый хвост распределения.
+
+        Без него показанные доли не складываются в сто процентов, а количества —
+        в объясняемое число, и расхождение спишут на расчёт.
+      properties:
+        products_count:
+          type: integer
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+        share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+      required:
+      - products_count
+      - quantity
+      - share
     MaterialSource:
       type: object
       description: Изделие, из-за продажи которого материал израсходован.
@@ -842,6 +1263,25 @@ components:
       - key
       - label
       - route
+    PricePoint:
+      type: object
+      description: |-
+        Точка ряда цен: когда и почём. Дата обязательна вместе с ценой.
+
+        Линия строится по времени, а не по номеру закупки: между 28.02 и 14.05
+        два с половиной месяца, между 01.07 и 30.07 — один, и равные промежутки
+        на экране соврали бы о том, как быстро материал дорожает.
+      properties:
+        moment:
+          type: string
+          format: date-time
+        price_kopecks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+      required:
+      - moment
+      - price_kopecks
     ProductDocument:
       type: object
       properties:
@@ -885,6 +1325,53 @@ components:
       - is_superuser
       - pages
       - username
+    Purchase:
+      type: object
+      description: |-
+        Одна закупка: документ целиком, а не строка в нём.
+
+        Цена средневзвешенная, если строк было несколько: диметилфталат пришёл
+        одной приёмкой двумя партиями — 2000 г по 40 копеек и 3000 г по 45.
+        Показать их двумя закупками значило бы нарисовать скачок цены,
+        которого не было.
+      properties:
+        document_id:
+          type: integer
+        number:
+          type: string
+        moment:
+          type: string
+          format: date-time
+        supplier:
+          type: string
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        amount_kopecks:
+          type: integer
+        price_kopecks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+          nullable: true
+        is_free:
+          type: boolean
+        price_change:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,8})?$
+          nullable: true
+      required:
+      - amount_kopecks
+      - document_id
+      - is_free
+      - moment
+      - number
+      - price_change
+      - price_kopecks
+      - quantity
+      - supplier
     Refused:
       type: object
       properties:
@@ -895,16 +1382,6 @@ components:
       required:
       - detail
       - retry_after_seconds
-    SalesChannel:
-      type: object
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-      required:
-      - id
-      - name
     ShipmentMaterialDetail:
       type: object
       properties:
@@ -925,7 +1402,17 @@ components:
           allOf:
           - $ref: '#/components/schemas/Stock'
           nullable: true
+        coverage:
+          $ref: '#/components/schemas/MaterialCoverage'
+        rates:
+          type: array
+          items:
+            $ref: '#/components/schemas/MaterialRate'
+        distribution:
+          $ref: '#/components/schemas/MaterialDistribution'
         sources_count:
+          type: integer
+        multi_path_count:
           type: integer
         sources:
           type: array
@@ -937,9 +1424,13 @@ components:
           nullable: true
       required:
       - cost_kopecks
+      - coverage
+      - distribution
       - material
+      - multi_path_count
       - price
       - quantity
+      - rates
       - rest
       - sources
       - sources_count
@@ -1016,7 +1507,7 @@ components:
         channels:
           type: array
           items:
-            $ref: '#/components/schemas/SalesChannel'
+            $ref: '#/components/schemas/FilterOption'
       required:
       - channels
       - count
@@ -1185,7 +1676,7 @@ components:
         channels:
           type: array
           items:
-            $ref: '#/components/schemas/SalesChannel'
+            $ref: '#/components/schemas/FilterOption'
       required:
       - channels
       - count
@@ -1209,12 +1700,18 @@ components:
           type: integer
         products_count:
           type: integer
+        revenue_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
       required:
       - documents_count
       - free_quantity
       - products_count
       - quantity
       - revenue_kopecks
+      - revenue_share
     Stock:
       type: object
       description: |-
@@ -1245,6 +1742,315 @@ components:
       - quantity
       - reserved
       - stock_days
+    SupplierPrice:
+      type: object
+      description: |-
+        Что и почём брали у одного поставщика — строка сравнения.
+
+        `above_best` считается от самой низкой **последней** цены среди
+        поставщиков. Не от крайних цен вообще: у «Крышки флип-топ» разброс между
+        первой и последней ценой одного «Лемуна» — 73%, и назвать это разницей
+        между поставщиками значило бы предложить уйти от него к нему же.
+      properties:
+        supplier_id:
+          type: integer
+        name:
+          type: string
+        supplies_count:
+          type: integer
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        amount_kopecks:
+          type: integer
+        avg_price_kopecks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+          nullable: true
+        last_price_kopecks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+          nullable: true
+        last_moment:
+          type: string
+          format: date-time
+          nullable: true
+        above_best:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,8})?$
+          nullable: true
+      required:
+      - above_best
+      - amount_kopecks
+      - avg_price_kopecks
+      - last_moment
+      - last_price_kopecks
+      - name
+      - quantity
+      - supplier_id
+      - supplies_count
+    SupplyMaterialDetail:
+      type: object
+      properties:
+        material:
+          $ref: '#/components/schemas/MaterialHead'
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        free_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        paid_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        amount_kopecks:
+          type: integer
+        avg_price_kopecks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+          nullable: true
+        price_change:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,8})?$
+          nullable: true
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/Purchase'
+        suppliers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierPrice'
+        stock:
+          allOf:
+          - $ref: '#/components/schemas/Stock'
+          nullable: true
+      required:
+      - amount_kopecks
+      - avg_price_kopecks
+      - free_quantity
+      - history
+      - material
+      - paid_quantity
+      - price_change
+      - quantity
+      - stock
+      - suppliers
+    SupplyMaterialRow:
+      type: object
+      properties:
+        material_id:
+          type: integer
+        name:
+          type: string
+        article:
+          type: string
+        code:
+          type: string
+        uom:
+          type: string
+        mixed_uom:
+          type: boolean
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        free_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        paid_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        amount_kopecks:
+          type: integer
+        amount_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+        avg_price_kopecks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+          nullable: true
+        last_price_kopecks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+          nullable: true
+        last_moment:
+          type: string
+          format: date-time
+          nullable: true
+        last_document_number:
+          type: string
+          nullable: true
+        last_supplier:
+          type: string
+          nullable: true
+        previous_price_kopecks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+          nullable: true
+        previous_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+          nullable: true
+        last_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+          nullable: true
+        price_change:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,8})?$
+          nullable: true
+        prices:
+          type: array
+          items:
+            $ref: '#/components/schemas/PricePoint'
+        supplies_count:
+          type: integer
+        suppliers_count:
+          type: integer
+      required:
+      - amount_kopecks
+      - amount_share
+      - article
+      - avg_price_kopecks
+      - code
+      - free_quantity
+      - last_document_number
+      - last_moment
+      - last_price_kopecks
+      - last_quantity
+      - last_supplier
+      - material_id
+      - mixed_uom
+      - name
+      - paid_quantity
+      - previous_price_kopecks
+      - previous_quantity
+      - price_change
+      - prices
+      - quantity
+      - suppliers_count
+      - supplies_count
+      - uom
+    SupplyMaterials:
+      type: object
+      properties:
+        synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        count:
+          type: integer
+        totals:
+          $ref: '#/components/schemas/SupplyMaterialsTotals'
+        coverage:
+          $ref: '#/components/schemas/SupplyMaterialsCoverage'
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplyMaterialRow'
+        suppliers:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterOption'
+      required:
+      - count
+      - coverage
+      - results
+      - suppliers
+      - synced_at
+      - totals
+    SupplyMaterialsCoverage:
+      type: object
+      description: |-
+        Насколько полное число видит человек — про выборку приёмок целиком.
+
+        Поиск сюда не входит намеренно: он сужает список материалов, а не то,
+        что закупили.
+      properties:
+        materials_count:
+          type: integer
+        amount_kopecks:
+          type: integer
+        documents_count:
+          type: integer
+        suppliers_count:
+          type: integer
+        positions_count:
+          type: integer
+        free_positions_count:
+          type: integer
+        priced_count:
+          type: integer
+        unpriced_count:
+          type: integer
+        with_history_count:
+          type: integer
+        multi_supplier_count:
+          type: integer
+      required:
+      - amount_kopecks
+      - documents_count
+      - free_positions_count
+      - materials_count
+      - multi_supplier_count
+      - positions_count
+      - priced_count
+      - suppliers_count
+      - unpriced_count
+      - with_history_count
+    SupplyMaterialsTotals:
+      type: object
+      description: |-
+        Итог под таблицей — про то, что в ней видно, с учётом поиска.
+
+        Обязан сходиться со сложением колонки: файл и экран открывают затем,
+        чтобы складывать, и расхождение заметят раньше нас.
+      properties:
+        materials_count:
+          type: integer
+        amount_kopecks:
+          type: integer
+        amount_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+        priced_count:
+          type: integer
+        unpriced_count:
+          type: integer
+        documents_count:
+          type: integer
+        suppliers_count:
+          type: integer
+      required:
+      - amount_kopecks
+      - amount_share
+      - documents_count
+      - materials_count
+      - priced_count
+      - suppliers_count
+      - unpriced_count
     SyncRun:
       type: object
       properties:

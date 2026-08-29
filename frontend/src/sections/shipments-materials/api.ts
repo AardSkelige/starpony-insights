@@ -13,6 +13,9 @@ export type ShipmentMaterials = components["schemas"]["ShipmentMaterials"]
 export type ShipmentMaterialRow = components["schemas"]["ShipmentMaterialRow"]
 export type ShipmentMaterialDetail = components["schemas"]["ShipmentMaterialDetail"]
 export type WithoutPlanRow = components["schemas"]["WithoutPlanRow"]
+export type MaterialCoverage = components["schemas"]["MaterialCoverage"]
+export type MaterialRate = components["schemas"]["MaterialRate"]
+export type MaterialDistribution = components["schemas"]["MaterialDistribution"]
 
 const PATH = "/api/shipments/materials/"
 

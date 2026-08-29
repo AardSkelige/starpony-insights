@@ -28,7 +28,11 @@ export function Explain({ children }: { children: React.ReactNode }) {
         }
       />
       <TooltipContent className="max-w-70 text-left font-normal normal-case tracking-normal">
-        {children}
+        {/* Содержимое одним блоком, а не набором детей. `TooltipContent`
+            из реестра — `inline-flex items-center gap-1.5`, и каждый `<b>`
+            внутри становится отдельной колонкой: подсказка рассыпается
+            на четыре узких столбика вместо абзаца. */}
+        <span className="block">{children}</span>
       </TooltipContent>
     </Tooltip>
   )

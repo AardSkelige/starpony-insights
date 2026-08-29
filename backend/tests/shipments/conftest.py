@@ -175,6 +175,21 @@ def make_supply(run, agent):
 
 
 @pytest.fixture
+def make_stock():
+    """Остаток на складе. Свободный считается моделью: количество минус резерв."""
+    from core.models import Stock
+
+    def _make(product, quantity, reserved="0"):
+        return Stock.objects.create(
+            product=product,
+            quantity=Decimal(str(quantity)),
+            reserved=Decimal(str(reserved)),
+        )
+
+    return _make
+
+
+@pytest.fixture
 def make_counterparty(run):
     counter = {"n": 0}
 

@@ -15,7 +15,7 @@ from api.shipments.serializers import (
     ShipmentMaterialsSerializer,
 )
 from api.shipments.services import excel_materials, material_detail, materials, selection
-from api.shipments.views.common import XLSX, export_name
+from api.common.export import XLSX, export_name
 from core.services.freshness import documents_synced_at
 
 

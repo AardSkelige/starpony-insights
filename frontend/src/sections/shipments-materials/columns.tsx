@@ -26,10 +26,19 @@ export const COLUMNS: Column<ShipmentMaterialRow>[] = [
     sortKey: "name",
     render: (row) => (
       <span className="flex min-w-0 flex-col">
-        {/* В таблице название ужимается — там под него отведена колонка;
-            в карточке на телефоне переносится целиком, иначе «Этикетка |
-            Кондиционер для гривы и хвоста Нейтр…» не отличить от соседа. */}
-        <span className="truncate max-sm:whitespace-normal max-sm:font-medium">
+        {/* Название переносится в две строки, а не обрезается в одну:
+            «Этикетка | Задняя | Кондиционер для гривы и хвоста Peachy
+            Banana 500 мл (Старое)», обрезанное после «для гривы и хвост…»,
+            не отличить от такой же этикетки другого запаха. Самое длинное
+            наименование в учёте — 84 знака, и в две строки оно входит
+            целиком. На телефоне ограничения нет вовсе: там строка карточки
+            занимает всю ширину.
+
+            `whitespace-normal` обязателен вместе с `line-clamp-2`:
+            `TableCell` из реестра объявляет `whitespace-nowrap`, и без отмены
+            переносить нечего — текст остаётся одной строкой, а `line-clamp`
+            просто обрезает её многоточием. */}
+        <span className="line-clamp-2 whitespace-normal max-sm:line-clamp-none max-sm:font-medium">
           {row.name}
         </span>
         <span className="truncate font-mono text-xs text-muted-foreground">

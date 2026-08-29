@@ -8,15 +8,16 @@
 
 from rest_framework import serializers
 
-from api.shipments.serializers.common import (
-    SalesChannelSerializer,
-    SelectionQuerySerializer,
+from api.common.serializers import (
+    FilterOptionSerializer,
+    MaterialHeadSerializer,
     StockSerializer,
 )
+from api.shipments.serializers.common import ShipmentQuerySerializer
 from api.shipments.services.materials import DEFAULT_ORDERING, ORDERING
 
 
-class ShipmentMaterialsQuerySerializer(SelectionQuerySerializer):
+class ShipmentMaterialsQuerySerializer(ShipmentQuerySerializer):
     ordering = serializers.ChoiceField(
         choices=sorted(ORDERING), required=False, default=DEFAULT_ORDERING
     )
@@ -119,7 +120,7 @@ class ShipmentMaterialsSerializer(serializers.Serializer):
     coverage = ShipmentMaterialsCoverageSerializer()
     results = ShipmentMaterialRowSerializer(many=True)
     without_plan = WithoutPlanRowSerializer(many=True)
-    channels = SalesChannelSerializer(many=True)
+    channels = FilterOptionSerializer(many=True)
 
 
 class MaterialPathSerializer(serializers.Serializer):
@@ -158,14 +159,6 @@ class MaterialPriceSerializer(serializers.Serializer):
     supplier = serializers.CharField()
 
 
-class MaterialHeadSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    name = serializers.CharField()
-    article = serializers.CharField(allow_blank=True)
-    code = serializers.CharField(allow_blank=True)
-    uom = serializers.CharField(allow_blank=True)
-
-
 class MaterialRestSerializer(serializers.Serializer):
     """Свёрнутый хвост списка источников.
 
@@ -177,6 +170,75 @@ class MaterialRestSerializer(serializers.Serializer):
     quantity = serializers.DecimalField(max_digits=18, decimal_places=6)
 
 
+class MaterialCoverageSerializer(serializers.Serializer):
+    """На сколько хватит остатка при нынешнем расходе.
+
+    Первая половина порога закупки (`PRD.md` §5.9): `minimumBalance` пуст
+    у всех 314 позиций, а расход за период против свободного остатка
+    берётся из фактов учёта.
+
+    **Это не прогноз**, и подсказка на экране обязана это сказать: средний
+    расход выбранного периода, а не тренд. Меняешь период — меняется число.
+    """
+
+    # Средний расход за сутки — рядом с ответом, чтобы формула собиралась
+    # из полученного, а не пересчитывалась на фронте.
+    per_day = serializers.DecimalField(max_digits=18, decimal_places=3)
+    days_of_period = serializers.IntegerField()
+    # `null` — остатка в отчёте нет (36 материалов из 161) или расхода
+    # за период не было. Ноль означал бы «кончился», а это другое
+    # утверждение об учёте.
+    days_left = serializers.IntegerField(allow_null=True)
+    # `none` / `ok` / `low` / `critical`. Считается на сервере: пороги
+    # и текст предупреждения обязаны меняться вместе.
+    level = serializers.CharField()
+
+
+class MaterialRateSerializer(serializers.Serializer):
+    """Норма расхода: сколько материала уходит на одно изделие.
+
+    Группой, а не по изделию: у 121 материала из 161 норма одна на все,
+    и шестнадцать одинаковых строк не сообщают ничего сверх одной. У 40
+    норма различается — у диметикона 200 г против 20 г, разница в десять
+    раз, и увидеть её больше негде.
+    """
+
+    rate = serializers.DecimalField(max_digits=18, decimal_places=6)
+    products_count = serializers.IntegerField()
+    # Три крупнейших изделия этой нормы — примеры, а не весь список.
+    examples = serializers.ListField(child=serializers.CharField())
+
+
+class MaterialShareSerializer(serializers.Serializer):
+    """Изделие и его доля в расходе материала."""
+
+    product_id = serializers.IntegerField()
+    name = serializers.CharField()
+    quantity = serializers.DecimalField(max_digits=18, decimal_places=6)
+    share = serializers.DecimalField(
+        max_digits=9, decimal_places=8, allow_null=True
+    )
+
+
+class MaterialShareRestSerializer(serializers.Serializer):
+    """Свёрнутый хвост распределения.
+
+    Без него показанные доли не складываются в сто процентов, а количества —
+    в объясняемое число, и расхождение спишут на расчёт.
+    """
+
+    products_count = serializers.IntegerField()
+    quantity = serializers.DecimalField(max_digits=18, decimal_places=6)
+    share = serializers.DecimalField(
+        max_digits=9, decimal_places=8, allow_null=True
+    )
+
+
+class MaterialDistributionSerializer(serializers.Serializer):
+    top = MaterialShareSerializer(many=True)
+    rest = MaterialShareRestSerializer(allow_null=True)
+
+
 class ShipmentMaterialDetailSerializer(serializers.Serializer):
     material = MaterialHeadSerializer()
     quantity = serializers.DecimalField(max_digits=18, decimal_places=6)
@@ -185,9 +247,16 @@ class ShipmentMaterialDetailSerializer(serializers.Serializer):
     # Остаток известен не по всем материалам. `null` честнее нуля,
     # который читается как «кончился».
     stock = StockSerializer(allow_null=True)
+    coverage = MaterialCoverageSerializer()
+    rates = MaterialRateSerializer(many=True)
+    distribution = MaterialDistributionSerializer()
     # Сколько изделий-источников всего и первые из них. Число рядом со
     # списком: у воды источников пятьдесят девять, показаны двадцать.
     sources_count = serializers.IntegerField()
+    # Сколько из них получают материал несколькими путями — по всем
+    # источникам, а не по показанным. Заголовок свёрнутого разбора говорит
+    # этим числом, стоит ли его открывать.
+    multi_path_count = serializers.IntegerField()
     sources = MaterialSourceSerializer(many=True)
     # `null`, когда показаны все источники: пустой хвост и свёрнутый хвост —
     # разные вещи, и в интерфейсе они выглядят по-разному.

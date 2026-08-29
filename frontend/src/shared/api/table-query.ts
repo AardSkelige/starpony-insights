@@ -1,5 +1,5 @@
 /**
- * Запрос таблицы раздела: период, канал, поиск, страница, порядок.
+ * Запрос таблицы раздела: период, справочник, поиск, страница, порядок.
  *
  * У всех разделов он одинаков — и должен оставаться таким. Копия на каждый
  * раздел уже была, и обе сборки адреса совпадали слово в слово: тридцать
@@ -12,7 +12,18 @@
 export type TableQuery = {
   dateFrom: string | null
   dateTo: string | null
-  channelId: number | null
+  /**
+   * Справочник, которым сужают выборку: канал продаж у отгрузок,
+   * поставщик у приёмок.
+   *
+   * Раньше здесь стояло `channelId`, и общий слой знал про каналы. У приёмки
+   * канала не существует — товар приходит от контрагента, а не через Озон, —
+   * поэтому имя параметра приносит страница. `pick` — что выбрано,
+   * `pickParam` — как это называется в запросе.
+   */
+  pickId: number | null
+  /** Имя параметра запроса: `channel_id` у отгрузок, `supplier_id` у приёмок. */
+  pickParam: string
   search: string
   page: number
   ordering?: string
@@ -37,7 +48,9 @@ function toSearchParams(query: TableQuery): string {
   const params = new URLSearchParams()
   if (query.dateFrom) params.set("date_from", query.dateFrom)
   if (query.dateTo) params.set("date_to", query.dateTo)
-  if (query.channelId) params.set("channel_id", String(query.channelId))
+  // Имя параметра приходит от страницы: сервер принимает `channel_id`
+  // на отгрузках и `supplier_id` на приёмках, и общего имени у них нет.
+  if (query.pickId) params.set(query.pickParam, String(query.pickId))
   if (query.search) params.set("search", query.search)
   if (query.page > 1) params.set("page", String(query.page))
   if (query.ordering) params.set("ordering", query.ordering)

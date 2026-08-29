@@ -5,7 +5,8 @@ import { withQuery, withSelection } from "@/shared/api/table-query"
 const EMPTY = {
   dateFrom: null,
   dateTo: null,
-  channelId: null,
+  pickId: null,
+  pickParam: "channel_id",
   search: "",
   page: 1,
 }
@@ -28,7 +29,8 @@ describe("адрес запроса таблицы", () => {
     const url = withQuery("/x/", {
       dateFrom: "2026-06-01",
       dateTo: "2026-06-30",
-      channelId: 7,
+      pickId: 7,
+      pickParam: "channel_id",
       search: "вода",
       page: 3,
       ordering: "-cost",
@@ -41,6 +43,20 @@ describe("адрес запроса таблицы", () => {
     expect(url).toContain("page=3")
     expect(url).toContain("ordering=-cost")
     expect(url).toContain("page_size=25")
+  })
+
+  it("имя параметра справочника приносит страница", () => {
+    // У приёмки канала продаж не существует: товар приходит от контрагента,
+    // а не через Озон. Общий слой поэтому не знает, что именно выбирают, —
+    // он знает только, что выбрали одно значение из справочника.
+    const supplies = withQuery("/api/supplies/materials/", {
+      ...EMPTY,
+      pickId: 7,
+      pickParam: "supplier_id",
+    })
+
+    expect(supplies).toContain("supplier_id=7")
+    expect(supplies).not.toContain("channel_id")
   })
 
   it("поиск экранируется", () => {

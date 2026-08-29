@@ -13,23 +13,39 @@ import { Skeleton } from "@/shared/ui/skeleton"
 export function Section({
   title,
   note,
+  explain,
   children,
   bare = false,
 }: {
   title: string
   /** Уточнение под заголовком: «показаны 20 из 59». */
   note?: string
+  /**
+   * Формула у заголовка раздела — как у колонки таблицы.
+   *
+   * Значок стоит рядом с подписью, а не отдельной строкой под блоком:
+   * висящий сам по себе вопросительный знак не говорит, к чему относится,
+   * и его просто не нажимают.
+   */
+  explain?: React.ReactNode
   children: React.ReactNode
   /** За вкладкой заголовок лишний — его роль играет сама вкладка. */
   bare?: boolean
 }) {
   return (
     <div className="min-w-0">
-      {bare ? null : (
+      {bare ? (
+        // За вкладкой заголовок лишний — его роль играет сама вкладка,
+        // но значок объяснения обязан остаться: на телефоне подсказки
+        // у колонок таблицы недостижимы вовсе (таблица там карточками),
+        // и это единственное место, где формулу можно посмотреть.
+        explain ? <div className="mb-2 flex justify-end">{explain}</div> : null
+      ) : (
         <div className="mb-2 flex items-center gap-2">
           <span className="text-xs tracking-wide text-muted-foreground uppercase">
             {title}
           </span>
+          {explain}
           <span className="h-px flex-1 bg-border" />
         </div>
       )}
@@ -48,7 +64,12 @@ export function Fact({
   label,
   value,
 }: {
-  label: string
+  /**
+   * Подпись. `ReactNode`, а не строка: рядом с ней встаёт значок объяснения
+   * там, где само число расчётное, — «расход в день» надо объяснить так же,
+   * как колонку таблицы.
+   */
+  label: React.ReactNode
   value: React.ReactNode
 }) {
   return (

@@ -9,8 +9,15 @@
 
 import type { components } from "@/shared/api/schema"
 
-/** Канал продаж в выпадающем списке фильтров. */
-export type SalesChannel = components["schemas"]["SalesChannel"]
+/**
+ * Значение справочника в выпадающем списке фильтров.
+ *
+ * Один тип на канал продаж и на поставщика: в списке они устроены одинаково —
+ * идентификатор и подпись. Раньше здесь жил `SalesChannel`, и фильтр знал
+ * про каналы; у приёмок канала не существует, зато есть поставщик, и общий
+ * фильтр перестал знать, что именно в нём выбирают.
+ */
+export type FilterOption = components["schemas"]["FilterOption"]
 
 /** Остаток на складе. Один тип на все разделы — так же, как на сервере. */
 export type Stock = components["schemas"]["Stock"]

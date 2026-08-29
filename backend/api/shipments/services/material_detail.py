@@ -1,20 +1,30 @@
-"""Детали одного материала: из каких изделий пришёл, какими путями, что осталось.
+"""Детали одного материала: хватит ли, почём, сколько на изделие и где сидит.
 
 Отдельным запросом, а не полем в списке: у воды пятьдесят девять изделий-
 источников, и на сто шестьдесят одну строку это девять тысяч лишних строк
 в ответе, из которых человек посмотрит одну.
 
-**Здесь живёт объяснение числа.** Строка таблицы говорит «1 324 150 г воды»;
-панель раскладывает это по изделиям, а внутри изделия — по путям, которыми
-материал в него попал. Отдушка входит в шампунь и напрямую при розливе,
-и через замес основы — два слагаемых, а не одно число с примечанием.
+**Порядок ответов задан тем, как часто их спрашивают.** Первым — запас:
+на сколько хватит остатка при нынешнем расходе. Это единственное число
+на странице, требующее действия сегодня: у диметикона его хватает на ноль
+дней, у воды на три. Дальше цена, норма расхода и распределение.
+
+**Разбор по техкартам остался последним и свёрнутым.** Он объясняет число
+до последнего слагаемого и незаменим ровно там, где расход не сводится
+к простому умножению: отдушка входит в шампунь и через замес основы,
+и прямым добавлением при розливе, и 1,02 г на изделие — не описка.
+Но таких материалов один из 161, и встречать этим блоком остальные сто
+шестьдесят значило показывать название трижды подряд вместо ответа.
 """
 
 from decimal import Decimal
 
-from api.shipments.services import consumption
+from django.db.models import Max, Min
+
+from api.shipments.services import consumption, material_rates, selection
 from api.shipments.services.materials import Filters, cost_of
 from core.models import Product
+from core.services import coverage
 from core.services.materials import explode, plans_by_product
 from core.services.stock import stock_of
 from core.services.purchase_prices import last_purchase_prices
@@ -85,6 +95,25 @@ def detail(filters: Filters, material_id: int) -> dict:
     shown = sources[:SOURCE_LIMIT]
     hidden = sources[SOURCE_LIMIT:]
 
+    stock = stock_of(material_id)
+    # `_days_of_data` считается только при открытом периоде: при заданных
+    # границах `days_in` возвращает их разницу, а лишний обход всех позиций
+    # выборки ради отброшенного числа стоит запроса на каждое раскрытие
+    # строки.
+    span = (
+        coverage.days_in(filters.date_from, filters.date_to, 0)
+        if filters.date_from and filters.date_to
+        else coverage.days_in(None, None, _days_of_data(filters))
+    )
+    left = coverage.of(
+        total,
+        span,
+        # Свободный остаток, а не общий: зарезервированное под заказы уже
+        # обещано, и считать его своим значит обнаружить нехватку
+        # в день отгрузки.
+        Decimal(stock["available"]) if stock else None,
+    )
+
     return {
         "material": {
             "id": material.pk,
@@ -107,8 +136,32 @@ def detail(filters: Filters, material_id: int) -> dict:
             if price
             else None
         ),
-        "stock": stock_of(material_id),
+        "stock": stock,
+        # Запас в днях — первая половина порога закупки (`PRD.md` §5.9).
+        # Считается из того, что уже на экране: расход за период против
+        # свободного остатка.
+        "coverage": {
+            "per_day": left.per_day,
+            "days_of_period": left.days_of_period,
+            "days_left": left.days_left,
+            "level": coverage.level(left.days_left),
+        },
+        # Сколько материала уходит на одно изделие. Одна строка там, где
+        # норма одна на все изделия (121 материал из 161), несколько — там,
+        # где она различается: у диметикона 200 г против 20 г.
+        "rates": material_rates.rates_of(sources),
+        # Где сидит расход: пять крупнейших изделий и свёрнутый хвост.
+        "distribution": material_rates.distribution(sources, total),
         "sources_count": len(sources),
+        # Сколько изделий получают материал несколькими путями — по **всем**
+        # источникам, а не по двадцати показанным. Заголовок свёрнутого
+        # разбора считался по видимым и у воды утверждал «в каждое одним
+        # путём», хотя многопутёвое изделие могло стоять двадцать первым:
+        # блок обещал, что раскрывать нечего, ровно там, где ради этого
+        # он и существует.
+        "multi_path_count": sum(
+            1 for source in sources if len(source["paths"]) > 1
+        ),
         "sources": shown,
         "rest": (
             {
@@ -119,3 +172,21 @@ def detail(filters: Filters, material_id: int) -> dict:
             else None
         ),
     }
+
+
+def _days_of_data(filters: Filters) -> int:
+    """Длина выборки в днях, когда период не задан руками.
+
+    Берётся из фактических дат отгрузок, а не из «сегодня минус год»:
+    делить расход на срок, которого в данных не было, значит занизить
+    дневной расход во столько раз, во сколько ошиблись со сроком.
+    """
+    bounds = selection.shipment_positions(
+        date_from=filters.date_from,
+        date_to=filters.date_to,
+        channel_id=filters.channel_id,
+    ).aggregate(first=Min("document__moment"), last=Max("document__moment"))
+
+    if not bounds["first"] or not bounds["last"]:
+        return 1
+    return (bounds["last"].date() - bounds["first"].date()).days + 1

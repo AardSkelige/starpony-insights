@@ -10,6 +10,7 @@ import {
   Loading,
   Section,
 } from "@/shared/components/detail"
+import { Explain } from "@/shared/components/explain"
 import {
   formatDayMonth,
   formatMoney,
@@ -67,7 +68,16 @@ export function PriceSection({ row }: { row: ShipmentProductRow }) {
   const free = Number(row.free_quantity)
 
   return (
-    <Section title="Цена">
+    <Section
+      title="Цена"
+      explain={
+        <Explain>
+          <b>Выручка ÷ количество</b> по выбранной выборке. Отгрузки за 0 ₽
+          в делении участвуют: 532 штуки из 2338 ушли даром, и средняя
+          из-за них ниже той, по которой действительно продавали.
+        </Explain>
+      }
+    >
       <Facts>
         <Fact
           label="Средняя за штуку"

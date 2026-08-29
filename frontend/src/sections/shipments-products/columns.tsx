@@ -26,10 +26,19 @@ export const COLUMNS: Column<ShipmentProductRow>[] = [
     sortKey: "name",
     render: (row) => (
       <span className="flex min-w-0 flex-col">
-        {/* В таблице название ужимается — там под него отведена колонка;
-            в карточке на телефоне переносится целиком, иначе «Кондиционер
-            для гривы и хвоста Сияющ…» не отличить от соседа. */}
-        <span className="truncate max-sm:whitespace-normal max-sm:font-medium">
+        {/* Название переносится в две строки, а не обрезается в одну:
+            «Этикетка | Задняя | Кондиционер для гривы и хвоста Peachy
+            Banana 500 мл (Старое)», обрезанное после «для гривы и хвост…»,
+            не отличить от такой же этикетки другого запаха. Самое длинное
+            наименование в учёте — 84 знака, и в две строки оно входит
+            целиком. На телефоне ограничения нет вовсе: там строка карточки
+            занимает всю ширину.
+
+            `whitespace-normal` обязателен вместе с `line-clamp-2`:
+            `TableCell` из реестра объявляет `whitespace-nowrap`, и без отмены
+            переносить нечего — текст остаётся одной строкой, а `line-clamp`
+            просто обрезает её многоточием. */}
+        <span className="line-clamp-2 whitespace-normal max-sm:line-clamp-none max-sm:font-medium">
           {row.name}
         </span>
         <span className="truncate font-mono text-xs text-muted-foreground">
@@ -144,15 +153,12 @@ export function totalsFor(totals: ShipmentProducts["totals"]): Totals {
       free: formatQuantity(totals.free_quantity),
       revenue: formatMoney(totals.revenue_kopecks),
       avg: <span className="text-muted-foreground">—</span>,
-      // Не строка «100 %»: когда выручка выборки нулевая, доли строк
-      // приходят пустыми, и подвал заявлял бы сто процентов над колонкой
-      // из прочерков.
-      share:
-        totals.revenue_kopecks > 0 ? (
-          "100 %"
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
+      // Доля приходит с сервера, а не пишется «100 %» жёстко. Без поиска
+      // это ровно сто процентов; с поиском — сколько найденное занимает
+      // в выручке выборки, и оно сходится со сложением колонки. Жёсткая
+      // строка стояла бы над колонкой, где доли складываются в четырнадцать
+      // процентов, и над пустой колонкой при нулевой выручке.
+      share: formatShare(totals.revenue_share),
     },
   }
 }

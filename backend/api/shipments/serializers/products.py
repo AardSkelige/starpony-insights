@@ -2,15 +2,12 @@
 
 from rest_framework import serializers
 
-from api.shipments.serializers.common import (
-    SalesChannelSerializer,
-    SelectionQuerySerializer,
-    StockSerializer,
-)
+from api.common.serializers import FilterOptionSerializer, StockSerializer
+from api.shipments.serializers.common import ShipmentQuerySerializer
 from api.shipments.services.products import DEFAULT_ORDERING, ORDERING
 
 
-class ShipmentProductsQuerySerializer(SelectionQuerySerializer):
+class ShipmentProductsQuerySerializer(ShipmentQuerySerializer):
     ordering = serializers.ChoiceField(
         choices=sorted(ORDERING), required=False, default=DEFAULT_ORDERING
     )
@@ -47,6 +44,13 @@ class ShipmentProductsTotalsSerializer(serializers.Serializer):
     revenue_kopecks = serializers.IntegerField()
     documents_count = serializers.IntegerField()
     products_count = serializers.IntegerField()
+    # Сколько показанное занимает в выручке выборки. Без поиска это ровно
+    # сто процентов, с поиском — доля найденного, и она сходится
+    # со сложением колонки. Жёсткое «100 %» стояло бы над колонкой,
+    # где доли складываются в четырнадцать.
+    revenue_share = serializers.DecimalField(
+        max_digits=9, decimal_places=8, allow_null=True
+    )
 
 
 class ChannelShareSerializer(serializers.Serializer):
@@ -83,4 +87,4 @@ class ShipmentProductsSerializer(serializers.Serializer):
     results = ShipmentProductRowSerializer(many=True)
     # Наполнение фильтра приходит вместе с данными: своего запроса за девятью
     # значениями фронт не делает, и список не может разойтись с выборкой.
-    channels = SalesChannelSerializer(many=True)
+    channels = FilterOptionSerializer(many=True)

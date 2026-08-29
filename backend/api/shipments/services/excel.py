@@ -2,13 +2,14 @@
 
 Отдельным модулем от расчёта: сводка по товарам нужна и экрану, и файлу,
 а знание про ширину колонки и формат ячейки — только файлу. Как устроена
-сама книга — в `workbook.py`, общем для выгрузок раздела.
+сама книга — в `api/common/workbook.py`, общем для всех выгрузок.
 """
 
 from io import BytesIO
 
-from api.shipments.services import products, workbook
-from api.shipments.services.workbook import MONEY, QUANTITY, SHARE
+from api.common import workbook
+from api.common.workbook import MONEY, QUANTITY, SHARE
+from api.shipments.services import products
 from core.money import rubles
 from core.text import with_plural
 

@@ -5,11 +5,7 @@
 пролистать другую.
 """
 
-from api.shipments.serializers.common import (
-    SalesChannelSerializer,
-    SelectionQuerySerializer,
-    StockSerializer,
-)
+from api.shipments.serializers.common import ShipmentQuerySerializer
 from api.shipments.serializers.materials import (
     ShipmentMaterialDetailSerializer,
     ShipmentMaterialsQuerySerializer,
@@ -22,9 +18,7 @@ from api.shipments.serializers.products import (
 )
 
 __all__ = [
-    "SalesChannelSerializer",
-    "SelectionQuerySerializer",
-    "StockSerializer",
+    "ShipmentQuerySerializer",
     "ShipmentMaterialDetailSerializer",
     "ShipmentMaterialsQuerySerializer",
     "ShipmentMaterialsSerializer",

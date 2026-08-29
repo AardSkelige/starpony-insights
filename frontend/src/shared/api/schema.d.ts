@@ -194,6 +194,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/supplies/materials/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Материалы в приёмках
+         * @description Что и почём закупали за период: количества, суммы, средняя цена, последняя цена и её изменение к предыдущей закупке.
+         */
+        get: operations["supply_materials_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/supplies/materials/{material_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Материал в приёмках — откуда взялось число
+         * @description История закупок и сравнение поставщиков. Фильтры те же, что у таблицы: слагаемые обязаны сходиться с числом своей строки.
+         */
+        get: operations["supply_material_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/supplies/materials/xlsx/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Материалы в приёмках — выгрузка в Excel
+         * @description Та же выборка, что на экране, целиком. Вторым листом — каждая закупка отдельной строкой.
+         */
+        get: operations["supply_materials_xlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sync/refresh/": {
         parameters: {
             query?: never;
@@ -268,6 +328,17 @@ export interface components {
         Detail: {
             detail: string;
         };
+        /**
+         * @description Значение справочника в выпадающем списке фильтров.
+         *
+         *     Один тип на канал продаж и на поставщика: в списке они устроены
+         *     одинаково — идентификатор и подпись, — а два одинаковых типа в схеме
+         *     дали бы фронтенду два компонента вместо одного поля фильтра.
+         */
+        FilterOption: {
+            id: number;
+            name: string;
+        };
         Health: {
             status: string;
             database: string;
@@ -276,6 +347,35 @@ export interface components {
             username: string;
             password: string;
         };
+        /**
+         * @description На сколько хватит остатка при нынешнем расходе.
+         *
+         *     Первая половина порога закупки (`PRD.md` §5.9): `minimumBalance` пуст
+         *     у всех 314 позиций, а расход за период против свободного остатка
+         *     берётся из фактов учёта.
+         *
+         *     **Это не прогноз**, и подсказка на экране обязана это сказать: средний
+         *     расход выбранного периода, а не тренд. Меняешь период — меняется число.
+         */
+        MaterialCoverage: {
+            /** Format: decimal */
+            per_day: string;
+            days_of_period: number;
+            days_left: number | null;
+            level: string;
+        };
+        MaterialDistribution: {
+            top: components["schemas"]["MaterialShare"][];
+            rest: components["schemas"]["MaterialShareRest"] | null;
+        };
+        /**
+         * @description Шапка разбора строки: чем именно является материал.
+         *
+         *     Один сериализатор на оба раздела. Поля у них совпадали до буквы, и схема
+         *     из-за двойника выдавала предупреждение «два компонента с одним именем
+         *     и разными телами» — то есть фронтенд получил бы неверные типы, ничего
+         *     об этом не узнав.
+         */
         MaterialHead: {
             id: number;
             name: string;
@@ -310,6 +410,20 @@ export interface components {
             supplier: string;
         };
         /**
+         * @description Норма расхода: сколько материала уходит на одно изделие.
+         *
+         *     Группой, а не по изделию: у 121 материала из 161 норма одна на все,
+         *     и шестнадцать одинаковых строк не сообщают ничего сверх одной. У 40
+         *     норма различается — у диметикона 200 г против 20 г, разница в десять
+         *     раз, и увидеть её больше негде.
+         */
+        MaterialRate: {
+            /** Format: decimal */
+            rate: string;
+            products_count: number;
+            examples: string[];
+        };
+        /**
          * @description Свёрнутый хвост списка источников.
          *
          *     Без него показанные слагаемые не складывались бы в число, которое панель
@@ -319,6 +433,28 @@ export interface components {
             products_count: number;
             /** Format: decimal */
             quantity: string;
+        };
+        /** @description Изделие и его доля в расходе материала. */
+        MaterialShare: {
+            product_id: number;
+            name: string;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            share: string | null;
+        };
+        /**
+         * @description Свёрнутый хвост распределения.
+         *
+         *     Без него показанные доли не складываются в сто процентов, а количества —
+         *     в объясняемое число, и расхождение спишут на расчёт.
+         */
+        MaterialShareRest: {
+            products_count: number;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            share: string | null;
         };
         /** @description Изделие, из-за продажи которого материал израсходован. */
         MaterialSource: {
@@ -338,6 +474,19 @@ export interface components {
             group: string;
             route: string;
         };
+        /**
+         * @description Точка ряда цен: когда и почём. Дата обязательна вместе с ценой.
+         *
+         *     Линия строится по времени, а не по номеру закупки: между 28.02 и 14.05
+         *     два с половиной месяца, между 01.07 и 30.07 — один, и равные промежутки
+         *     на экране соврали бы о том, как быстро материал дорожает.
+         */
+        PricePoint: {
+            /** Format: date-time */
+            moment: string;
+            /** Format: decimal */
+            price_kopecks: string;
+        };
         ProductDocument: {
             number: string;
             /** Format: date-time */
@@ -354,13 +503,32 @@ export interface components {
             is_superuser: boolean;
             pages: components["schemas"]["Page"][];
         };
+        /**
+         * @description Одна закупка: документ целиком, а не строка в нём.
+         *
+         *     Цена средневзвешенная, если строк было несколько: диметилфталат пришёл
+         *     одной приёмкой двумя партиями — 2000 г по 40 копеек и 3000 г по 45.
+         *     Показать их двумя закупками значило бы нарисовать скачок цены,
+         *     которого не было.
+         */
+        Purchase: {
+            document_id: number;
+            number: string;
+            /** Format: date-time */
+            moment: string;
+            supplier: string;
+            /** Format: decimal */
+            quantity: string;
+            amount_kopecks: number;
+            /** Format: decimal */
+            price_kopecks: string | null;
+            is_free: boolean;
+            /** Format: decimal */
+            price_change: string | null;
+        };
         Refused: {
             detail: string;
             retry_after_seconds: number;
-        };
-        SalesChannel: {
-            id: number;
-            name: string;
         };
         ShipmentMaterialDetail: {
             material: components["schemas"]["MaterialHead"];
@@ -369,7 +537,11 @@ export interface components {
             cost_kopecks: number | null;
             price: components["schemas"]["MaterialPrice"] | null;
             stock: components["schemas"]["Stock"] | null;
+            coverage: components["schemas"]["MaterialCoverage"];
+            rates: components["schemas"]["MaterialRate"][];
+            distribution: components["schemas"]["MaterialDistribution"];
             sources_count: number;
+            multi_path_count: number;
             sources: components["schemas"]["MaterialSource"][];
             rest: components["schemas"]["MaterialRest"] | null;
         };
@@ -398,7 +570,7 @@ export interface components {
             coverage: components["schemas"]["ShipmentMaterialsCoverage"];
             results: components["schemas"]["ShipmentMaterialRow"][];
             without_plan: components["schemas"]["WithoutPlanRow"][];
-            channels: components["schemas"]["SalesChannel"][];
+            channels: components["schemas"]["FilterOption"][];
         };
         /**
          * @description Насколько полное число видит человек — про выборку отгрузок целиком.
@@ -464,7 +636,7 @@ export interface components {
             count: number;
             totals: components["schemas"]["ShipmentProductsTotals"];
             results: components["schemas"]["ShipmentProductRow"][];
-            channels: components["schemas"]["SalesChannel"][];
+            channels: components["schemas"]["FilterOption"][];
         };
         ShipmentProductsTotals: {
             /** Format: decimal */
@@ -474,6 +646,8 @@ export interface components {
             revenue_kopecks: number;
             documents_count: number;
             products_count: number;
+            /** Format: decimal */
+            revenue_share: string | null;
         };
         /**
          * @description Что лежит на складе сейчас — одинаково для товара и для материала.
@@ -491,6 +665,126 @@ export interface components {
             /** Format: decimal */
             available: string;
             stock_days: number | null;
+        };
+        /**
+         * @description Что и почём брали у одного поставщика — строка сравнения.
+         *
+         *     `above_best` считается от самой низкой **последней** цены среди
+         *     поставщиков. Не от крайних цен вообще: у «Крышки флип-топ» разброс между
+         *     первой и последней ценой одного «Лемуна» — 73%, и назвать это разницей
+         *     между поставщиками значило бы предложить уйти от него к нему же.
+         */
+        SupplierPrice: {
+            supplier_id: number;
+            name: string;
+            supplies_count: number;
+            /** Format: decimal */
+            quantity: string;
+            amount_kopecks: number;
+            /** Format: decimal */
+            avg_price_kopecks: string | null;
+            /** Format: decimal */
+            last_price_kopecks: string | null;
+            /** Format: date-time */
+            last_moment: string | null;
+            /** Format: decimal */
+            above_best: string | null;
+        };
+        SupplyMaterialDetail: {
+            material: components["schemas"]["MaterialHead"];
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            free_quantity: string;
+            /** Format: decimal */
+            paid_quantity: string;
+            amount_kopecks: number;
+            /** Format: decimal */
+            avg_price_kopecks: string | null;
+            /** Format: decimal */
+            price_change: string | null;
+            history: components["schemas"]["Purchase"][];
+            suppliers: components["schemas"]["SupplierPrice"][];
+            stock: components["schemas"]["Stock"] | null;
+        };
+        SupplyMaterialRow: {
+            material_id: number;
+            name: string;
+            article: string;
+            code: string;
+            uom: string;
+            mixed_uom: boolean;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            free_quantity: string;
+            /** Format: decimal */
+            paid_quantity: string;
+            amount_kopecks: number;
+            /** Format: decimal */
+            amount_share: string | null;
+            /** Format: decimal */
+            avg_price_kopecks: string | null;
+            /** Format: decimal */
+            last_price_kopecks: string | null;
+            /** Format: date-time */
+            last_moment: string | null;
+            last_document_number: string | null;
+            last_supplier: string | null;
+            /** Format: decimal */
+            previous_price_kopecks: string | null;
+            /** Format: decimal */
+            previous_quantity: string | null;
+            /** Format: decimal */
+            last_quantity: string | null;
+            /** Format: decimal */
+            price_change: string | null;
+            prices: components["schemas"]["PricePoint"][];
+            supplies_count: number;
+            suppliers_count: number;
+        };
+        SupplyMaterials: {
+            /** Format: date-time */
+            synced_at: string | null;
+            count: number;
+            totals: components["schemas"]["SupplyMaterialsTotals"];
+            coverage: components["schemas"]["SupplyMaterialsCoverage"];
+            results: components["schemas"]["SupplyMaterialRow"][];
+            suppliers: components["schemas"]["FilterOption"][];
+        };
+        /**
+         * @description Насколько полное число видит человек — про выборку приёмок целиком.
+         *
+         *     Поиск сюда не входит намеренно: он сужает список материалов, а не то,
+         *     что закупили.
+         */
+        SupplyMaterialsCoverage: {
+            materials_count: number;
+            amount_kopecks: number;
+            documents_count: number;
+            suppliers_count: number;
+            positions_count: number;
+            free_positions_count: number;
+            priced_count: number;
+            unpriced_count: number;
+            with_history_count: number;
+            multi_supplier_count: number;
+        };
+        /**
+         * @description Итог под таблицей — про то, что в ней видно, с учётом поиска.
+         *
+         *     Обязан сходиться со сложением колонки: файл и экран открывают затем,
+         *     чтобы складывать, и расхождение заметят раньше нас.
+         */
+        SupplyMaterialsTotals: {
+            materials_count: number;
+            amount_kopecks: number;
+            /** Format: decimal */
+            amount_share: string | null;
+            priced_count: number;
+            unpriced_count: number;
+            documents_count: number;
+            suppliers_count: number;
         };
         SyncRun: {
             status: string;
@@ -874,6 +1168,150 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+        };
+    };
+    supply_materials_list: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-amount` - -amount
+                 *     * `-avg_price` - -avg_price
+                 *     * `-change` - -change
+                 *     * `-last_price` - -last_price
+                 *     * `-name` - -name
+                 *     * `-quantity` - -quantity
+                 *     * `-suppliers` - -suppliers
+                 *     * `-supplies` - -supplies
+                 *     * `amount` - amount
+                 *     * `avg_price` - avg_price
+                 *     * `change` - change
+                 *     * `last_price` - last_price
+                 *     * `name` - name
+                 *     * `quantity` - quantity
+                 *     * `suppliers` - suppliers
+                 *     * `supplies` - supplies
+                 */
+                ordering?: "-amount" | "-avg_price" | "-change" | "-last_price" | "-name" | "-quantity" | "-suppliers" | "-supplies" | "amount" | "avg_price" | "change" | "last_price" | "name" | "quantity" | "suppliers" | "supplies";
+                page?: number;
+                page_size?: number;
+                search?: string;
+                supplier_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplyMaterials"];
+                };
+            };
+        };
+    };
+    supply_material_detail: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-amount` - -amount
+                 *     * `-avg_price` - -avg_price
+                 *     * `-change` - -change
+                 *     * `-last_price` - -last_price
+                 *     * `-name` - -name
+                 *     * `-quantity` - -quantity
+                 *     * `-suppliers` - -suppliers
+                 *     * `-supplies` - -supplies
+                 *     * `amount` - amount
+                 *     * `avg_price` - avg_price
+                 *     * `change` - change
+                 *     * `last_price` - last_price
+                 *     * `name` - name
+                 *     * `quantity` - quantity
+                 *     * `suppliers` - suppliers
+                 *     * `supplies` - supplies
+                 */
+                ordering?: "-amount" | "-avg_price" | "-change" | "-last_price" | "-name" | "-quantity" | "-suppliers" | "-supplies" | "amount" | "avg_price" | "change" | "last_price" | "name" | "quantity" | "suppliers" | "supplies";
+                page?: number;
+                page_size?: number;
+                search?: string;
+                supplier_id?: number | null;
+            };
+            header?: never;
+            path: {
+                material_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplyMaterialDetail"];
+                };
+            };
+            /** @description No response body */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    supply_materials_xlsx: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-amount` - -amount
+                 *     * `-avg_price` - -avg_price
+                 *     * `-change` - -change
+                 *     * `-last_price` - -last_price
+                 *     * `-name` - -name
+                 *     * `-quantity` - -quantity
+                 *     * `-suppliers` - -suppliers
+                 *     * `-supplies` - -supplies
+                 *     * `amount` - amount
+                 *     * `avg_price` - avg_price
+                 *     * `change` - change
+                 *     * `last_price` - last_price
+                 *     * `name` - name
+                 *     * `quantity` - quantity
+                 *     * `suppliers` - suppliers
+                 *     * `supplies` - supplies
+                 */
+                ordering?: "-amount" | "-avg_price" | "-change" | "-last_price" | "-name" | "-quantity" | "-suppliers" | "-supplies" | "amount" | "avg_price" | "change" | "last_price" | "name" | "quantity" | "suppliers" | "supplies";
+                page?: number;
+                page_size?: number;
+                search?: string;
+                supplier_id?: number | null;
             };
             header?: never;
             path?: never;

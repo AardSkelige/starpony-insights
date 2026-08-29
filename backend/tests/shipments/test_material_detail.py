@@ -25,6 +25,12 @@ def shampoo(make_product, make_plan):
     return {"bottled": bottled, "base": base, "water": water}
 
 
+@pytest.fixture
+def sold_ten(shampoo, make_demand):
+    """Десять шампуней одной отгрузкой: 500 г воды напрямую, 1000 через основу."""
+    return position(make_demand(), shampoo["bottled"], "10", 500_00)
+
+
 class TestExplanation:
     def test_both_paths_are_shown(self, shampoo, make_demand):
         """Вода из замеса и вода из розлива — два слагаемых, а не одно число.
@@ -166,3 +172,181 @@ class TestRest:
         """Пустой хвост и свёрнутый хвост — разные вещи."""
         position(make_demand(), shampoo["bottled"], "10", 500_00)
         assert material_detail.detail(materials.Filters(), shampoo["water"].pk)["rest"] is None
+
+
+class TestCoverageInDetail:
+    """Запас в днях — единственное число страницы, требующее действия сегодня.
+
+    Считается из того, что уже загружено: расход за период против свободного
+    остатка. На боевых данных диметикона хватает на 0 дней, воды на 3.
+    """
+
+    def test_days_left_uses_free_stock_not_total(
+        self, shampoo, make_demand, make_stock
+    ):
+        """Зарезервированное уже обещано под заказы.
+
+        Считать его своим значит обнаружить нехватку в день отгрузки —
+        и сказать «хватит на 10 дней» там, где хватит на один.
+        """
+        # Десять дней по 150 г воды в день: 1500 г расхода за 10 дней.
+        position(make_demand(moment=moscow(2026, 6, 1)), shampoo["bottled"], "5", 250_00)
+        position(make_demand(moment=moscow(2026, 6, 10)), shampoo["bottled"], "5", 250_00)
+        make_stock(shampoo["water"], quantity="1500", reserved="1350")
+
+        payload = material_detail.detail(materials.Filters(), shampoo["water"].pk)
+
+        # Расход 150 г/день. Свободно 150 → ровно на день.
+        # По всему остатку вышло бы десять — вдесятеро больше правды.
+        assert payload["coverage"]["per_day"] == Decimal("150")
+        assert payload["coverage"]["days_left"] == 1
+
+    def test_no_stock_means_unknown_not_zero(self, shampoo, sold_ten):
+        """У 36 материалов из 161 остатка в отчёте нет вовсе.
+
+        Ноль читался бы как «кончился» — утверждение об учёте, которого
+        учёт не делает.
+        """
+        payload = material_detail.detail(materials.Filters(), shampoo["water"].pk)
+
+        assert payload["stock"] is None
+        assert payload["coverage"]["days_left"] is None
+        assert payload["coverage"]["level"] == "none"
+        # Расход при этом известен: нет остатка, а не нет расхода.
+        assert payload["coverage"]["per_day"] > 0
+
+    def test_period_length_comes_from_the_filters(self, shampoo, make_demand):
+        """Период задан руками — делим на него, а не на разброс дат.
+
+        Иначе выборка за один день, в который отгрузок было две, дала бы
+        дневной расход вдвое ниже настоящего.
+        """
+        position(make_demand(moment=moscow(2026, 6, 10)), shampoo["bottled"], "10", 500_00)
+
+        payload = material_detail.detail(
+            materials.Filters(
+                date_from=moscow(2026, 6, 1).date(), date_to=moscow(2026, 6, 30).date()
+            ),
+            shampoo["water"].pk,
+        )
+        assert payload["coverage"]["days_of_period"] == 30
+
+    def test_open_period_measures_the_data(self, shampoo, make_demand):
+        """Период не задан — длина берётся из фактических дат отгрузок.
+
+        «Сегодня минус год» занизил бы дневной расход во столько раз,
+        во сколько ошиблись со сроком.
+        """
+        position(make_demand(moment=moscow(2026, 6, 1)), shampoo["bottled"], "10", 500_00)
+        position(make_demand(moment=moscow(2026, 6, 10)), shampoo["bottled"], "10", 500_00)
+
+        payload = material_detail.detail(materials.Filters(), shampoo["water"].pk)
+        assert payload["coverage"]["days_of_period"] == 10
+
+
+class TestRatesInDetail:
+    def test_uniform_rate_is_one_row(self, shampoo, sold_ten):
+        """121 материал из 161 имеет одну норму на все изделия."""
+        payload = material_detail.detail(materials.Filters(), shampoo["water"].pk)
+
+        assert len(payload["rates"]) == 1
+        assert payload["rates"][0]["products_count"] == 1
+
+    def test_rate_counts_every_path(self, shampoo, sold_ten):
+        """Норма — весь расход на изделие, а не расход одним путём.
+
+        В шампунь вода приходит дважды: 100 г через замес основы и 50 г
+        прямым добавлением при розливе. Норма — 150 г, и показать 50
+        значило бы занизить её втрое.
+        """
+        payload = material_detail.detail(materials.Filters(), shampoo["water"].pk)
+        assert payload["rates"][0]["rate"] == 150
+
+    def test_distribution_adds_up_to_the_row(self, shampoo, sold_ten):
+        """Показанное обязано складываться в число, которое объясняет."""
+        payload = material_detail.detail(materials.Filters(), shampoo["water"].pk)
+        dist = payload["distribution"]
+
+        shown = sum(item["quantity"] for item in dist["top"])
+        if dist["rest"]:
+            shown += dist["rest"]["quantity"]
+        assert shown == payload["quantity"]
+
+    def test_breakdown_by_plans_is_still_there(self, shampoo, sold_ten):
+        """Разбор по техкартам не удалён — он уехал вниз и свернулся.
+
+        Это единственное место, где видно, что отдушка приходит в шампунь
+        двумя путями и 1,02 г на изделие — не описка.
+        """
+        payload = material_detail.detail(materials.Filters(), shampoo["water"].pk)
+
+        assert payload["sources_count"] >= 1
+        assert payload["sources"][0]["paths"]
+
+
+class TestMultiPathCount:
+    """Заголовок свёрнутого разбора говорит, стоит ли его открывать.
+
+    Считался по двадцати показанным источникам, а сравнивался с общим их
+    числом: у воды (59 источников) заголовок утверждал «в каждое одним
+    путём», хотя многопутёвое изделие могло стоять двадцать первым. Блок
+    обещал, что раскрывать нечего, ровно там, где ради этого и существует.
+    """
+
+    def test_counts_paths_beyond_the_shown_sources(
+        self, shampoo, make_demand, make_product, make_plan
+    ):
+        # Двадцать один источник: двадцать простых и один двухпутёвый,
+        # который по величине расхода окажется за пределом показанных.
+        for index in range(20):
+            simple = make_product(f"Мыло {index}", article=f"9.{index}", code=f"9-{index}")
+            make_plan(f"Розлив мыла {index}", simple, output=1,
+                      materials=[(shampoo["water"], 1000)])
+            position(make_demand(), simple, "10", 100_00)
+
+        # Шампунь берёт воду двумя путями, но расходует мало — уйдёт в хвост.
+        position(make_demand(), shampoo["bottled"], "1", 500_00)
+
+        payload = material_detail.detail(materials.Filters(), shampoo["water"].pk)
+
+        assert payload["sources_count"] == 21
+        assert len(payload["sources"]) == 20
+        assert payload["multi_path_count"] == 1, (
+            "многопутёвое изделие за пределом показанных не сосчитано"
+        )
+
+    def test_no_multi_paths_is_zero(self, shampoo, make_demand, make_product, make_plan):
+        simple = make_product("Мыло", article="9.1", code="9-1")
+        make_plan("Розлив мыла", simple, output=1, materials=[(shampoo["water"], 10)])
+        position(make_demand(), simple, "10", 100_00)
+
+        payload = material_detail.detail(materials.Filters(), shampoo["water"].pk)
+        assert payload["multi_path_count"] == 0
+
+
+class TestDetailQueries:
+    def test_fixed_period_costs_no_extra_query(
+        self, shampoo, sold_ten, django_assert_num_queries
+    ):
+        """Границы заданы — длину периода считать неоткуда не надо.
+
+        `days_in` при обеих границах возвращает их разницу, и обход всех
+        позиций выборки ради отброшенного числа стоил запроса на каждое
+        раскрытие строки.
+        """
+        filters = materials.Filters(
+            date_from=moscow(2026, 6, 1).date(), date_to=moscow(2026, 6, 30).date()
+        )
+        with django_assert_num_queries(9):
+            material_detail.detail(filters, shampoo["water"].pk)
+
+    def test_open_period_pays_for_measuring_the_data(
+        self, shampoo, sold_ten, django_assert_num_queries
+    ):
+        """Период не задан — длина берётся из дат выборки, это один запрос.
+
+        Ровно на один больше, чем при заданных границах: столько и стоит
+        измерение выборки, и столько мы перестали платить впустую.
+        """
+        with django_assert_num_queries(10):
+            material_detail.detail(materials.Filters(), shampoo["water"].pk)

@@ -1,4 +1,5 @@
 import * as React from "react"
+import { Radio } from "lucide-react"
 
 import { exportUrl, useShipmentMaterials } from "@/sections/shipments-materials/api"
 import { COLUMNS, SORT_KEYS, totalsFor } from "@/sections/shipments-materials/columns"
@@ -22,7 +23,11 @@ export function ShipmentMaterialsPage() {
   const screen = useScreen()
   // Минус обязателен: «cost» значит «по возрастанию», и страница открывалась бы
   // с этикеток по копейке вместо сырья, ради которого её открыли.
-  const table = useTableParams({ defaultSort: "-cost", sortKeys: SORT_KEYS })
+  const table = useTableParams({
+    defaultSort: "-cost",
+    sortKeys: SORT_KEYS,
+    pickerKey: "channel",
+  })
 
   const refresh = useRefresh()
   // Прогон могли запустить в другой вкладке или вовсе не вы — кнопка обязана
@@ -65,7 +70,12 @@ export function ShipmentMaterialsPage() {
         value={table.filters}
         onChange={table.changeFilters}
         onReset={table.resetFilters}
-        channels={data?.channels ?? []}
+        picker={{
+          key: "channel",
+          label: "Канал",
+          icon: Radio,
+          options: data?.channels ?? [],
+        }}
         searchPlaceholder={SEARCH_PLACEHOLDER}
         searchLabel={SEARCH_LABEL}
       />
@@ -105,7 +115,12 @@ export function ShipmentMaterialsPage() {
 
       {data && (rows.length > 0 || table.page > 1) ? (
         <TableFooter
-          summary={`${withPlural(data.count, "материал", "материала", "материалов")} · ${withPlural(data.coverage.documents_count, "отгрузка", "отгрузки", "отгрузок")}`}
+          // Только материалы: число это про показанные строки и сходится
+          // с поиском. Отгрузки из `coverage` описывают выборку целиком,
+          // и рядом с найденными материалами читались бы как их отгрузки —
+          // «22 материала · 294 отгрузки». Число отгрузок стоит в сводке
+          // под таблицей, где оно про всю выборку и это верно.
+          summary={withPlural(data.count, "материал", "материала", "материалов")}
           page={table.page}
           pageCount={pageCount}
           pageSize={table.pageSize}

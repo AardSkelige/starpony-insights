@@ -15,6 +15,7 @@
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
+from api.common.selection import page_bounds
 from api.shipments.services import consumption, selection
 from api.shipments.services.consumption import Consumed
 from core.money import share
@@ -184,7 +185,7 @@ def page(filters: Filters) -> dict:
     whole = prepared(filters)
     rows = whole["rows"]
 
-    start, end = selection.page_bounds(filters.page, filters.page_size)
+    start, end = page_bounds(filters.page, filters.page_size)
 
     return {
         "count": len(rows),

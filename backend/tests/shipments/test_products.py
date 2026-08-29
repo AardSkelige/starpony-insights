@@ -154,3 +154,62 @@ def test_deleted_documents_are_not_counted(make_product, make_demand):
 
     assert row["quantity"] == Decimal("1.000")
     assert row["revenue_kopecks"] == 10000
+
+
+class TestShareIgnoresSearch:
+    """Доля — от выручки выборки, но без учёта поиска.
+
+    Период и канал в знаменатель входят: при фильтре по Озону доли обязаны
+    складываться в сто процентов Озона. Поиск — нет: он сужает список строк,
+    а не то, что продали. Иначе, найдя один товар, человек увидит «100 %»
+    и прочтёт это как «весь оборот в нём».
+
+    То же правило на обеих страницах материалов — три страницы обязаны
+    считать долю одинаково.
+    """
+
+    @pytest.fixture
+    def two_products(self, make_product, make_demand):
+        shampoo = make_product("Шампунь 500 мл", article="100.001", code="2-001")
+        brush = make_product("Щётка", article="200.001", code="3-001")
+        position(make_demand(), shampoo, "1", 250_00)
+        position(make_demand(), brush, "1", 750_00)
+        return {"shampoo": shampoo, "brush": brush}
+
+    def test_search_does_not_inflate_the_share(self, two_products):
+        """Шампунь — четверть выручки, и поиск этого не меняет."""
+        page = products.page(products.Filters(search="шампунь"))
+
+        assert page["count"] == 1
+        assert page["results"][0]["revenue_share"] == Decimal("0.25")
+
+    def test_channel_does_narrow_the_share(self, make_product, make_demand, channel):
+        """Канал в знаменатель входит: доли Озона складываются в сто процентов."""
+        shampoo = make_product("Шампунь 500 мл", article="100.001", code="2-001")
+        brush = make_product("Щётка", article="200.001", code="3-001")
+        position(make_demand(channel=channel), shampoo, "1", 250_00)
+        position(make_demand(), brush, "1", 750_00)
+
+        page = products.page(products.Filters(channel_id=channel.pk))
+        assert page["results"][0]["revenue_share"] == 1
+
+    def test_footer_share_matches_the_column(self, two_products):
+        """Итог обязан сходиться со сложением колонки, а не показывать «100 %»."""
+        page = products.page(products.Filters(search="шампунь"))
+        shown = sum(row["revenue_share"] for row in page["results"])
+
+        assert page["totals"]["revenue_share"] == shown
+
+    def test_no_search_is_a_hundred_percent(self, two_products):
+        page = products.page(products.Filters())
+        assert page["totals"]["revenue_share"] == 1
+
+    def test_extra_aggregate_only_when_searching(
+        self, two_products, django_assert_num_queries
+    ):
+        """Знаменатель без поиска — второй проход, и он платится только там,
+        где поиск задан."""
+        with django_assert_num_queries(3):
+            products.page(products.Filters())
+        with django_assert_num_queries(4):
+            products.page(products.Filters(search="шампунь"))

@@ -11,7 +11,7 @@
 отображение.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 
 from django.db.models import (
@@ -26,6 +26,7 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, NullIf
 
+from api.common.selection import matching, page_bounds
 from api.shipments.services import selection
 from core.models import DocumentPosition
 from core.money import share
@@ -131,7 +132,7 @@ def positions(filters: Filters) -> QuerySet[DocumentPosition]:
     )
 
     if filters.search:
-        queryset = queryset.filter(selection.matching(filters.search.strip()))
+        queryset = queryset.filter(matching(filters.search.strip()))
 
     return queryset
 
@@ -179,22 +180,34 @@ def page(filters: Filters) -> dict:
     Итоги нужны и подвалу, и доле в каждой строке. Считать их дважды —
     это второй проход по всем позициям на каждый запрос.
 
-    Доля берётся от выручки **той же выборки**, а не от всех продаж вообще:
-    иначе при фильтре по каналу доли строк не сложились бы в сто процентов,
-    и число, показанное рядом с ними, перестало бы значить то, что написано.
+    **Доля берётся от выручки выборки, но без учёта поиска.** Период и канал
+    в знаменатель входят: при фильтре по Озону доли обязаны складываться
+    в сто процентов Озона. Поиск — нет: набрав «шампунь», человек сужает
+    список строк, а не то, что продали, и доля 14,4 % должна значить долю
+    в выручке, а не в найденном. Иначе, найдя один товар, увидишь «100 %».
+
+    То же правило действует на обеих страницах материалов — там оно было
+    выведено раньше, и три страницы обязаны считать долю одинаково.
     """
     # Не `selection`: так называется модуль общего отбора, который этот файл
     # импортирует, — и локальное имя перекрыло бы его внутри функции.
     chosen = grouped(filters)
     totals = summary(filters)
+    # Знаменатель доли — выручка без поиска. Отдельный проход стоит одного
+    # агрегата и только когда поиск задан.
+    denominator = (
+        summary(replace(filters, search=""))["revenue_kopecks"]
+        if filters.search
+        else totals["revenue_kopecks"]
+    )
 
-    start, end = selection.page_bounds(filters.page, filters.page_size)
+    start, end = page_bounds(filters.page, filters.page_size)
     visible = list(chosen[start:end])
 
     return {
         "count": chosen.count(),
-        "totals": totals,
-        "results": [row_of(item, totals["revenue_kopecks"]) for item in visible],
+        "totals": {**totals, "revenue_share": share(totals["revenue_kopecks"], denominator)},
+        "results": [row_of(item, denominator) for item in visible],
     }
 
 
@@ -224,7 +237,7 @@ def row_of(item: dict, total_revenue: int) -> dict:
         # как «товар отдавали бесплатно», а на деле цены просто нет.
         "avg_price_kopecks": _divide(revenue, quantity),
         "avg_price_paid_kopecks": _divide(revenue, quantity - free),
-        # Доля от выручки **этой же выборки**: при фильтре по каналу доли
+        # Доля от выручки выборки без учёта поиска: при фильтре по каналу доли
         # строк обязаны складываться в сто процентов, иначе число рядом
         # с ними перестаёт значить то, что написано.
         "revenue_share": share(revenue, total_revenue),

@@ -1,5 +1,4 @@
-import type { SalesChannel } from "@/shared/api/types"
-import { Filters, type FilterValue } from "@/shared/components/filters"
+import { Filters, type FilterValue, type Picker } from "@/shared/components/filters"
 import { Toolbar } from "@/shared/components/page"
 
 /**
@@ -20,7 +19,8 @@ export function FiltersBar(props: {
   value: FilterValue
   onChange: (patch: Partial<FilterValue>) => void
   onReset: () => void
-  channels: SalesChannel[]
+  /** Чем эта страница сужает выборку: канал у отгрузок, поставщик у приёмок. */
+  picker: Picker
   /** Что ищут на этой странице — подсказка в поле и подпись для чтения с экрана. */
   searchPlaceholder: string
   searchLabel: string

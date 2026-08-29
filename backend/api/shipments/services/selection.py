@@ -5,77 +5,30 @@
 но отбирают обе одинаково, и разойдись отбор, две страницы за один период
 показали бы разное число отгрузок.
 
-Границы периода живут здесь же: день — понятие календаря, а не UTC, и
-сравнение с концом дня теряет документ, проведённый в 23:59:59.5.
+Здесь только то, что про отгрузки: вид документа и канал продаж. Период,
+поиск, страница и границы дня — в `api/common/selection.py`, потому что
+у приёмок они точно такие же.
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import date
 
-from django.db.models import Q, QuerySet
-from django.utils import timezone
+from django.db.models import QuerySet
 
+from api.common import selection
 from core.models import DocumentKind, DocumentPosition
-
-# Потолок высоты страницы. Общий: он защищает базу от ссылки с `size=100000`,
-# а база у страниц одна.
-MAX_PAGE_SIZE = 200
-# Столько же, сколько по умолчанию показывает таблица на экране
-# (`PAGE_SIZES` во фронтенде). Два разных умолчания значили бы, что ответ
-# из `/api/docs` не совпадает с тем, что человек видит на странице.
-DEFAULT_PAGE_SIZE = 10
 
 
 @dataclass(frozen=True)
-class Filters:
-    """Что человек выбрал в панели фильтров — общая часть для страниц раздела.
+class Filters(selection.Filters):
+    """Общее — в `selection.Filters`, своё у отгрузок — канал продаж.
 
-    Период, канал, поиск и разбиение на страницы устроены одинаково у всех:
-    они приходят из адресной строки и оттуда же восстанавливаются по ссылке.
-    Своё у страницы одно — какие сортировки она понимает, — и задаётся оно
-    наследником, ровно как у сериализаторов запроса.
-
-    `ordering` здесь нет намеренно: у него нет умолчания, верного для обеих
-    страниц. У «Товаров» это `-revenue`, а у «Материалов» такого ключа нет
-    вовсе — общее умолчание пришлось бы придумывать, и оно было бы неверным.
+    У приёмок канала нет вовсе: товар приходит от поставщика, а не через
+    Озон. Держи мы это поле в общем классе, страница приёмок принимала бы
+    `channel_id` и молча его игнорировала.
     """
 
-    date_from: date | None = None
-    date_to: date | None = None
     channel_id: int | None = None
-    search: str = ""
-    page: int = 1
-    page_size: int = DEFAULT_PAGE_SIZE
-
-
-def page_bounds(page: int, page_size: int) -> tuple[int, int]:
-    """Границы среза страницы: откуда и докуда резать.
-
-    Годится и для запроса, и для готового списка — «Товары» режут QuerySet,
-    «Материалы» список после разворота техкарт, а арифметика у них одна.
-
-    Высота подрезается и здесь тоже. Запрос снаружи до этого места
-    с несуразной высотой не доходит — сериализатор отвечает четырёхсотой, —
-    но `page()` зовут ещё из тестов и из выгрузки, а защита базы от
-    `size=100000` не должна зависеть от того, кто позвал.
-    """
-    size = max(1, min(page_size, MAX_PAGE_SIZE))
-    start = max(0, (page - 1) * size)
-    return start, start + size
-
-
-def day_start(day: date) -> datetime:
-    """Начало дня в текущем поясе: граница периода — про календарь, не про UTC."""
-    return timezone.make_aware(datetime.combine(day, time.min))
-
-
-def day_after(day: date) -> datetime:
-    """Начало следующего дня: верхняя граница строгая, чтобы день вошёл целиком.
-
-    Сравнивать с концом дня нельзя: `moment` хранит секунды, и документ,
-    проведённый в 23:59:59.5, выпал бы из периода без единого признака.
-    """
-    return day_start(day) + timedelta(days=1)
 
 
 def shipment_positions(
@@ -98,29 +51,12 @@ def shipment_positions(
         # появится первый, расхождение с учётом никто не заметит.
         document__applicable=True,
     )
+    queryset = selection.within(queryset, date_from, date_to)
 
-    if date_from:
-        queryset = queryset.filter(document__moment__gte=day_start(date_from))
-    if date_to:
-        queryset = queryset.filter(document__moment__lt=day_after(date_to))
     if channel_id:
         queryset = queryset.filter(document__sales_channel_id=channel_id)
 
     return queryset
-
-
-def matching(term: str) -> Q:
-    """Условие поиска по номенклатуре: название, артикул, код.
-
-    Возвращает условие, а не отфильтрованный запрос: у «Материалов» искать
-    надо по полю `product`, а у деталей строки — по другому пути к тому же
-    товару. Условие переносится, готовый фильтр — нет.
-    """
-    return (
-        Q(product__name__icontains=term)
-        | Q(product__article__icontains=term)
-        | Q(product__code__icontains=term)
-    )
 
 
 def channels(

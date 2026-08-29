@@ -9,7 +9,8 @@ from decimal import Decimal
 
 import pytest
 
-from api.shipments.services import materials, selection
+from api.common import selection
+from api.shipments.services import materials
 from core.models import ProductKind
 from tests.shipments.conftest import moscow, position
 
@@ -295,10 +296,17 @@ class TestFilters:
 
 
 class TestPagination:
-    def test_page_size_is_capped(self, shampoo, sold_ten):
-        """Ссылка с огромной высотой страницы не должна уводить в долгий обход."""
+    def test_huge_page_size_does_not_break_the_page(self, shampoo, sold_ten):
+        """Ссылка с огромной высотой отвечает таблицей, а не ошибкой.
+
+        Сам потолок проверяется в `tests/test_selection.py`: здесь строк
+        меньше двухсот, и сравнение с потолком выполнялось бы при любом
+        коде — тест проходил вхолостую, пока это не вскрыла проверка
+        внесёнными дефектами.
+        """
         page = materials.page(materials.Filters(page_size=100_000))
-        assert len(page["results"]) <= selection.MAX_PAGE_SIZE
+        assert len(page["results"]) == 2
+        assert selection.MAX_PAGE_SIZE == 200
 
     def test_count_is_of_selection_not_page(self, shampoo, sold_ten):
         page = materials.page(materials.Filters(page_size=1))
