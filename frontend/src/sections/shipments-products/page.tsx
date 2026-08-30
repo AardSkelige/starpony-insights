@@ -85,6 +85,11 @@ export function ShipmentProductsPage() {
         // на вкладку, и таблица темнела каждый раз, когда человек
         // переключался в другое окно и обратно, хотя числа не менялись.
         refreshing={query.isPlaceholderData}
+        // Тот же признак, что у кнопки и отметки свежести: чужой прогон
+        // виден всем, и его результат подсвечивается так же, как свой.
+        syncPending={refresh.isPending || sync.running}
+        syncFailed={refresh.isError}
+        dataVersion={query.dataUpdatedAt}
         error={query.isError}
         onRetry={() => query.refetch()}
         emptyTitle="За этот период ничего не продано"

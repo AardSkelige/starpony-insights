@@ -88,6 +88,11 @@ export function ShipmentMaterialsPage() {
         // Приглушаются только устаревшие данные — те, что показаны, пока
         // едут новые после смены фильтра или страницы.
         refreshing={query.isPlaceholderData}
+        // Тот же признак, что у кнопки и отметки свежести: чужой прогон
+        // виден всем, и его результат подсвечивается так же, как свой.
+        syncPending={refresh.isPending || sync.running}
+        syncFailed={refresh.isError}
+        dataVersion={query.dataUpdatedAt}
         error={query.isError}
         onRetry={() => query.refetch()}
         emptyTitle={

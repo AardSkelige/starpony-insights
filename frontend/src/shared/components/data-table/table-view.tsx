@@ -1,6 +1,9 @@
+import * as React from "react"
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight } from "lucide-react"
 
+import { changedCellKey } from "@/shared/components/data-table/changes"
 import type { Column, Sort, Totals } from "@/shared/components/data-table/columns"
+import { DetailRow } from "@/shared/components/data-table/detail-row"
 import { cn } from "@/shared/lib/utils"
 import {
   Table,
@@ -25,7 +28,12 @@ import {
  * Применяется и к шапке, и к строкам, и к подвалу: хватит одной ячейки
  * без ограничения, чтобы колонка снова растянулась.
  */
-const NAME_CELL = "w-full max-w-0"
+// Колонка имени забирает всю свободную ширину (`w-full max-w-0`), но ниже
+// `min-w` не опускается. Без нижней границы на узком экране она схлопывалась
+// до полутора сотен точек, и семь строк подряд читались как «Кондиционер для
+// гривы и хвоста…» — неотличимо друг от друга. Таблица и так прокручивается
+// внутри себя, и горизонтальная полоса честнее, чем список одинаковых строк.
+const NAME_CELL = "w-full min-w-56 max-w-0"
 
 type Props<Row> = {
   columns: Column<Row>[]
@@ -39,6 +47,7 @@ type Props<Row> = {
   sort?: Sort | null
   onSort?: (key: string, numeric: boolean) => void
   muted?: boolean
+  changedCells?: Set<string>
 }
 
 export function TableView<Row>({
@@ -52,14 +61,34 @@ export function TableView<Row>({
   sort,
   onSort,
   muted = false,
+  changedCells = new Set(),
 }: Props<Row>) {
   const expandable = Boolean(renderDetail)
+
+  // Ключ строки, которая сейчас схлопывается. Раскрытая строка одна, значит
+  // и закрывающаяся одна: держать здесь множество нечего.
+  //
+  // Прошлый ключ живёт в состоянии, а не в ссылке: правка при рендере — тот
+  // самый случай, для которого React держит этот приём, а ссылку в нём читать
+  // нельзя (`react-hooks/refs` ловит это в линтере).
+  const opened = expandedKey ?? null
+  const [tracked, setTracked] = React.useState<{
+    opened: string | number | null
+    collapsing: string | number | null
+  }>({ opened, collapsing: null })
+
+  if (tracked.opened !== opened) {
+    // Закрытие обязано застать разбор ещё смонтированным, иначе схлопывать
+    // нечего: прошлый ключ переезжает в `collapsing` до следующего кадра.
+    setTracked({ opened, collapsing: tracked.opened })
+  }
+  const collapsing = tracked.collapsing
 
   return (
     // Таблица шире экрана прокручивается внутри себя: горизонтальная полоса
     // у всей страницы уводила бы вместе с таблицей и шапку с фильтрами.
-    <div className="overflow-x-auto rounded-lg border">
-      <Table className={cn(muted && "opacity-60 transition-opacity")}>
+    <div className="motion-content-reveal overflow-x-auto rounded-lg border">
+      <Table className={cn("motion-opacity-transition", muted && "opacity-60")}>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             {columns.map((column, index) => {
@@ -89,7 +118,14 @@ export function TableView<Row>({
                         type="button"
                         onClick={() => onSort?.(column.sortKey!, Boolean(column.numeric))}
                         className={cn(
-                          "inline-flex items-center gap-1 rounded-sm transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                          // `uppercase` обязателен здесь, хотя он уже задан
+                          // у `TableHead`: `button` не наследует
+                          // `text-transform`, и заголовки сортируемых колонок
+                          // выходили строчными, а несортируемых — прописными.
+                          // Рядом это читается как две разные таблицы;
+                          // на «Материалах в отгрузках» так и было с самого
+                          // начала, просто несортируемая колонка там одна.
+                          "inline-flex items-center gap-1 rounded-sm uppercase transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                           column.numeric && "flex-row-reverse",
                           active && "text-foreground"
                         )}
@@ -149,7 +185,9 @@ export function TableView<Row>({
                     className={cn(
                       column.numeric && "text-right tabular-nums",
                       column.strong && "font-medium",
-                      index === 0 && NAME_CELL
+                      index === 0 && NAME_CELL,
+                      changedCells.has(changedCellKey(key, column.key)) &&
+                        "motion-data-flash"
                     )}
                   >
                     {index === 0 && expandable ? (
@@ -157,7 +195,7 @@ export function TableView<Row>({
                         <ChevronRight
                           aria-hidden
                           className={cn(
-                            "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                            "motion-transform-transition size-3.5 shrink-0 text-muted-foreground",
                             open && "rotate-90"
                           )}
                         />
@@ -170,20 +208,21 @@ export function TableView<Row>({
                 ))}
               </TableRow>,
 
-              open ? (
-                <TableRow key={`${key}-detail`} className="hover:bg-transparent">
-                  {/* `whitespace-normal` обязателен: `TableCell` из реестра
-                      объявляет `whitespace-nowrap`, и разбор строки это
-                      наследует — абзацы внутри идут одной строкой и уползают
-                      за край экрана. Правило верно для ячейки с числом
-                      и неверно для ячейки с текстом. */}
-                  <TableCell
-                    colSpan={columns.length}
-                    className="bg-accent/40 p-0 whitespace-normal"
-                  >
-                    {renderDetail?.(row)}
-                  </TableCell>
-                </TableRow>
+              expandable && (open || key === collapsing) ? (
+                <DetailRow
+                  key={`${key}-detail`}
+                  open={open}
+                  colSpan={columns.length}
+                  onCollapsed={() =>
+                    setTracked((current) =>
+                      current.collapsing === key
+                        ? { ...current, collapsing: null }
+                        : current
+                    )
+                  }
+                >
+                  {renderDetail?.(row)}
+                </DetailRow>
               ) : null,
             ]
           })}
@@ -197,7 +236,14 @@ export function TableView<Row>({
                   key={column.key}
                   className={cn(
                     column.numeric && "text-right tabular-nums",
-                    index === 0 && NAME_CELL
+                    // `whitespace-normal` обязателен: `TableCell` из реестра
+                    // объявляет `whitespace-nowrap`, а ячейка имени —
+                    // `max-w-0`. Вместе это значит, что подпись итога никуда
+                    // не переносится и вытекает поверх соседней ячейки:
+                    // «Итого · 212 материалов» наезжало на «разные единицы».
+                    // У строк таблицы этого не видно только потому, что
+                    // страницы сами оборачивают имя в обрезающий span.
+                    index === 0 && cn(NAME_CELL, "whitespace-normal"),
                   )}
                 >
                   {index === 0 ? totals.label : (totals.values[column.key] ?? null)}

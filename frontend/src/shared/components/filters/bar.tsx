@@ -19,8 +19,11 @@ export function FiltersBar(props: {
   value: FilterValue
   onChange: (patch: Partial<FilterValue>) => void
   onReset: () => void
-  /** Чем эта страница сужает выборку: канал у отгрузок, поставщик у приёмок. */
-  picker: Picker
+  /**
+   * Чем эта страница сужает выборку: канал у отгрузок, поставщик у приёмок.
+   * Может отсутствовать — у «Поставщиков» поставщик и есть строка таблицы.
+   */
+  picker?: Picker
   /** Что ищут на этой странице — подсказка в поле и подпись для чтения с экрана. */
   searchPlaceholder: string
   searchLabel: string

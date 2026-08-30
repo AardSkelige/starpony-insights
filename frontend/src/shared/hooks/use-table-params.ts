@@ -42,13 +42,16 @@ export function useTableParams({
    * Общего имени у них нет намеренно. Назови мы параметр `pick`, и ссылка
    * «pick=3» со страницы отгрузок открыла бы на приёмках поставщика номер
    * три — фильтр, выглядящий выбранным, но означающий не то.
+   *
+   * **Необязателен.** У «Поставщиков» справочника нет: поставщик там и есть
+   * строка таблицы. Тогда в адрес не попадает ни параметра, ни его следа.
    */
-  pickerKey: string
+  pickerKey?: string
 }) {
   const [params, setParams] = useQueryStates({
     from: parseAsString,
     to: parseAsString,
-    [pickerKey]: parseAsInteger,
+    ...(pickerKey ? { [pickerKey]: parseAsInteger } : {}),
     q: parseAsString.withDefault(""),
     page: parseAsInteger.withDefault(1),
     // Минус обязателен: без него «revenue» значит «по возрастанию», и страница
@@ -60,7 +63,12 @@ export function useTableParams({
   const filters: FilterValue = {
     dateFrom: params.from,
     dateTo: params.to,
-    pickId: (params[pickerKey] as number | null) ?? null,
+    // Приведение неизбежно: набор ключей теперь зависит от того, есть ли
+    // у страницы справочник, а `useQueryStates` выводит их статически
+    // и про условный ключ ничего не знает.
+    pickId: pickerKey
+      ? ((params as unknown as Record<string, number | null>)[pickerKey] ?? null)
+      : null,
     search: params.q,
   }
 
@@ -96,7 +104,9 @@ export function useTableParams({
       setParams({
         ...(patch.dateFrom !== undefined ? { from: patch.dateFrom } : {}),
         ...(patch.dateTo !== undefined ? { to: patch.dateTo } : {}),
-        ...(patch.pickId !== undefined ? { [pickerKey]: patch.pickId } : {}),
+        ...(pickerKey && patch.pickId !== undefined
+          ? { [pickerKey]: patch.pickId }
+          : {}),
         ...(patch.search !== undefined ? { q: patch.search } : {}),
         page: 1,
       })
@@ -106,7 +116,13 @@ export function useTableParams({
   )
 
   const resetFilters = React.useCallback(() => {
-    setParams({ from: null, to: null, [pickerKey]: null, q: "", page: 1 })
+    setParams({
+      from: null,
+      to: null,
+      ...(pickerKey ? { [pickerKey]: null } : {}),
+      q: "",
+      page: 1,
+    })
     setExpanded(null)
   }, [setParams, pickerKey])
 
@@ -142,7 +158,9 @@ export function useTableParams({
     applied: {
       ...filters,
       search: settledSearch,
-      pickParam: `${pickerKey}_id`,
+      // Без справочника имени параметра нет вовсе: пустая строка уехала бы
+      // в адрес как `?_id=`, стоило бы `pickId` однажды оказаться не пустым.
+      ...(pickerKey ? { pickParam: `${pickerKey}_id` } : {}),
     },
     /** Как сейчас отсортировано. Минус — убывание, как в SQL. */
     sort: {

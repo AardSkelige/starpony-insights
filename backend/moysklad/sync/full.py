@@ -13,7 +13,11 @@ from core.models import SyncKind, SyncRun
 from moysklad.client import MoySkladClient
 from moysklad.limits import ApiDisabledRisk
 from moysklad.sync.catalog import sync_products, sync_uoms
-from moysklad.sync.documents import sync_demands, sync_supplies
+from moysklad.sync.documents import (
+    sync_demands,
+    sync_purchase_orders,
+    sync_supplies,
+)
 from moysklad.sync.lock import advisory_lock
 from moysklad.sync.production import sync_processing_plans
 from moysklad.sync.references import sync_counterparties, sync_sales_channels
@@ -26,6 +30,9 @@ LOCK_NAME = "sync:documents"
 # Порядок обязателен, а не для красоты: документы ссылаются на товары,
 # контрагентов и каналы, а товары — на единицы измерения. Справочники
 # идут первыми, иначе документ не на что будет повесить.
+#
+# Заказы поставщикам — перед приёмками по той же причине: приёмка ссылается
+# на заказ, и в обратном порядке связь не установилась бы ни у одной из них.
 ENTITIES = (
     ("uom", sync_uoms),
     ("product", sync_products),
@@ -33,6 +40,7 @@ ENTITIES = (
     ("counterparty", sync_counterparties),
     ("saleschannel", sync_sales_channels),
     ("demand", sync_demands),
+    ("purchaseorder", sync_purchase_orders),
     ("supply", sync_supplies),
 )
 

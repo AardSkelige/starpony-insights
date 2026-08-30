@@ -1,6 +1,5 @@
 """Выгрузка «Товаров в отгрузках» в XLSX."""
 
-from decimal import Decimal
 from io import BytesIO
 
 import pytest

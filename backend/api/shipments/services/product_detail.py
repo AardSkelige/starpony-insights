@@ -10,16 +10,17 @@
 
 from decimal import Decimal
 
-from django.db.models import DecimalField, Sum, Value
+from django.db.models import Count, DecimalField, Sum, Value
 from django.db.models.functions import Coalesce
 
+from api.shipments.services import timeline
 from api.shipments.services.products import Filters, positions
 from core.services.stock import stock_of
 
-# Сколько документов показать. Полный список — отдельная задача со своей
-# страницей: десять последних отвечают на вопрос «кому и когда», а тысяча
-# строк в выдвижной панели не отвечает ни на один.
-DOCUMENT_LIMIT = 10
+# Сколько контрагентов показать поимённо. Остальные — строкой «ещё N»,
+# как у распределения расхода на соседней странице: хвост сворачивается,
+# но не выбрасывается, иначе слагаемые не складываются в заголовок блока.
+AGENT_LIMIT = 5
 
 _QUANTITY = DecimalField(max_digits=18, decimal_places=3)
 
@@ -58,24 +59,82 @@ def channels(filters: Filters, product_id: int) -> list[dict]:
     ]
 
 
-def documents(filters: Filters, product_id: int) -> list[dict]:
-    """Последние отгрузки с этим товаром — кому, когда, сколько."""
-    rows = (
-        positions(filters)
-        .filter(product_id=product_id)
-        .select_related("document", "document__agent")
-        .order_by("-document__moment", "-id")[:DOCUMENT_LIMIT]
+def free_recipients(filters: Filters, product_id: int) -> dict | None:
+    """Кому товар уходил бесплатно. `None` — таких отгрузок не было.
+
+    На боевых данных даром ушло 532 штуки из 2369 — почти четверть всего
+    выпуска. Колонка это число показывала, но не отвечала «кому», а ответ
+    оказался осмысленным: конные клубы, фонд, центры реабилитации лошадей
+    и внутренние операции. Это спонсорство, а не потеря, и его надо видеть.
+    """
+    return _recipients(
+        positions(filters).filter(product_id=product_id, total_kopecks=0)
     )
-    return [
-        {
-            "number": row.document.number,
-            "moment": row.document.moment,
-            "agent": row.document.agent.name,
-            "quantity": row.quantity,
-            "total_kopecks": row.total_kopecks,
-        }
-        for row in rows
-    ]
+
+
+def buyers(filters: Filters, product_id: int) -> dict | None:
+    """Кому товар продавали — крупнейшие покупатели. `None` — продаж не было.
+
+    Заменило журнал последних отгрузок. Тот отвечал на «кому и когда» списком
+    из десяти строк — при том что у ходового товара отгрузок 109, и по строке
+    «00278 · Ложис Софья · 1 шт» решение не принимают. «Кто берёт больше
+    всех» — вопрос, на который отвечают, и полоса отвечает на него длиной.
+
+    Бесплатные отгрузки сюда не входят: у них свой блок, а смешай их
+    с покупателями — «КСК Отрада» встал бы в список крупных клиентов
+    с выручкой ноль.
+    """
+    return _recipients(
+        positions(filters).filter(product_id=product_id).exclude(total_kopecks=0)
+    )
+
+
+def _recipients(queryset) -> dict | None:
+    """Контрагенты выборки с количествами: крупнейшие поимённо, хвост строкой.
+
+    Один расчёт на покупателей и на получателей бесплатного — отличается
+    только выборка, которую передаёт вызывающий. Две копии разошлись бы
+    на первом же уточнении: например, считать ли отгрузку, где товар
+    и продали, и доложили бесплатно.
+
+    **Группируется по идентификатору, а не по названию.** `Counterparty.name`
+    не уникален — ни в модели, ни в самом МойСкладе: два «ИП Иванов» там
+    заводятся спокойно. Сгруппируй мы по имени, их отгрузки слиплись бы
+    в одну строку, и количество, выручка, число документов и сам состав
+    первой пятёрки оказались бы неверны. В аккаунте дублей сейчас нет —
+    все 104 имени уникальны, — и потому ошибка была бы тихой.
+    """
+    rows = list(
+        queryset.values("document__agent_id", "document__agent__name")
+        .annotate(
+            quantity=Coalesce(Sum("quantity"), Value(Decimal(0)), output_field=_QUANTITY),
+            revenue_kopecks=Coalesce(Sum("total_kopecks"), Value(0)),
+            documents_count=Count("document", distinct=True),
+        )
+        .order_by("-quantity")
+    )
+    if not rows:
+        return None
+
+    shown = rows[:AGENT_LIMIT]
+    rest = rows[AGENT_LIMIT:]
+    return {
+        "agents": [
+            {
+                # Идентификатор уходит на фронт как ключ списка: по имени
+                # React считал бы двух разных контрагентов одной строкой.
+                "agent_id": row["document__agent_id"],
+                "name": row["document__agent__name"],
+                "quantity": row["quantity"],
+                "revenue_kopecks": row["revenue_kopecks"],
+                "documents_count": row["documents_count"],
+            }
+            for row in shown
+        ],
+        "rest_agents_count": len(rest),
+        "rest_quantity": sum((row["quantity"] for row in rest), Decimal(0)),
+        "quantity": sum((row["quantity"] for row in rows), Decimal(0)),
+    }
 
 
 def detail(filters: Filters, product_id: int) -> dict:
@@ -85,6 +144,15 @@ def detail(filters: Filters, product_id: int) -> dict:
 
     return {
         "channels": channels(filters, product_id),
-        "documents": documents(filters, product_id),
+        # Журнал последних отгрузок заменён двумя ответами: **когда** продавали
+        # и **кому**. Список из десяти строк не отвечал ни на один вопрос,
+        # а сто девять строк в панель не помещаются.
+        "timeline": timeline.of(
+            positions(filters).filter(product_id=product_id),
+            date_from=filters.date_from,
+            date_to=filters.date_to,
+        ),
+        "buyers": buyers(filters, product_id),
+        "free": free_recipients(filters, product_id),
         "stock": stock_of(product_id),
     }

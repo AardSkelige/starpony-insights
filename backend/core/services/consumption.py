@@ -2,7 +2,16 @@
 
 Отдельно от сборки страницы: здесь ответ на вопрос «сколько чего
 израсходовано», там — как это показать, сложить в деньги и отсортировать.
-Разворачивание понадобится и раскрытию строки, и, позже, расчёту производства.
+
+**Живёт в `core/`, потому что понадобилось второму разделу.** «Материалы
+в приёмках» отвечают на «что закупали», а спрашивают с них «что пора
+закупить» — и для этого нужен тот же расход, что считают «Материалы
+в отгрузках». Расчёт понадобится и «Расчёту производства».
+
+**Выборку задаёт раздел, а не этот модуль.** Он принимает готовый запрос
+позиций отгрузок: у отгрузок есть фильтр по каналу продаж, у приёмок его
+нет вовсе, и знать про каналы расчёту незачем. Так же устроены соседи —
+`coverage.of` и `lead_time.of`.
 
 Считается в два шага. Сначала позиции отгрузок сворачиваются по товару —
 это Postgres. Потом каждое проданное наименование разворачивается по
@@ -17,14 +26,12 @@
 """
 
 from dataclasses import dataclass, field
-from datetime import date
 from decimal import Decimal
 
-from django.db.models import DecimalField, Sum, Value
+from django.db.models import DecimalField, QuerySet, Sum, Value
 from django.db.models.functions import Coalesce
 
-from api.shipments.services import selection
-from core.models import Product, ProductKind
+from core.models import DocumentPosition, Product, ProductKind
 from core.services.materials import explode, plans_by_product
 
 _QUANTITY = DecimalField(max_digits=18, decimal_places=3)
@@ -53,18 +60,10 @@ class Consumption:
     documents_count: int
 
 
-def sold(
-    *,
-    date_from: date | None = None,
-    date_to: date | None = None,
-    channel_id: int | None = None,
-) -> list[dict]:
+def sold(positions: QuerySet[DocumentPosition]) -> list[dict]:
     """Проданные наименования, свёрнутые по товару."""
     return list(
-        selection.shipment_positions(
-            date_from=date_from, date_to=date_to, channel_id=channel_id
-        )
-        .values("product_id")
+        positions.values("product_id")
         .annotate(
             quantity=Coalesce(Sum("quantity"), Value(Decimal(0)), output_field=_QUANTITY),
             revenue_kopecks=Coalesce(Sum("total_kopecks"), Value(0)),
@@ -73,14 +72,9 @@ def sold(
     )
 
 
-def of_shipments(
-    *,
-    date_from: date | None = None,
-    date_to: date | None = None,
-    channel_id: int | None = None,
-) -> Consumption:
-    """Развернуть всё проданное за период до сырья."""
-    rows = sold(date_from=date_from, date_to=date_to, channel_id=channel_id)
+def of_shipments(positions: QuerySet[DocumentPosition]) -> Consumption:
+    """Развернуть всё проданное из этой выборки до сырья."""
+    rows = sold(positions)
     plans = plans_by_product()
     products = {
         product.pk: product
@@ -124,23 +118,14 @@ def of_shipments(
         without_plan=without_plan,
         exploded_count=exploded,
         revenue_kopecks=sum(row["revenue_kopecks"] for row in rows),
-        documents_count=_documents_count(date_from, date_to, channel_id),
+        documents_count=_documents_count(positions),
     )
 
 
-def _documents_count(
-    date_from: date | None, date_to: date | None, channel_id: int | None
-) -> int:
+def _documents_count(positions: QuerySet[DocumentPosition]) -> int:
     """Сколько отгрузок попало в выборку. Считает база, а не сумма по строкам.
 
     Одна отгрузка содержит несколько позиций, и сложить их по товарам значило бы
     посчитать её столько раз, сколько в ней наименований.
     """
-    return (
-        selection.shipment_positions(
-            date_from=date_from, date_to=date_to, channel_id=channel_id
-        )
-        .values("document_id")
-        .distinct()
-        .count()
-    )
+    return positions.values("document_id").distinct().count()

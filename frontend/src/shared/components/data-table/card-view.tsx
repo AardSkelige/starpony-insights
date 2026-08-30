@@ -1,4 +1,5 @@
 import type { Column, Totals } from "@/shared/components/data-table/columns"
+import { changedCellKey } from "@/shared/components/data-table/changes"
 import { cn } from "@/shared/lib/utils"
 
 type Props<Row> = {
@@ -8,6 +9,7 @@ type Props<Row> = {
   onOpen?: (row: Row) => void
   totals?: Totals
   muted?: boolean
+  changedCells?: Set<string>
 }
 
 /**
@@ -28,37 +30,60 @@ export function CardView<Row>({
   onOpen,
   totals,
   muted = false,
+  changedCells = new Set(),
 }: Props<Row>) {
   const [title, ...rest] = columns
 
   return (
-    <div className={cn("flex flex-col gap-2", muted && "opacity-60 transition-opacity")}>
-      {rows.map((row) => (
-        <button
-          key={rowKey(row)}
-          type="button"
-          onClick={onOpen ? () => onOpen(row) : undefined}
-          disabled={!onOpen}
-          className="flex flex-col gap-2.5 rounded-xl border bg-card p-3 text-left transition-colors active:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none"
-        >
-          <div className="min-w-0">{title.render(row)}</div>
-          <dl className="flex flex-col">
-            {rest.map((column) => (
-              <div
-                key={column.key}
-                className="flex items-baseline justify-between gap-3 border-b py-1.5 text-sm last:border-b-0"
-              >
-                <dt className="min-w-0 text-muted-foreground">
-                  {column.cardLabel ?? column.label}
-                </dt>
-                {/* Число не переносится и не ужимается: подпись слева
+    <div
+      className={cn(
+        "motion-content-reveal motion-opacity-transition flex flex-col gap-2",
+        muted && "opacity-60"
+      )}
+    >
+      {rows.map((row) => {
+        const key = rowKey(row)
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={onOpen ? () => onOpen(row) : undefined}
+            disabled={!onOpen}
+            className="flex flex-col gap-2.5 rounded-xl border bg-card p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:bg-accent disabled:pointer-events-none"
+          >
+            <div
+              className={cn(
+                "min-w-0 rounded-sm",
+                changedCells.has(changedCellKey(key, title.key)) &&
+                  "motion-data-flash"
+              )}
+            >
+              {title.render(row)}
+            </div>
+            <dl className="flex flex-col">
+              {rest.map((column) => (
+                <div
+                  key={column.key}
+                  className={cn(
+                    "flex items-baseline justify-between gap-3 rounded-sm border-b py-1.5 text-sm last:border-b-0",
+                    changedCells.has(changedCellKey(key, column.key)) &&
+                      "motion-data-flash"
+                  )}
+                >
+                  <dt className="min-w-0 text-muted-foreground">
+                    {column.cardLabel ?? column.label}
+                  </dt>
+                  {/* Число не переносится и не ужимается: подпись слева
                     уступит место первой, ей есть куда. */}
-                <dd className="shrink-0 tabular-nums">{column.render(row)}</dd>
-              </div>
-            ))}
-          </dl>
-        </button>
-      ))}
+                  <dd className="shrink-0 tabular-nums">
+                    {column.render(row)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </button>
+        )
+      })}
 
       {totals ? (
         <div className="flex flex-col gap-2.5 rounded-xl border bg-muted/40 p-3">
@@ -73,7 +98,9 @@ export function CardView<Row>({
                   <dt className="min-w-0 text-muted-foreground">
                     {column.cardLabel ?? column.label}
                   </dt>
-                  <dd className="shrink-0 tabular-nums">{totals.values[column.key]}</dd>
+                  <dd className="shrink-0 tabular-nums">
+                    {totals.values[column.key]}
+                  </dd>
                 </div>
               ) : null
             )}

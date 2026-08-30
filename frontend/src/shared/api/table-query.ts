@@ -20,10 +20,15 @@ export type TableQuery = {
    * канала не существует — товар приходит от контрагента, а не через Озон, —
    * поэтому имя параметра приносит страница. `pick` — что выбрано,
    * `pickParam` — как это называется в запросе.
+   *
+   * **Необязательны оба.** У «Поставщиков» справочника нет вовсе: поставщик
+   * там и есть строка таблицы, и фильтр по нему оставил бы в ней одну.
+   * Пустая строка вместо имени параметра была бы враньём в типе — поле
+   * просто отсутствует.
    */
-  pickId: number | null
+  pickId?: number | null
   /** Имя параметра запроса: `channel_id` у отгрузок, `supplier_id` у приёмок. */
-  pickParam: string
+  pickParam?: string
   search: string
   page: number
   ordering?: string
@@ -50,7 +55,10 @@ function toSearchParams(query: TableQuery): string {
   if (query.dateTo) params.set("date_to", query.dateTo)
   // Имя параметра приходит от страницы: сервер принимает `channel_id`
   // на отгрузках и `supplier_id` на приёмках, и общего имени у них нет.
-  if (query.pickId) params.set(query.pickParam, String(query.pickId))
+  // Обоих может не быть — у «Поставщиков» справочника нет.
+  if (query.pickId && query.pickParam) {
+    params.set(query.pickParam, String(query.pickId))
+  }
   if (query.search) params.set("search", query.search)
   if (query.page > 1) params.set("page", String(query.page))
   if (query.ordering) params.set("ordering", query.ordering)

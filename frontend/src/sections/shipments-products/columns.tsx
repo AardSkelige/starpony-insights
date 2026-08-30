@@ -24,6 +24,7 @@ export const COLUMNS: Column<ShipmentProductRow>[] = [
     key: "name",
     label: "Наименование",
     sortKey: "name",
+    changeValue: (row) => [row.name, row.code, row.article],
     render: (row) => (
       <span className="flex min-w-0 flex-col">
         {/* Название переносится в две строки, а не обрезается в одну:
@@ -52,6 +53,7 @@ export const COLUMNS: Column<ShipmentProductRow>[] = [
     label: "Продано",
     numeric: true,
     sortKey: "quantity",
+    changeValue: (row) => [row.quantity, row.uom],
     render: (row) => formatQuantity(row.quantity, row.uom),
     explain: (
       <Explain>
@@ -69,6 +71,7 @@ export const COLUMNS: Column<ShipmentProductRow>[] = [
     // На узком экране прячется первой: это важное число, но не то, ради
     // которого открывают страницу.
     hideOn: ["narrow"],
+    changeValue: (row) => row.free_quantity,
     render: (row) =>
       Number(row.free_quantity) > 0 ? formatQuantity(row.free_quantity) : "—",
     explain: (
@@ -84,6 +87,7 @@ export const COLUMNS: Column<ShipmentProductRow>[] = [
     label: "Выручка",
     numeric: true,
     sortKey: "revenue",
+    changeValue: (row) => row.revenue_kopecks,
     render: (row) => formatMoney(row.revenue_kopecks),
     explain: (
       <Explain>
@@ -97,6 +101,7 @@ export const COLUMNS: Column<ShipmentProductRow>[] = [
     cardLabel: "Средняя цена",
     numeric: true,
     sortKey: "avg_price",
+    changeValue: (row) => row.avg_price_kopecks,
     render: (row) => formatUnitPrice(row.avg_price_kopecks),
     explain: (
       <Explain>
@@ -113,6 +118,7 @@ export const COLUMNS: Column<ShipmentProductRow>[] = [
     numeric: true,
     sortKey: "share",
     hideOn: ["narrow"],
+    changeValue: (row) => row.revenue_share,
     render: (row) => formatShare(row.revenue_share),
     explain: (
       <Explain>

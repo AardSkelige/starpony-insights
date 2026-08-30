@@ -1,3 +1,4 @@
+import { cn } from "@/shared/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 
 export type Bar = {
@@ -9,6 +10,13 @@ export type Bar = {
   display: string
   /** Что показать по наведению — второе измерение, не влезшее в подпись. */
   hint?: string
+  /**
+   * Второе число у конца полосы: доля, процент, разница.
+   *
+   * Приглушено и уже основного: полоса и `display` отвечают на «сколько»,
+   * а это уточняет «какая часть» — читается вторым, а не наравне.
+   */
+  secondary?: string
 }
 
 /**
@@ -25,7 +33,22 @@ export type Bar = {
  * контраст 1.48, а `chart-5` на тёмном — 1.31, при пороге 3:1. У `primary`
  * проверка проходит в обеих темах.
  */
-export function BarList({ bars }: { bars: Bar[] }) {
+export function BarList({
+  bars,
+  wideLabels = false,
+}: {
+  bars: Bar[]
+  /**
+   * Широкая колонка подписей.
+   *
+   * Не вкус, а разница в данных: названия каналов короткие («ХорсСмарт»,
+   * «Точка продаж»), а имена получателей — нет («ГКФХ Торшин Валерий
+   * Вячеславович»). Обрезанное имя перестаёт быть опознавательным знаком,
+   * а полоса и без того длинная — отдать ей часть ширины дешевле, чем
+   * потерять того, о ком строка.
+   */
+  wideLabels?: boolean
+}) {
   const max = Math.max(...bars.map((bar) => bar.value), 0)
   if (max <= 0) return null
 
@@ -36,20 +59,34 @@ export function BarList({ bars }: { bars: Bar[] }) {
           <TooltipTrigger
             render={
               <div className="flex items-center gap-3 text-sm">
-                <span className="w-24 shrink-0 truncate text-xs text-muted-foreground">
+                <span
+                  className={cn(
+                    "shrink-0 truncate text-xs text-muted-foreground",
+                    wideLabels ? "w-44" : "w-24"
+                  )}
+                >
                   {bar.label}
                 </span>
                 {/* Дорожка во всю ширину: без неё полосы не с чем сравнивать,
                     кроме друг друга, и доля от целого не читается. */}
                 <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-[3px] bg-muted">
                   <span
-                    className="block h-full rounded-r-[3px] bg-primary"
+                    className="motion-bar-reveal block h-full rounded-r-[3px] bg-primary"
                     style={{ width: `${(bar.value / max) * 100}%` }}
                   />
                 </span>
-                <span className="w-16 shrink-0 text-right text-xs tabular-nums">
+                {/* Ширина под самое длинное, что сюда попадает, — денежную
+                    сумму «23 350,00 ₽». Колонка чисел обязана выравниваться
+                    по правому краю, поэтому ширина фиксированная: подгонка
+                    по содержимому дала бы рваный столбец. */}
+                <span className="w-24 shrink-0 text-right text-xs whitespace-nowrap tabular-nums">
                   {bar.display}
                 </span>
+                {bar.secondary ? (
+                  <span className="w-12 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                    {bar.secondary}
+                  </span>
+                ) : null}
               </div>
             }
           />

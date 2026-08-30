@@ -194,6 +194,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/suppliers/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Поставщики
+         * @description Кто, на какие суммы и как часто поставляет: приёмки, наименования, регулярность поставок и срок от заказа до прихода товара.
+         */
+        get: operations["suppliers_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/suppliers/xlsx/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Поставщики — выгрузка в Excel
+         * @description Та же выборка, что на экране, целиком. Вторым листом — каждая поставка отдельной строкой.
+         */
+        get: operations["suppliers_xlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/supplies/materials/": {
         parameters: {
             query?: never;
@@ -314,6 +354,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description Контрагент с количеством: и покупатель, и получатель бесплатного.
+         *
+         *     Один тип на оба блока — поля совпадают до буквы, а два близнеца в схеме
+         *     дали бы фронтенду два типа, под которые пишутся два компонента.
+         */
+        AgentShare: {
+            agent_id: number;
+            name: string;
+            /** Format: decimal */
+            quantity: string;
+            revenue_kopecks: number;
+            documents_count: number;
+        };
         /** @description Доля канала в продажах товара. Основа полос в раскрытии строки. */
         ChannelShare: {
             id: number | null;
@@ -343,12 +397,36 @@ export interface components {
             status: string;
             database: string;
         };
+        /**
+         * @description Медиана в днях вместе с тем, из чего она получена.
+         *
+         *     Один тип на регулярность и на срок поставки: поля у них совпадают
+         *     до буквы, и два близнеца в схеме дали бы фронтенду два типа, под которые
+         *     пишутся два компонента. Так уже расходился блок «Склад».
+         *
+         *     Названия полей нейтральны к смыслу (`days`, а не `interval_days`)
+         *     именно поэтому: подпись даёт колонка, а не контракт.
+         */
+        LeadTime: {
+            /** Format: decimal */
+            days: string | null;
+            measurements: number;
+            min_days: number | null;
+            max_days: number | null;
+            /** Format: decimal */
+            average_days: string | null;
+            unlinked: number;
+        };
         Login: {
             username: string;
             password: string;
         };
         /**
          * @description На сколько хватит остатка при нынешнем расходе.
+         *
+         *     Один тип на два раздела: «Материалы в отгрузках» отвечают им на «надолго
+         *     ли хватит», «Материалы в приёмках» — на «пора ли закупать». Вопрос разный,
+         *     число одно, и разойтись оно не имеет права.
          *
          *     Первая половина порога закупки (`PRD.md` §5.9): `minimumBalance` пуст
          *     у всех 314 позиций, а расход за период против свободного остатка
@@ -358,6 +436,8 @@ export interface components {
          *     расход выбранного периода, а не тренд. Меняешь период — меняется число.
          */
         MaterialCoverage: {
+            /** Format: decimal */
+            quantity: string;
             /** Format: decimal */
             per_day: string;
             days_of_period: number;
@@ -487,15 +567,6 @@ export interface components {
             /** Format: decimal */
             price_kopecks: string;
         };
-        ProductDocument: {
-            number: string;
-            /** Format: date-time */
-            moment: string;
-            agent: string;
-            /** Format: decimal */
-            quantity: string;
-            total_kopecks: number;
-        };
         Profile: {
             id: number;
             username: string;
@@ -526,9 +597,37 @@ export interface components {
             /** Format: decimal */
             price_change: string | null;
         };
+        /** @description Крупнейшие контрагенты плюс свёрнутый хвост. */
+        Recipients: {
+            agents: components["schemas"]["AgentShare"][];
+            rest_agents_count: number;
+            /** Format: decimal */
+            rest_quantity: string;
+            /** Format: decimal */
+            quantity: string;
+        };
         Refused: {
             detail: string;
             retry_after_seconds: number;
+        };
+        /**
+         * @description Медиана в днях вместе с тем, из чего она получена.
+         *
+         *     Один тип на регулярность и на срок поставки: поля у них совпадают
+         *     до буквы, и два близнеца в схеме дали бы фронтенду два типа, под которые
+         *     пишутся два компонента. Так уже расходился блок «Склад».
+         *
+         *     Названия полей нейтральны к смыслу (`days`, а не `interval_days`)
+         *     именно поэтому: подпись даёт колонка, а не контракт.
+         */
+        Regularity: {
+            /** Format: decimal */
+            days: string | null;
+            measurements: number;
+            min_days: number | null;
+            max_days: number | null;
+            /** Format: decimal */
+            average_days: string | null;
         };
         ShipmentMaterialDetail: {
             material: components["schemas"]["MaterialHead"];
@@ -608,7 +707,9 @@ export interface components {
         };
         ShipmentProductDetail: {
             channels: components["schemas"]["ChannelShare"][];
-            documents: components["schemas"]["ProductDocument"][];
+            timeline: components["schemas"]["Timeline"];
+            buyers: components["schemas"]["Recipients"] | null;
+            free: components["schemas"]["Recipients"] | null;
             stock: components["schemas"]["Stock"] | null;
         };
         ShipmentProductRow: {
@@ -666,6 +767,23 @@ export interface components {
             available: string;
             stock_days: number | null;
         };
+        SupplierMaterial: {
+            name: string;
+            amount_kopecks: number;
+            /** Format: decimal */
+            share: string | null;
+        };
+        /**
+         * @description Что именно берём у поставщика: крупнейшие плюс свёрнутый хвост.
+         *
+         *     По суммам, а не по количествам: у материалов разные единицы — граммы
+         *     против штук, — и сложить их нельзя. Деньги единственное, что у них общее.
+         */
+        SupplierMaterials: {
+            items: components["schemas"]["SupplierMaterial"][];
+            rest_count: number;
+            rest_amount_kopecks: number;
+        };
         /**
          * @description Что и почём брали у одного поставщика — строка сравнения.
          *
@@ -690,6 +808,54 @@ export interface components {
             /** Format: decimal */
             above_best: string | null;
         };
+        SupplierRow: {
+            supplier_id: number;
+            name: string;
+            supplies_count: number;
+            delivery_days: number;
+            amount_kopecks: number;
+            /** Format: decimal */
+            amount_share: string | null;
+            /** Format: date-time */
+            first_moment: string;
+            /** Format: date-time */
+            last_moment: string;
+            materials_count: number;
+            positions_count: number;
+            free_positions_count: number;
+            regularity: components["schemas"]["Regularity"];
+            lead_time: components["schemas"]["LeadTime"];
+            materials: components["schemas"]["SupplierMaterials"];
+        };
+        Suppliers: {
+            count: number;
+            /** Format: date-time */
+            synced_at: string | null;
+            totals: components["schemas"]["SuppliersTotals"];
+            coverage: components["schemas"]["SuppliersCoverage"];
+            results: components["schemas"]["SupplierRow"][];
+        };
+        /** @description Сводка — про выборку приёмок целиком. Поиск её не трогает. */
+        SuppliersCoverage: {
+            suppliers_count: number;
+            supplies_count: number;
+            amount_kopecks: number;
+            positions_count: number;
+            materials_count: number;
+            free_positions_count: number;
+            with_regularity_count: number;
+            with_lead_time_count: number;
+            unlinked_supplies_count: number;
+        };
+        /** @description Итог под таблицей — про то, что в ней видно, с учётом поиска. */
+        SuppliersTotals: {
+            suppliers_count: number;
+            supplies_count: number;
+            amount_kopecks: number;
+            /** Format: decimal */
+            amount_share: string | null;
+            materials_count: number;
+        };
         SupplyMaterialDetail: {
             material: components["schemas"]["MaterialHead"];
             /** Format: decimal */
@@ -706,6 +872,7 @@ export interface components {
             history: components["schemas"]["Purchase"][];
             suppliers: components["schemas"]["SupplierPrice"][];
             stock: components["schemas"]["Stock"] | null;
+            coverage: components["schemas"]["MaterialCoverage"];
         };
         SupplyMaterialRow: {
             material_id: number;
@@ -802,6 +969,28 @@ export interface components {
             running: boolean;
             /** Format: date-time */
             started_at: string | null;
+        };
+        /**
+         * @description Продажи во времени. Заменило журнал последних отгрузок.
+         *
+         *     Шаг подбирается под период на сервере и приходит подписью: два места,
+         *     решающие это по-своему, разъедутся, а человек обязан видеть, в чём мерят,
+         *     иначе смена шага читается как смена данных.
+         */
+        Timeline: {
+            step: string;
+            step_label: string;
+            points: components["schemas"]["TimelinePoint"][];
+        };
+        /** @description Один столбик: начало промежутка и что в него попало. */
+        TimelinePoint: {
+            /** Format: date */
+            start: string;
+            /** Format: date */
+            end: string;
+            /** Format: decimal */
+            quantity: string;
+            revenue_kopecks: number;
         };
         /**
          * @description Проданное, чего техкарта не описывает: услуги и покупные товары.
@@ -1165,6 +1354,90 @@ export interface operations {
                  *     * `share` - share
                  */
                 ordering?: "-avg_price" | "-free" | "-name" | "-quantity" | "-revenue" | "-share" | "avg_price" | "free" | "name" | "quantity" | "revenue" | "share";
+                page?: number;
+                page_size?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+        };
+    };
+    suppliers_list: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-amount` - -amount
+                 *     * `-last` - -last
+                 *     * `-lead_time` - -lead_time
+                 *     * `-materials` - -materials
+                 *     * `-name` - -name
+                 *     * `-regularity` - -regularity
+                 *     * `-supplies` - -supplies
+                 *     * `amount` - amount
+                 *     * `last` - last
+                 *     * `lead_time` - lead_time
+                 *     * `materials` - materials
+                 *     * `name` - name
+                 *     * `regularity` - regularity
+                 *     * `supplies` - supplies
+                 */
+                ordering?: "-amount" | "-last" | "-lead_time" | "-materials" | "-name" | "-regularity" | "-supplies" | "amount" | "last" | "lead_time" | "materials" | "name" | "regularity" | "supplies";
+                page?: number;
+                page_size?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Suppliers"];
+                };
+            };
+        };
+    };
+    suppliers_xlsx: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-amount` - -amount
+                 *     * `-last` - -last
+                 *     * `-lead_time` - -lead_time
+                 *     * `-materials` - -materials
+                 *     * `-name` - -name
+                 *     * `-regularity` - -regularity
+                 *     * `-supplies` - -supplies
+                 *     * `amount` - amount
+                 *     * `last` - last
+                 *     * `lead_time` - lead_time
+                 *     * `materials` - materials
+                 *     * `name` - name
+                 *     * `regularity` - regularity
+                 *     * `supplies` - supplies
+                 */
+                ordering?: "-amount" | "-last" | "-lead_time" | "-materials" | "-name" | "-regularity" | "-supplies" | "amount" | "last" | "lead_time" | "materials" | "name" | "regularity" | "supplies";
                 page?: number;
                 page_size?: number;
                 search?: string;

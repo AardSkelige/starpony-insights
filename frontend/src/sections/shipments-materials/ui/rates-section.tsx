@@ -3,6 +3,7 @@ import type {
   MaterialRate,
   ShipmentMaterialRow,
 } from "@/sections/shipments-materials/api"
+import { BarList } from "@/shared/components/bar-list"
 import { Failed, Loading, Section } from "@/shared/components/detail"
 import { Explain } from "@/shared/components/explain"
 import { formatQuantity, formatShare } from "@/shared/lib/format"
@@ -69,26 +70,45 @@ export function RatesSection({
         </Explain>
       }
     >
-      <div className="flex min-w-0 flex-col">
-        {rates.map((rate) => (
-          <div
-            key={rate.rate}
-            className="flex items-baseline gap-3 border-b py-1.5 text-sm last:border-b-0"
-          >
-            {/* Число не ужимается — уступает список примеров. */}
-            <span className="w-24 shrink-0 font-medium tabular-nums">
-              {formatQuantity(rate.rate, row.uom)}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-              {rate.examples.join(", ")}
-              {rate.products_count > rate.examples.length ? "…" : ""}
-            </span>
-            <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-              {withPlural(rate.products_count, "изделие", "изделия", "изделий")}
-            </span>
-          </div>
-        ))}
-      </div>
+      {varies ? (
+        <div className="flex min-w-0 flex-col">
+          {rates.map((rate) => (
+            <div
+              key={rate.rate}
+              className="flex min-w-0 flex-col gap-0.5 border-b py-1.5 text-sm last:border-b-0"
+            >
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="shrink-0 font-medium tabular-nums">
+                  {formatQuantity(rate.rate, row.uom)} на изделие
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {withPlural(rate.products_count, "изделие", "изделия", "изделий")}
+                </span>
+              </div>
+              {/* Названия переносятся, а не обрезаются в одну строку: когда
+                  норма различается, весь смысл блока в том, **у каких именно**
+                  изделий она другая. Обрезанное «Репеллент…, Кондиц…»
+                  не отвечает ни на что. */}
+              <span className="min-w-0 text-xs text-muted-foreground">
+                {rate.examples.join(", ")}
+                {rate.products_count > rate.examples.length ? " и другие" : ""}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* Норма одна на все изделия — тогда это одно предложение, а не
+           таблица из одной строки с перечнем названий. Перечень здесь
+           не сообщал ничего: те же изделия стоят ниже, в «Где сидит расход»,
+           и там они с числами. */
+        <p className="text-sm">
+          <span className="font-medium tabular-nums">
+            {formatQuantity(rates[0].rate, row.uom)}
+          </span>{" "}
+          в каждое из{" "}
+          {withPlural(rates[0].products_count, "изделия", "изделий", "изделий")}.
+        </p>
+      )}
 
       {varies ? (
         <p className="mt-2 text-xs text-muted-foreground">
@@ -135,7 +155,6 @@ export function DistributionSection({
   }
 
   const { top, rest } = detail.data.distribution
-  const biggest = top.length > 0 ? Number(top[0].quantity) : 0
 
   return (
     <Section
@@ -157,48 +176,41 @@ export function DistributionSection({
         </Explain>
       }
     >
-      <div className="flex min-w-0 flex-col">
-        {top.map((item) => (
-          <div
-            key={item.product_id}
-            className="flex items-center gap-3 border-b py-1.5 text-sm last:border-b-0"
-          >
-            <span className="min-w-0 flex-1 truncate">{item.name}</span>
-            {/* Полоса относительно крупнейшего, а не всей суммы: у воды
-                на первое изделие приходится 4,3 %, и полоса в 4 % ширины
-                не отличима от пустой. */}
-            <span className="h-1 w-14 shrink-0 overflow-hidden rounded-full bg-muted">
-              <span
-                className="block h-full rounded-full bg-primary"
-                style={{
-                  width: `${biggest > 0 ? (Number(item.quantity) / biggest) * 100 : 0}%`,
-                }}
-              />
-            </span>
-            <span className="w-24 shrink-0 text-right tabular-nums">
-              {formatQuantity(item.quantity, row.uom)}
-            </span>
-            <span className="w-12 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
-              {formatShare(item.share)}
-            </span>
-          </div>
-        ))}
+      {/* Полосами через общий `BarList`, а не своей разметкой: тот же вид
+          и та же анатомия, что у «Каналов» и «Кому продавали». Своя копия
+          здесь уже разошлась — полоса была вчетверо короче и без подсказки
+          по наведению, хотя вопрос у блока тот же: кто крупнее.
 
-        {rest ? (
-          <div className="mt-1 flex items-center gap-3 border-t border-dashed pt-2 text-sm text-muted-foreground">
-            <span className="min-w-0 flex-1">
-              Ещё {withPlural(rest.products_count, "изделие", "изделия", "изделий")}
-            </span>
-            <span className="w-24 shrink-0 text-right font-medium text-foreground tabular-nums">
-              {formatQuantity(rest.quantity, row.uom)}
-            </span>
-            <span className="w-12 shrink-0 text-right text-xs tabular-nums">
-              {formatShare(rest.share)}
-            </span>
-          </div>
-        ) : null}
-      </div>
+          Длина считается от крупнейшего, а не от всей суммы: у воды
+          на первое изделие приходится 4,3 %, и полоса в 4 % ширины
+          не отличима от пустой. */}
+      <BarList
+        wideLabels
+        bars={top.map((item) => ({
+          key: String(item.product_id),
+          label: item.name,
+          value: Number(item.quantity),
+          display: formatQuantity(item.quantity),
+          secondary: formatShare(item.share),
+          hint: `${item.name}: ${formatQuantity(item.quantity, row.uom)} · ${formatShare(item.share)}`,
+        }))}
+      />
 
+      {/* Хвост свёрнут, но не отброшен: иначе показанное не сходится
+          с числом строки, и расхождение спишут на расчёт. */}
+      {rest ? (
+        <div className="mt-2 flex items-center gap-3 border-t border-dashed pt-2 text-sm text-muted-foreground">
+          <span className="min-w-0 flex-1">
+            Ещё {withPlural(rest.products_count, "изделие", "изделия", "изделий")}
+          </span>
+          <span className="shrink-0 text-right font-medium text-foreground tabular-nums">
+            {formatQuantity(rest.quantity, row.uom)}
+          </span>
+          <span className="w-12 shrink-0 text-right text-xs tabular-nums">
+            {formatShare(rest.share)}
+          </span>
+        </div>
+      ) : null}
     </Section>
   )
 }

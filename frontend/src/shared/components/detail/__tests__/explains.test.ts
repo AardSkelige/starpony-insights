@@ -26,9 +26,27 @@ const SECTION_SOURCE = readSectionSource(UI)
 
 /** Разделы разбора, которые показывают посчитанное, а не взятое из учёта. */
 const COMPUTED: Record<string, string[]> = {
-  "shipments-materials": ["Запас", "Норма расхода", "Где сидит расход", "Цена закупки"],
+  "shipments-materials": ["Норма расхода", "Где сидит расход", "Цена закупки"],
   "supplies-materials": ["Цена", "Закупки", "У кого дешевле"],
-  "shipments-products": ["Цена"],
+  "shipments-products": ["Цена", "Когда продавали", "Кому продавали", "Кому уходит даром"],
+  suppliers: ["Ритм поставок", "Срок поставки"],
+}
+
+/**
+ * Заголовок блока и его окрестность — до открывающей скобки компонента.
+ *
+ * Ловит обе формы: буквальную (`title="Запас"`) и выбранную выражением
+ * (`title={free ? "Кому уходит даром" : "Кому продавали"}`) — один компонент
+ * рисует оба блока, когда у них общий вид и разный вопрос.
+ *
+ * Окно широкое намеренно: у блока с двумя вариантами объяснения между
+ * заголовком и `explain=` помещается вся развилка.
+ */
+function titleRe(title: string): RegExp {
+  return new RegExp(
+    `title=(?:"${title}"|\\{[^}]*"${title}"[^}]*\\})[\\s\\S]{0,900}?>`,
+    "g"
+  )
 }
 
 /** Все `.tsx` каждого раздела одной строкой: блоки разложены по файлам. */
@@ -56,9 +74,7 @@ describe.each(Object.entries(COMPUTED))(
       // «едет» и «не доехало», и объяснять там нечего. Достаточно, чтобы
       // объяснение было хотя бы у одного — того, что показывает числа.
       const blocks = [
-        ...(SECTION_SOURCE[section] ?? "").matchAll(
-          new RegExp(`title="${title}"[\\s\\S]{0,400}?>`, "g")
-        ),
+        ...(SECTION_SOURCE[section] ?? "").matchAll(titleRe(title)),
       ]
 
       expect(
@@ -72,6 +88,40 @@ describe.each(Object.entries(COMPUTED))(
     })
   }
 )
+
+/**
+ * Расчётные блоки общего слоя.
+ *
+ * Проверяются отдельно от разделов: «Запас» переехал в `shared/`, когда
+ * понадобился второму разделу, и выпал бы из проверки по разделам молча —
+ * а это ровно тот блок, ради которого страницу открывают.
+ */
+const SHARED_COMPUTED = ["Запас"]
+
+const SHARED_SOURCE = Object.values(
+  import.meta.glob("../*.tsx", {
+    query: "?raw",
+    import: "default",
+    eager: true,
+  }) as Record<string, string>
+).join("\n")
+
+describe("расчётные блоки общего слоя объясняют себя", () => {
+  it.each(SHARED_COMPUTED)("у раздела «%s» есть значок объяснения", (title) => {
+    const blocks = [
+      ...SHARED_SOURCE.matchAll(titleRe(title)),
+    ]
+
+    expect(
+      blocks.length,
+      `раздел «${title}» не найден в shared/components/detail`
+    ).toBeGreaterThan(0)
+    expect(
+      blocks.some((block) => block[0].includes("explain=")),
+      `у раздела «${title}» нет объяснения — DESIGN §8`
+    ).toBe(true)
+  })
+})
 
 describe("значок объяснения не исчезает за вкладкой", () => {
   it("`Section` рисует explain и в кратком виде", () => {

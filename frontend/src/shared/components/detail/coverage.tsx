@@ -1,9 +1,6 @@
 import { TriangleAlert } from "lucide-react"
 
-import type {
-  MaterialCoverage,
-  ShipmentMaterialRow,
-} from "@/sections/shipments-materials/api"
+import type { MaterialCoverage } from "@/shared/api/types"
 import { Fact, Facts, Failed, Loading, Section } from "@/shared/components/detail"
 import { Explain } from "@/shared/components/explain"
 import { formatQuantity, formatRate } from "@/shared/lib/format"
@@ -12,6 +9,11 @@ import { cn } from "@/shared/lib/utils"
 
 /**
  * Запас: на сколько хватит остатка при нынешнем расходе.
+ *
+ * **В общем слое, потому что понадобился второму разделу.** «Материалы
+ * в отгрузках» спрашивают «надолго ли хватит», «Материалы в приёмках» —
+ * «пора ли закупать». Вопрос разный, число одно, и две копии разошлись бы
+ * молча: обе остались бы правдоподобными.
  *
  * **Единственное число этой страницы, требующее действия сегодня.** На боевых
  * данных диметикона хватает на ноль дней, воды на три, флакона 28/415
@@ -38,12 +40,20 @@ const FULL_BAR_DAYS = 90
 
 export function CoverageSection({
   detail,
-  row,
+  uom,
   bare = false,
+  lead = false,
 }: {
   detail: Detail
-  row: ShipmentMaterialRow
+  /** Единица измерения материала — своя у каждой строки. */
+  uom: string
   bare?: boolean
+  /**
+   * Ведущий блок страницы. У обеих страниц про материалы это он и есть:
+   * «надолго ли хватит» и «пора ли закупать» — вопросы, ради которых
+   * строку раскрывают.
+   */
+  lead?: boolean
 }) {
   if (detail.isError) {
     return (
@@ -68,24 +78,53 @@ export function CoverageSection({
     <Section
       title="Запас"
       bare={bare}
+      lead={lead}
+      // Цвет берётся из расчёта, а не назначается страницей: пороги и текст
+      // предупреждения обязаны меняться вместе, и решает это сервер.
+      tone={
+        coverage.level === "critical"
+          ? "critical"
+          : coverage.level === "low"
+            ? "warning"
+            : "default"
+      }
       explain={
         <Explain>
           <b>Свободный остаток ÷ расход в день.</b> Свободный, а не общий:
           зарезервированное под заказы уже обещано, и считать его своим значит
-          обнаружить нехватку в день отгрузки. Прочерк там, где остатка нет
-          в отчёте МойСклада, — у 36 материалов из 161.
+          обнаружить нехватку в день отгрузки. Прочерк бывает по двум разным
+          причинам: остатка нет в отчёте МойСклада (36 материалов из 161)
+          либо за выбранный период материал не расходовался — делить не на что.
         </Explain>
       }
     >
       <div className="flex min-w-0 flex-col gap-3">
         {days === null ? (
-          // Остатка в отчёте нет — это факт учёта, и он говорится словами.
-          // Ноль читался бы как «кончился», а мы просто не знаем.
-          <p className="text-sm text-muted-foreground">
-            Остатка по этому материалу в отчёте МойСклада нет, поэтому запас
-            в днях не посчитан. Расход известен —{" "}
-            {formatRate(coverage.per_day, row.uom)} в день.
-          </p>
+          // Причин у прочерка две, и они разные. Раньше обе печатали «остатка
+          // в отчёте нет», а во втором случае остаток как раз известен —
+          // сообщение было прямой ложью об учёте.
+          //
+          // Различает их `stock`: он `null` только когда позиции нет в отчёте
+          // остатков. Если он есть, а `days_left` пуст — значит нулевой расход,
+          // делить не на что.
+          stock === null ? (
+            <p className="text-sm text-muted-foreground">
+              Остатка по этому материалу в отчёте МойСклада нет, поэтому запас
+              в днях не посчитан.
+              {Number(coverage.per_day) > 0 ? (
+                <> Расход известен — {formatRate(coverage.per_day, uom)} в день.</>
+              ) : null}
+            </p>
+          ) : (
+            // Остаток есть, а расхода за период не было. Писать «0 в день»
+            // как объяснение нельзя: ноль здесь не измерен, а означает
+            // «в этот период не расходовали».
+            <p className="text-sm text-muted-foreground">
+              За выбранный период материал не расходовался, поэтому запас
+              в днях не посчитан. На складе свободно{" "}
+              {formatQuantity(stock.available, uom)}.
+            </p>
+          )
         ) : (
           <>
             <div className="flex items-baseline gap-2.5">
@@ -118,9 +157,9 @@ export function CoverageSection({
               </div>
               <div className="mt-1 flex justify-between gap-3 text-xs text-muted-foreground tabular-nums">
                 <span>
-                  свободно {formatQuantity(stock?.available ?? "0", row.uom)}
+                  свободно {formatQuantity(stock?.available ?? "0", uom)}
                 </span>
-                <span>{formatRate(coverage.per_day, row.uom)} в день</span>
+                <span>{formatRate(coverage.per_day, uom)} в день</span>
               </div>
             </div>
 
@@ -133,7 +172,7 @@ export function CoverageSection({
         <Facts>
           <Fact
             label="Израсходовано за период"
-            value={formatQuantity(row.quantity, row.uom)}
+            value={formatQuantity(coverage.quantity, uom)}
           />
           <Fact
             label={
@@ -141,7 +180,7 @@ export function CoverageSection({
                 Расход в день
                 <Explain>
                   <b>
-                    {formatQuantity(row.quantity, row.uom)} ÷{" "}
+                    {formatQuantity(coverage.quantity, uom)} ÷{" "}
                     {withPlural(
                       coverage.days_of_period,
                       "день",
@@ -156,7 +195,7 @@ export function CoverageSection({
                 </Explain>
               </span>
             }
-            value={formatRate(coverage.per_day, row.uom)}
+            value={formatRate(coverage.per_day, uom)}
           />
         </Facts>
       </div>

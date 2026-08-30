@@ -80,12 +80,27 @@ def day_after(day: date) -> datetime:
     return day_start(day) + timedelta(days=1)
 
 
-def within(queryset, date_from: date | None, date_to: date | None):
-    """Сузить выборку документов периодом. Пустая граница — не ограничивает."""
+def within(
+    queryset,
+    date_from: date | None,
+    date_to: date | None,
+    *,
+    field: str = "document__moment",
+):
+    """Сузить выборку периодом. Пустая граница — не ограничивает.
+
+    `field` — путь до даты документа. По умолчанию это строка документа
+    (`document__moment`), потому что так считают три страницы из четырёх.
+    «Поставщики» считают по самим приёмкам, и там путь — просто `moment`.
+
+    Параметром, а не второй функцией: правило про границы дня здесь одно,
+    и вторая копия разошлась бы ровно на том документе, что проведён
+    в 23:59:59.5.
+    """
     if date_from:
-        queryset = queryset.filter(document__moment__gte=day_start(date_from))
+        queryset = queryset.filter(**{f"{field}__gte": day_start(date_from)})
     if date_to:
-        queryset = queryset.filter(document__moment__lt=day_after(date_to))
+        queryset = queryset.filter(**{f"{field}__lt": day_after(date_to)})
     return queryset
 
 

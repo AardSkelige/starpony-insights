@@ -21,3 +21,12 @@ export type FilterOption = components["schemas"]["FilterOption"]
 
 /** Остаток на складе. Один тип на все разделы — так же, как на сервере. */
 export type Stock = components["schemas"]["Stock"]
+
+/**
+ * Запас в днях: на сколько хватит остатка при нынешнем расходе.
+ *
+ * Один тип на два раздела. «Материалы в отгрузках» отвечают им на «надолго
+ * ли хватит», «Материалы в приёмках» — на «пора ли закупать»: вопрос разный,
+ * число одно, и разойтись оно не имеет права.
+ */
+export type MaterialCoverage = components["schemas"]["MaterialCoverage"]

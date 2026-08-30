@@ -8,7 +8,6 @@
 
 from decimal import Decimal
 
-import pytest
 
 from api.shipments.services.material_rates import (
     TOP_SOURCES,

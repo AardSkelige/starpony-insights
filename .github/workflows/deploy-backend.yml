@@ -50,6 +50,17 @@ jobs:
         run: pip install -r requirements.txt
         working-directory: backend
 
+      - name: Линтер
+        # Ruff стоял только в pre-commit, а хук обходится `--no-verify`
+        # и не работает вовсе в свежем клоне, где `pre-commit install`
+        # ещё не запускали. Тогда линтер не отрабатывал ни разу, и код
+        # выкатывался непроверенным.
+        #
+        # Перед тестами, а не после: падает за доли секунды, тесты — за
+        # полминуты, и незачем ждать вторые, чтобы узнать про первое.
+        run: ruff check .
+        working-directory: backend
+
       - name: Тесты
         run: python -m pytest -q
         working-directory: backend

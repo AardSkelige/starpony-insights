@@ -14,6 +14,7 @@
 from rest_framework import serializers
 
 from api.common.serializers import (
+    MaterialCoverageSerializer,
     FilterOptionSerializer,
     MaterialHeadSerializer,
     SelectionQuerySerializer,
@@ -239,3 +240,7 @@ class SupplyMaterialDetailSerializer(serializers.Serializer):
     # Остаток известен не по всем материалам. `null` честнее нуля,
     # который читается как «кончился».
     stock = StockSerializer(allow_null=True)
+    # Запас в днях — то же число и тот же тип, что на «Материалах
+    # в отгрузках»: вопрос разный («надолго ли хватит» против «пора ли
+    # закупать»), а расчёт один, и разойтись он не имеет права.
+    coverage = MaterialCoverageSerializer()

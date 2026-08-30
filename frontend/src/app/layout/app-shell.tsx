@@ -49,9 +49,15 @@ export function AppShell({ profile }: { profile: Profile }) {
         onCommitWidth={saveWidth}
         onResetWidth={resetWidth}
       />
-      <SidebarInset>
+      {/* `min-w-0` — цепочка обязана быть сквозной: хватит одного звена
+          без него, и широкая таблица распирает оболочку вместо того, чтобы
+          прокручиваться внутри своей рамки. Компонент реестра мы не правим,
+          но класс ему передать можем. */}
+      <SidebarInset className="min-w-0">
         <AppHeader profile={profile} />
-        <div className="flex flex-1 flex-col gap-4 p-3 sm:p-4">
+        {/* `min-w-0` — по той же причине, что и в `Page`: без него широкое
+            содержимое распирает оболочку, а не прокручивается внутри себя. */}
+        <div className="flex min-w-0 flex-1 flex-col gap-4 p-3 sm:p-4">
           <Outlet />
         </div>
       </SidebarInset>

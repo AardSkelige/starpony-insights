@@ -31,9 +31,28 @@ repos:
         files: ^frontend/
         pass_filenames: false
 
+      - id: backend-lint
+        # Только ошибки логики, не стиль: настройка и обоснование —
+        # в backend/ruff.toml. Заведён после того, как задвоенный ключ
+        # словаря пережил и pytest, и обзор глазами.
+        #
+        # Имена файлов не передаём по той же причине, что у eslint: pre-commit
+        # отдаёт пути от корня репозитория, а ruff запускается из backend/
+        # и таких путей не видит. Весь бэкенд проверяется за доли секунды.
+        name: ruff (бэкенд)
+        entry: bash -c 'source scripts/hook-env.sh && cd backend && ../.venv/bin/ruff check .'
+        language: system
+        # Не только `.py`: правка самого `ruff.toml` меняет набор правил,
+        # а `requirements.txt` — версию линтера. С шаблоном по одним лишь
+        # исходникам такой коммит проходил мимо проверки
+        # («no files to check» → Skipped), и ослабленное правило въезжало
+        # в репозиторий незамеченным.
+        files: ^backend/(.*\.py|ruff\.toml|requirements\.txt)$
+        pass_filenames: false
+
       - id: backend-tests
         name: pytest (бэкенд)
-        entry: bash -c 'cd backend && ../.venv/bin/python -m pytest -q'
+        entry: bash -c 'source scripts/hook-env.sh && cd backend && ../.venv/bin/python -m pytest -q'
         language: system
         files: ^backend/.*\.py$
         pass_filenames: false

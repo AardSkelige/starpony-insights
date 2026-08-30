@@ -4,7 +4,10 @@
 каждая приёмка с датой, номером, поставщиком, количеством и ценой — сложите
 суммы, получите сумму строки. **По поставщикам** объясняет разброс: у одного
 и того же материала цены разных поставщиков различаются вдвое и втрое.
-**Склад** отвечает на «а надо ли докупать» — он про сегодня, а не про период.
+**Склад** отвечает на «а надо ли докупать» — он про сегодня, а не про период,
+и вместе с ним идёт **запас в днях**: остаток сам по себе не говорит ничего,
+пока не известно, с какой скоростью он уходит. «989 штук» — это много или
+мало, зависит от того, тратим мы их за неделю или за год.
 
 **Разброс считается по последним ценам поставщиков, а не по крайним ценам
 вообще.** Иначе «Крышка флип-топ» показывает разброс 73% между «Лемуном»
@@ -14,8 +17,12 @@
 
 from decimal import Decimal
 
+from api.common import selection as common_selection
 from api.supplies.services import materials, purchases, selection
 from api.supplies.services.purchases import Purchase
+from core.models import DocumentKind
+from core.services import consumption, coverage
+from core.services.documents import alive, positions_in
 from core.services.stock import stock_of
 
 
@@ -30,6 +37,7 @@ def detail(filters: materials.Filters, material_id: int) -> dict:
     строки. Возьми разбор весь период, а строка — апрель, и человек увидел бы
     объяснение, которое не складывается в объясняемое.
     """
+    stock = stock_of(material_id)
     positions = list(
         selection.supply_positions(
             date_from=filters.date_from,
@@ -67,7 +75,10 @@ def detail(filters: materials.Filters, material_id: int) -> dict:
         "suppliers": _by_supplier(items),
         # Остаток — про сегодня, а не про период: он отвечает на «хватит ли
         # до следующей закупки», и фильтры к этому вопросу отношения не имеют.
-        "stock": stock_of(material_id),
+        "stock": stock,
+        # А вот запас в днях — про сегодня против расхода за период: «989 штук»
+        # само по себе не говорит, много это или мало.
+        "coverage": _coverage_of(filters, material_id, stock),
     }
 
 
@@ -153,4 +164,62 @@ def _supplier_cells(group: list[Purchase]) -> dict:
         "avg_price_kopecks": materials.unit_price(amount, paid_quantity),
         "last_price_kopecks": paid[-1].price_kopecks if paid else None,
         "last_moment": paid[-1].moment if paid else None,
+    }
+
+
+def _coverage_of(
+    filters: materials.Filters, material_id: int, stock: dict | None
+) -> dict:
+    """На сколько дней хватит остатка при нынешнем расходе.
+
+    **Расход берётся из отгрузок, а не из приёмок.** Приёмка говорит, сколько
+    пришло; вопрос «пора ли закупать» — про то, сколько уходит, а уходит
+    материал вместе с проданной продукцией, через техкарты. Тот же расчёт,
+    что на «Материалах в отгрузках», и числа обязаны совпасть.
+
+    **Фильтр по поставщику в расход не входит.** Он сужает закупки, а не
+    потребление: выбрав «Лемуна», человек смотрит его приёмки — но расходуется
+    материал независимо от того, у кого куплен. Учти мы поставщика, «хватит
+    на 3 дня» превратилось бы в «на 30» от одного щелчка по фильтру.
+
+    Период — тот же, что у страницы: расход за апрель против остатка сегодня
+    отвечает на «хватит ли, если дальше будет как в апреле».
+    """
+    shipments = common_selection.within(
+        positions_in(alive(DocumentKind.DEMAND)), filters.date_from, filters.date_to
+    )
+    used = next(
+        (
+            item.quantity
+            for item in consumption.of_shipments(shipments).materials
+            if item.product.pk == material_id
+        ),
+        Decimal(0),
+    )
+    span = (
+        coverage.days_in(filters.date_from, filters.date_to, 0)
+        if filters.date_from and filters.date_to
+        else coverage.days_in(None, None, coverage.days_of(shipments))
+    )
+    # Расход считается всегда, даже когда остатка в отчёте нет (36 материалов
+    # из 161). Прочерк там только у «хватит на N дней» — делить не на что;
+    # а «израсходовано за период» и «расход в день» известны, и подставить
+    # вместо них ноль значило бы показать выдуманное число как факт.
+    #
+    # Свободный остаток, а не общий: зарезервированное под заказы уже обещано,
+    # и считать его своим значит обнаружить нехватку в день отгрузки.
+    available = Decimal(stock["available"]) if stock else None
+    return _cells(coverage.of(used, span, available))
+
+
+def _cells(left: coverage.Coverage) -> dict:
+    """Форма ответа общая с «Материалами в отгрузках» — контракт один."""
+    return {
+        "quantity": left.quantity,
+        "per_day": left.per_day,
+        "days_of_period": left.days_of_period,
+        "days_left": left.days_left,
+        # Считается на сервере: пороги и текст предупреждения обязаны
+        # меняться вместе.
+        "level": coverage.level(left.days_left),
     }

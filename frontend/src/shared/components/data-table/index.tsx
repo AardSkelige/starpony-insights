@@ -2,6 +2,7 @@ import type { Column, Sort, Totals } from "@/shared/components/data-table/column
 import { visibleColumns } from "@/shared/components/data-table/columns"
 import { CardView } from "@/shared/components/data-table/card-view"
 import { TableView } from "@/shared/components/data-table/table-view"
+import { useChangedCells } from "@/shared/components/data-table/use-changed-cells"
 import { EmptyState, ErrorState } from "@/shared/components/states"
 import { useScreen } from "@/shared/hooks/use-screen"
 import { Skeleton } from "@/shared/ui/skeleton"
@@ -21,6 +22,12 @@ type Props<Row> = {
   loading?: boolean
   /** Повторная: старые данные приглушаются, но остаются на экране. */
   refreshing?: boolean
+  /** Синхронизация с МойСкладом — единственный источник подсветки чисел.
+   *  Чужой прогон считается наравне со своим: его так же видно в шапке. */
+  syncPending?: boolean
+  syncFailed?: boolean
+  /** Время последнего успешного ответа React Query. */
+  dataVersion?: number
   error?: boolean
   onRetry?: () => void
 
@@ -53,6 +60,9 @@ export function DataTable<Row>({
   rowKey,
   loading = false,
   refreshing = false,
+  syncPending = false,
+  syncFailed = false,
+  dataVersion = 0,
   error = false,
   onRetry,
   emptyTitle,
@@ -67,6 +77,15 @@ export function DataTable<Row>({
 }: Props<Row>) {
   const screen = useScreen()
   const shown = visibleColumns(columns, screen)
+  const changedCells = useChangedCells({
+    columns,
+    rows,
+    rowKey,
+    syncPending,
+    syncFailed,
+    dataVersion,
+    selectionChanging: refreshing,
+  })
 
   if (error) {
     return <ErrorState onRetry={onRetry ?? (() => {})} />
@@ -89,6 +108,7 @@ export function DataTable<Row>({
         onOpen={onOpen}
         totals={totals}
         muted={refreshing}
+        changedCells={changedCells}
       />
     )
   }
@@ -107,6 +127,7 @@ export function DataTable<Row>({
       sort={sort}
       onSort={onSort}
       muted={refreshing}
+      changedCells={changedCells}
     />
   )
 }
@@ -114,7 +135,7 @@ export function DataTable<Row>({
 /** Скелетон повторяет форму содержимого: шапка и строки той же ширины. */
 function TableSkeleton({ columns }: { columns: number }) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-3">
+    <div className="motion-content-reveal flex flex-col gap-2 rounded-lg border p-3">
       {Array.from({ length: 8 }).map((_, row) => (
         <div key={row} className="flex items-center gap-3">
           <Skeleton className="h-4 flex-1" />

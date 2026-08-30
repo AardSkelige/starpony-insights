@@ -9,7 +9,7 @@
 
 import logging
 import time
-from typing import Any, Iterator
+from typing import Iterator
 from urllib.parse import urlencode
 
 import requests

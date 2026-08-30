@@ -12,11 +12,11 @@ import {
 } from "@/shared/components/detail"
 import { Explain } from "@/shared/components/explain"
 import {
-  formatDayMonth,
   formatMoney,
   formatQuantity,
   formatUnitPrice,
 } from "@/shared/lib/format"
+import { withPlural } from "@/shared/lib/plural"
 
 /**
  * Блоки деталей строки.
@@ -70,6 +70,7 @@ export function PriceSection({ row }: { row: ShipmentProductRow }) {
   return (
     <Section
       title="Цена"
+      lead
       explain={
         <Explain>
           <b>Выручка ÷ количество</b> по выбранной выборке. Отгрузки за 0 ₽
@@ -143,50 +144,124 @@ export function ChannelsSection({
   )
 }
 
-export function DocumentsSection({
+/**
+ * Кому уходит товар — покупателям или даром.
+ *
+ * Даром ушло 532 штуки из 2369 — почти четверть выпуска, и страница до сих пор
+ * показывала это число, не отвечая «кому». Ответ оказался осмысленным: конные
+ * клубы, фонд «Шанс на жизнь», центры реабилитации лошадей и внутренние
+ * операции. Это спонсорство и работа с амбассадорами, а не потеря, — но
+ * увидеть, во что она обходится, можно было только здесь.
+ *
+ * Блока нет вовсе, когда бесплатных отгрузок не было: пустой список читался
+ * бы как «никому», хотя вопрос просто не стоит.
+ */
+export function RecipientsSection({
   detail,
-  count,
+  uom,
+  free = false,
   bare = false,
 }: {
   detail: Detail
-  count: number
+  uom: string
+  /** Подарки вместо покупок: другой вопрос, тот же вид. */
+  free?: boolean
   bare?: boolean
 }) {
-  const documents = detail.data?.documents ?? []
+  const title = free ? "Кому уходит даром" : "Кому продавали"
+
+  // Сбой не должен выглядеть как «никому не продавали»: пустой блок читается
+  // как факт об учёте, хотя данные просто не доехали. На телефоне этот блок
+  // занимает вкладку целиком, и без сообщения там оставалась бы пустота
+  // без единого способа повторить запрос.
+  if (detail.isError) {
+    return (
+      <Section title={title} bare={bare}>
+        <Failed onRetry={() => detail.refetch()} />
+      </Section>
+    )
+  }
+
+  if (detail.isPending) {
+    return (
+      <Section title={title} bare={bare}>
+        <Loading count={4} />
+      </Section>
+    )
+  }
+
+  const data = free ? detail.data.free : detail.data.buyers
+
+  // Блока нет вовсе, когда таких отгрузок не было: пустой список читался бы
+  // как «никому», хотя вопрос просто не стоит.
+  if (!data) return null
 
   return (
-    <Section title={`Последние отгрузки · всего ${count}`} bare={bare}>
-      {detail.isError ? (
-        <Failed onRetry={() => detail.refetch()} />
-      ) : detail.isPending ? (
-        <Loading count={3} />
-      ) : (
-        <div className="flex flex-col">
-          {documents.map((document) => (
-            <div
-              key={`${document.number}-${document.moment}`}
-              className="flex items-baseline gap-2 border-b py-1.5 text-sm last:border-b-0"
-            >
-              <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                {document.number}
-              </span>
-              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                {formatDayMonth(document.moment)}
-              </span>
-              {/* Имя контрагента — единственное, чем можно пожертвовать:
-                  числа не переносятся, а «ООО „Коноспортивный центр…“»
-                  читается и в укороченном виде. */}
-              <span className="min-w-0 flex-1 truncate">{document.agent}</span>
-              <span className="shrink-0 tabular-nums">
-                {formatQuantity(document.quantity)}
-              </span>
-              <span className="shrink-0 tabular-nums">
-                {formatMoney(document.total_kopecks)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+    <Section
+      // Литералом, а не переменной: проверка объяснений читает исходники
+      // и по `title={title}` не находит блок — а её задача в том, чтобы
+      // забытое объяснение падало.
+      title={free ? "Кому уходит даром" : "Кому продавали"}
+      bare={bare}
+      note={`${formatQuantity(data.quantity, uom)} за период`}
+      explain={
+        free ? (
+          <Explain>
+            Отгрузки с нулевой суммой — <b>подарки и спонсорство</b>, а не
+            ошибка учёта: конные клубы, фонды и центры реабилитации. В проданное
+            количество они входят, в выручку — нет, и потому средняя цена
+            без них выше.
+          </Explain>
+        ) : (
+          <Explain>
+            Крупнейшие покупатели за период. <b>Бесплатные отгрузки сюда
+            не входят</b> — у них свой блок: смешай их с покупками, и клуб,
+            которому товар подарили, встал бы в список крупных клиентов
+            с выручкой ноль. Проданное плюс отданное даром даёт количество
+            строки.
+          </Explain>
+        )
+      }
+    >
+      {/* Полосами, а не списком: вопрос блока — «кому уходит больше всего»,
+          то есть сравнение величин, и длина отвечает на него быстрее
+          столбика чисел. Тот же вид, что у «По каналам продаж» рядом:
+          данные одной формы обязаны выглядеть одинаково.
+
+          Один тон на все полосы — получатели не упорядочены и не образуют
+          шкалу, так что красить каждого своим цветом значило бы второй раз
+          закодировать то, что уже показывает длина. */}
+      <BarList
+        wideLabels
+        bars={data.agents.map((agent) => ({
+          // Ключ — идентификатор, а не имя: `Counterparty.name` не уникален,
+          // и двух тёзок React считал бы одной строкой.
+          key: String(agent.agent_id),
+          label: agent.name,
+          value: Number(agent.quantity),
+          display: formatQuantity(agent.quantity),
+          hint: `${agent.name}: ${formatQuantity(agent.quantity, uom)} в ${withPlural(agent.documents_count, "отгрузке", "отгрузках", "отгрузках")}`,
+        }))}
+      />
+
+      {/* Хвост свёрнут, но не отброшен: без него доли не складываются
+          в число из заголовка блока, и расхождение спишут на расчёт. */}
+      {data.rest_agents_count > 0 ? (
+        <p className="mt-2 flex items-baseline justify-between gap-3 text-xs text-muted-foreground">
+          <span className="min-w-0">
+            Ещё{" "}
+            {withPlural(
+              data.rest_agents_count,
+              "получатель",
+              "получателя",
+              "получателей"
+            )}
+          </span>
+          <span className="shrink-0 tabular-nums">
+            {formatQuantity(data.rest_quantity)}
+          </span>
+        </p>
+      ) : null}
     </Section>
   )
 }

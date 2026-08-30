@@ -61,6 +61,22 @@ def agent(run):
 
 
 @pytest.fixture
+def make_agent(run):
+    """Разные покупатели — нужны там, где важно «кому», а не «сколько»."""
+    counter = {"n": 0}
+
+    def _make(name):
+        counter["n"] += 1
+        return Counterparty.objects.create(
+            ms_id=f"30000000-0000-0000-0000-{counter['n']:012d}",
+            name=name,
+            last_seen_run=run,
+        )
+
+    return _make
+
+
+@pytest.fixture
 def channel(run):
     return SalesChannel.objects.create(
         ms_id="00000000-0000-0000-0000-0000000000cc", name="Озон", last_seen_run=run
@@ -105,14 +121,14 @@ def make_demand(run, agent):
     counter = {"n": 0}
 
     def _make(moment=None, channel=None, deleted=False, kind=DocumentKind.DEMAND,
-              applicable=True):
+              applicable=True, buyer=None):
         counter["n"] += 1
         return Document.objects.create(
             ms_id=f"10000000-0000-0000-0000-{counter['n']:012d}",
             kind=kind,
             number=f"{counter['n']:05d}",
             moment=moment or moscow(2026, 6, 15),
-            agent=agent,
+            agent=buyer or agent,
             sales_channel=channel,
             applicable=applicable,
             deleted_at=timezone.now() if deleted else None,

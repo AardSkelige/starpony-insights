@@ -19,9 +19,9 @@
 
 from decimal import Decimal
 
-from django.db.models import Max, Min
 
-from api.shipments.services import consumption, material_rates, selection
+from api.shipments.services import material_rates, selection
+from core.services import consumption
 from api.shipments.services.materials import Filters, cost_of
 from core.models import Product
 from core.services import coverage
@@ -47,9 +47,11 @@ class MaterialNotUsed(Exception):
 def detail(filters: Filters, material_id: int) -> dict:
     """Всё про материал в контексте выбранных фильтров."""
     rows = consumption.sold(
-        date_from=filters.date_from,
-        date_to=filters.date_to,
-        channel_id=filters.channel_id,
+        selection.shipment_positions(
+            date_from=filters.date_from,
+            date_to=filters.date_to,
+            channel_id=filters.channel_id,
+        )
     )
     plans = plans_by_product()
     products = {
@@ -141,6 +143,7 @@ def detail(filters: Filters, material_id: int) -> dict:
         # Считается из того, что уже на экране: расход за период против
         # свободного остатка.
         "coverage": {
+            "quantity": left.quantity,
             "per_day": left.per_day,
             "days_of_period": left.days_of_period,
             "days_left": left.days_left,
@@ -175,18 +178,11 @@ def detail(filters: Filters, material_id: int) -> dict:
 
 
 def _days_of_data(filters: Filters) -> int:
-    """Длина выборки в днях, когда период не задан руками.
-
-    Берётся из фактических дат отгрузок, а не из «сегодня минус год»:
-    делить расход на срок, которого в данных не было, значит занизить
-    дневной расход во столько раз, во сколько ошиблись со сроком.
-    """
-    bounds = selection.shipment_positions(
-        date_from=filters.date_from,
-        date_to=filters.date_to,
-        channel_id=filters.channel_id,
-    ).aggregate(first=Min("document__moment"), last=Max("document__moment"))
-
-    if not bounds["first"] or not bounds["last"]:
-        return 1
-    return (bounds["last"].date() - bounds["first"].date()).days + 1
+    """Длина выборки в днях, когда период не задан руками."""
+    return coverage.days_of(
+        selection.shipment_positions(
+            date_from=filters.date_from,
+            date_to=filters.date_to,
+            channel_id=filters.channel_id,
+        )
+    )

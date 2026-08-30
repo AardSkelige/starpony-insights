@@ -24,6 +24,7 @@ export const COLUMNS: Column<ShipmentMaterialRow>[] = [
     key: "name",
     label: "Материал",
     sortKey: "name",
+    changeValue: (row) => [row.name, row.code, row.article],
     render: (row) => (
       <span className="flex min-w-0 flex-col">
         {/* Название переносится в две строки, а не обрезается в одну:
@@ -52,6 +53,7 @@ export const COLUMNS: Column<ShipmentMaterialRow>[] = [
     label: "Израсходовано",
     numeric: true,
     sortKey: "quantity",
+    changeValue: (row) => [row.quantity, row.uom],
     render: (row) => formatQuantity(row.quantity, row.uom),
     explain: (
       <Explain>
@@ -68,6 +70,7 @@ export const COLUMNS: Column<ShipmentMaterialRow>[] = [
     // На узком экране прячется первой: цена важна, но она — слагаемое
     // стоимости, которая рядом, и её видно в раскрытии строки.
     hideOn: ["narrow"],
+    changeValue: (row) => [row.price_kopecks, row.uom],
     render: (row) =>
       row.price_kopecks === null ? (
         <span className="text-muted-foreground">—</span>
@@ -88,6 +91,7 @@ export const COLUMNS: Column<ShipmentMaterialRow>[] = [
     label: "Стоимость",
     numeric: true,
     sortKey: "cost",
+    changeValue: (row) => row.cost_kopecks,
     render: (row) =>
       row.cost_kopecks === null ? (
         <span className="text-muted-foreground">—</span>
@@ -109,6 +113,7 @@ export const COLUMNS: Column<ShipmentMaterialRow>[] = [
     numeric: true,
     sortKey: "share",
     hideOn: ["narrow"],
+    changeValue: (row) => row.cost_share,
     render: (row) => formatShare(row.cost_share),
     explain: (
       <Explain>
@@ -124,6 +129,7 @@ export const COLUMNS: Column<ShipmentMaterialRow>[] = [
     numeric: true,
     sortKey: "products",
     hideOn: ["narrow"],
+    changeValue: (row) => row.products_count,
     render: (row) => String(row.products_count),
     explain: (
       <Explain>

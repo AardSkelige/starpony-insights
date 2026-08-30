@@ -86,3 +86,35 @@ class MaterialHeadSerializer(serializers.Serializer):
     article = serializers.CharField(allow_blank=True)
     code = serializers.CharField(allow_blank=True)
     uom = serializers.CharField(allow_blank=True)
+
+
+class MaterialCoverageSerializer(serializers.Serializer):
+    """На сколько хватит остатка при нынешнем расходе.
+
+    Один тип на два раздела: «Материалы в отгрузках» отвечают им на «надолго
+    ли хватит», «Материалы в приёмках» — на «пора ли закупать». Вопрос разный,
+    число одно, и разойтись оно не имеет права.
+
+    Первая половина порога закупки (`PRD.md` §5.9): `minimumBalance` пуст
+    у всех 314 позиций, а расход за период против свободного остатка
+    берётся из фактов учёта.
+
+    **Это не прогноз**, и подсказка на экране обязана это сказать: средний
+    расход выбранного периода, а не тренд. Меняешь период — меняется число.
+    """
+
+    # Расход за период — числитель формулы. Приходит вместе с ответом,
+    # а не берётся из строки: у «Материалов в приёмках» в строке лежит
+    # закупленное, а не израсходованное.
+    quantity = serializers.DecimalField(max_digits=18, decimal_places=3)
+    # Средний расход за сутки — рядом с ответом, чтобы формула собиралась
+    # из полученного, а не пересчитывалась на фронте.
+    per_day = serializers.DecimalField(max_digits=18, decimal_places=3)
+    days_of_period = serializers.IntegerField()
+    # `null` — остатка в отчёте нет (36 материалов из 161) или расхода
+    # за период не было. Ноль означал бы «кончился», а это другое
+    # утверждение об учёте.
+    days_left = serializers.IntegerField(allow_null=True)
+    # `none` / `ok` / `low` / `critical`. Считается на сервере: пороги
+    # и текст предупреждения обязаны меняться вместе.
+    level = serializers.CharField()

@@ -34,6 +34,10 @@ import {
  * компонента страница передаёт подпись, иконку и список: `?channel=7`
  * у отгрузок, `?supplier=7` у приёмок.
  *
+ * **А ещё его может не быть вовсе.** У «Поставщиков» поставщик — это строка
+ * таблицы: выбери его фильтром, и в ней останется одна строка, а переключиться
+ * будет нечем, кроме сброса. Там фильтров два: период и поиск.
+ *
  * **На телефоне поля стоят в столбик прямо на странице, а не в выдвижной
  * панели.** Панель была ошибкой: чтобы найти позицию, приходилось нажать
  * «Фильтры», дождаться анимации, ввести запрос и закрыть панель — четыре
@@ -67,7 +71,7 @@ type Props = {
   value: FilterValue
   onChange: (patch: Partial<FilterValue>) => void
   onReset: () => void
-  picker: Picker
+  picker?: Picker
   /** Что ищут на этой странице — подсказка в поле и подпись для чтения с экрана. */
   searchPlaceholder: string
   searchLabel: string
@@ -90,8 +94,6 @@ export function Filters({
   const dirty =
     Boolean(value.dateFrom || value.dateTo || value.pickId) || value.search !== ""
 
-  const PickIcon = picker.icon
-
   return (
     <>
       <div className="relative w-full sm:w-56">
@@ -110,6 +112,42 @@ export function Filters({
 
       <PeriodField value={value} onChange={onChange} />
 
+      {picker ? <PickerField value={value} onChange={onChange} picker={picker} /> : null}
+
+      {dirty ? (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onReset}
+          className={cn("max-sm:w-full", PHONE_HEIGHT)}
+        >
+          <X data-icon="inline-start" />
+          Сбросить
+        </Button>
+      ) : null}
+    </>
+  )
+}
+
+/**
+ * Справочник страницы отдельным компонентом.
+ *
+ * Вынесен, потому что его может не быть: условие вокруг тридцати строк
+ * разметки читается хуже, чем условие вокруг одного вызова, — а забыть
+ * закрыть его посреди `Select` куда легче.
+ */
+function PickerField({
+  value,
+  onChange,
+  picker,
+}: {
+  value: FilterValue
+  onChange: (patch: Partial<FilterValue>) => void
+  picker: Picker
+}) {
+  const PickIcon = picker.icon
+
+  return (
       <Select
         value={value.pickId ? String(value.pickId) : ALL}
         onValueChange={(next: string | null) =>
@@ -154,19 +192,6 @@ export function Filters({
           </SelectGroup>
         </SelectContent>
       </Select>
-
-      {dirty ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onReset}
-          className={cn("max-sm:w-full", PHONE_HEIGHT)}
-        >
-          <X data-icon="inline-start" />
-          Сбросить
-        </Button>
-      ) : null}
-    </>
   )
 }
 

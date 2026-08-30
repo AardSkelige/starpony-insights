@@ -16,8 +16,9 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
 from api.common.selection import page_bounds
-from api.shipments.services import consumption, selection
-from api.shipments.services.consumption import Consumed
+from api.shipments.services import selection
+from core.services import consumption
+from core.services.consumption import Consumed
 from core.money import share
 from core.services.purchase_prices import PurchasePrice, last_purchase_prices
 
@@ -146,9 +147,11 @@ def prepared(filters: Filters) -> dict:
     ради страницы и ради файла — незачем.
     """
     result = consumption.of_shipments(
-        date_from=filters.date_from,
-        date_to=filters.date_to,
-        channel_id=filters.channel_id,
+        selection.shipment_positions(
+            date_from=filters.date_from,
+            date_to=filters.date_to,
+            channel_id=filters.channel_id,
+        )
     )
     prices = last_purchase_prices(item.product.pk for item in result.materials)
 

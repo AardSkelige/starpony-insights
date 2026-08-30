@@ -62,17 +62,62 @@ class ChannelShareSerializer(serializers.Serializer):
     revenue_kopecks = serializers.IntegerField()
 
 
-class ProductDocumentSerializer(serializers.Serializer):
-    number = serializers.CharField()
-    moment = serializers.DateTimeField()
-    agent = serializers.CharField()
+class AgentShareSerializer(serializers.Serializer):
+    """Контрагент с количеством: и покупатель, и получатель бесплатного.
+
+    Один тип на оба блока — поля совпадают до буквы, а два близнеца в схеме
+    дали бы фронтенду два типа, под которые пишутся два компонента.
+    """
+
+    # Идентификатор, а не имя: `Counterparty.name` не уникален, и два разных
+    # контрагента с одинаковым названием обязаны остаться двумя строками.
+    agent_id = serializers.IntegerField()
+    name = serializers.CharField()
     quantity = serializers.DecimalField(max_digits=18, decimal_places=3)
-    total_kopecks = serializers.IntegerField()
+    revenue_kopecks = serializers.IntegerField()
+    documents_count = serializers.IntegerField()
+
+
+class RecipientsSerializer(serializers.Serializer):
+    """Крупнейшие контрагенты плюс свёрнутый хвост."""
+
+    agents = AgentShareSerializer(many=True)
+    rest_agents_count = serializers.IntegerField()
+    rest_quantity = serializers.DecimalField(max_digits=18, decimal_places=3)
+    quantity = serializers.DecimalField(max_digits=18, decimal_places=3)
+
+
+class TimelinePointSerializer(serializers.Serializer):
+    """Один столбик: начало промежутка и что в него попало."""
+
+    start = serializers.DateField()
+    # Последний день промежутка. Без него одна дата рядом с «по неделям»
+    # читается как день — вопрос «это дни видимо?» возник на первом показе.
+    end = serializers.DateField()
+    quantity = serializers.DecimalField(max_digits=18, decimal_places=3)
+    revenue_kopecks = serializers.IntegerField()
+
+
+class TimelineSerializer(serializers.Serializer):
+    """Продажи во времени. Заменило журнал последних отгрузок.
+
+    Шаг подбирается под период на сервере и приходит подписью: два места,
+    решающие это по-своему, разъедутся, а человек обязан видеть, в чём мерят,
+    иначе смена шага читается как смена данных.
+    """
+
+    step = serializers.CharField()
+    step_label = serializers.CharField()
+    points = TimelinePointSerializer(many=True)
 
 
 class ShipmentProductDetailSerializer(serializers.Serializer):
     channels = ChannelShareSerializer(many=True)
-    documents = ProductDocumentSerializer(many=True)
+    timeline = TimelineSerializer()
+    # `null` — платных отгрузок не было: товар только раздавали.
+    buyers = RecipientsSerializer(allow_null=True)
+    # `null` — бесплатных отгрузок у этого товара не было.
+    free = RecipientsSerializer(allow_null=True)
     # Остаток известен не по всем товарам: в отчёте МойСклада его может
     # не быть вовсе. `null` честнее нуля, который читается как «кончился».
     stock = StockSerializer(allow_null=True)

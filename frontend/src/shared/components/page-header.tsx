@@ -2,8 +2,8 @@ import { Download, RefreshCw } from "lucide-react"
 
 import { useScreen } from "@/shared/hooks/use-screen"
 import { formatSyncedAt } from "@/shared/lib/format"
+import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
-import { Spinner } from "@/shared/ui/spinner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 
 type Props = {
@@ -51,13 +51,23 @@ export function PageHeader({
         {subtitle ? (
           <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
         ) : null}
-        <p className="mt-1 text-xs text-muted-foreground sm:hidden">
+        <p
+          className={cn(
+            "mt-1 text-xs text-muted-foreground sm:hidden",
+            refreshing && "motion-sync-pulse"
+          )}
+        >
           {refreshNote ?? formatSyncedAt(syncedAt)}
         </p>
       </div>
 
       <div className="flex items-center gap-2">
-        <span className="hidden text-xs text-muted-foreground sm:inline">
+        <span
+          className={cn(
+            "hidden text-xs text-muted-foreground sm:inline",
+            refreshing && "motion-sync-pulse"
+          )}
+        >
           {refreshNote ?? formatSyncedAt(syncedAt)}
         </span>
 
@@ -67,6 +77,7 @@ export function PageHeader({
             label="Экспорт"
             onClick={onExport}
             busy={exporting}
+            busyMotion="pulse"
             hint="Выгрузит то, что сейчас на экране, — с учётом фильтров и сортировки. Формат XLSX."
           />
         ) : null}
@@ -77,6 +88,7 @@ export function PageHeader({
             label={refreshing ? "Обновляем…" : "Обновить"}
             onClick={onRefresh}
             busy={refreshing}
+            busyMotion="spin"
             hint="Перетянет данные из МойСклада прямо сейчас, не дожидаясь ночного расписания. Занимает около двадцати секунд. Чаще раза в три минуты запускать нельзя: лимит запросов общий с ботом, который проверяет учёт круглосуточно."
           />
         ) : null}
@@ -100,17 +112,32 @@ export function PageHeader({
  * то, что вы меняете, и повторить этот способ. Здесь способ — вариант
  * `size="icon"`, который для того и существует.
  */
+const BUSY_MOTION = {
+  spin: "motion-refresh-spin",
+  pulse: "motion-sync-pulse",
+} as const
+
 function HeaderAction({
   icon: Icon,
   label,
   onClick,
   busy,
+  busyMotion,
   hint,
 }: {
   icon: typeof Download
   label: string
   onClick: () => void
   busy: boolean
+  /**
+   * Занятость показывает сама иконка, а не подмена её на кружок: подмена
+   * меняет форму, и это читается как мигание рядом со второй такой же кнопкой.
+   *
+   * Движение разное, потому что разные и процессы: обновление ходит в МойСклад
+   * двадцать секунд по кругу — это `spin`; выгрузка отдаёт файл один раз
+   * и ждать её нечего — это `pulse`.
+   */
+  busyMotion: "spin" | "pulse"
   hint: string
 }) {
   const screen = useScreen()
@@ -128,7 +155,7 @@ function HeaderAction({
         // 40 точек — минимум под палец (§15), у варианта `icon` их 32.
         className="size-10"
       >
-        {busy ? <Spinner /> : <Icon />}
+        <Icon className={cn(busy && BUSY_MOTION[busyMotion])} />
       </Button>
     )
   }
@@ -138,12 +165,18 @@ function HeaderAction({
       <TooltipTrigger
         render={
           <Button variant="outline" size="sm" onClick={onClick} disabled={busy}>
-            {busy ? <Spinner data-icon="inline-start" /> : <Icon data-icon="inline-start" />}
+            <Icon
+              data-icon="inline-start"
+              className={cn(busy && BUSY_MOTION[busyMotion])}
+            />
             {label}
           </Button>
         }
       />
-      <TooltipContent>{hint}</TooltipContent>
+      {/* Снизу, а не сверху. Кнопки стоят в самой шапке страницы, и подсказка
+          над ними накрывает заголовок раздела и отметку «данные на 14:32» —
+          то есть закрывает контекст ровно в тот момент, когда его читают. */}
+      <TooltipContent side="bottom">{hint}</TooltipContent>
     </Tooltip>
   )
 }

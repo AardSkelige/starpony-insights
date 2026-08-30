@@ -2,7 +2,7 @@ import {
   useMaterialDetail,
   type ShipmentMaterialRow,
 } from "@/sections/shipments-materials/api"
-import { CoverageSection } from "@/sections/shipments-materials/ui/coverage-section"
+import { CoverageSection } from "@/shared/components/detail/coverage"
 import {
   BreakdownSection,
   PriceSection,
@@ -76,7 +76,7 @@ export function RowDetail({
 
         <TabsContent value="stock" className="flex flex-col gap-5">
           {repeatRowNumbers ? <TotalsSection row={row} /> : null}
-          <CoverageSection detail={detail} row={row} bare />
+          <CoverageSection detail={detail} uom={row.uom} bare />
         </TabsContent>
 
         <TabsContent value="price">
@@ -101,12 +101,12 @@ export function RowDetail({
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="grid gap-x-8 gap-y-5 lg:grid-cols-2">
-        <div className="flex min-w-0 flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-4">
           {repeatRowNumbers ? <TotalsSection row={row} /> : null}
-          <CoverageSection detail={detail} row={row} />
+          <CoverageSection detail={detail} uom={row.uom} lead />
           <PriceSection detail={detail} row={row} />
         </div>
-        <div className="flex min-w-0 flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-4">
           <RatesSection detail={detail} row={row} />
           <DistributionSection detail={detail} row={row} />
         </div>

@@ -20,11 +20,21 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
+from django.db.models import Max, Min, QuerySet
+
+from core.dates import days_between
+from core.models import DocumentPosition
+
 
 @dataclass(frozen=True)
 class Coverage:
     """На сколько хватит остатка и из чего это посчитано."""
 
+    # Расход за период — числитель формулы. Хранится рядом с ответом,
+    # а не берётся из строки таблицы: у «Материалов в приёмках» в строке
+    # лежит **закупленное**, а не израсходованное, и подставить её значило бы
+    # показать формулу, в которой числа не сходятся.
+    quantity: Decimal
     # Средний расход за сутки. Приходит рядом с ответом, чтобы формула
     # собиралась из полученного, а не пересчитывалась на фронте.
     per_day: Decimal
@@ -48,6 +58,25 @@ def days_in(date_from: date | None, date_to: date | None, fallback: int) -> int:
     return max(fallback, 1)
 
 
+def days_of(positions: QuerySet[DocumentPosition]) -> int:
+    """Длина выборки в днях — от первого документа до последнего.
+
+    Нужна, когда период не задан руками: делить расход на срок, которого
+    в данных не было («сегодня минус год»), значит занизить дневной расход
+    во столько раз, во сколько ошиблись со сроком.
+
+    Живёт здесь, а не у раздела: тот же вопрос задают «Материалы в отгрузках»
+    и «Материалы в приёмках», а две копии разошлись бы на первом же
+    уточнении — например, считать ли последний день целиком.
+    """
+    bounds = positions.aggregate(
+        first=Min("document__moment"), last=Max("document__moment")
+    )
+    if not bounds["first"] or not bounds["last"]:
+        return 1
+    return days_between(bounds["first"], bounds["last"]) + 1
+
+
 def of(
     quantity: Decimal,
     days: int,
@@ -63,12 +92,17 @@ def of(
 
     if available is None or per_day <= 0:
         return Coverage(
-            per_day=per_day, days_of_period=days, days_left=None, available=available
+            quantity=quantity,
+            per_day=per_day,
+            days_of_period=days,
+            days_left=None,
+            available=available,
         )
 
     # Округление вниз: «хватит на 2,9 дня» — это два дня, а не три.
     # Вверх — значит пообещать день, которого нет.
     return Coverage(
+        quantity=quantity,
         per_day=per_day,
         days_of_period=days,
         days_left=int(max(available, Decimal(0)) / per_day),

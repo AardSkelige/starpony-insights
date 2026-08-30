@@ -16,6 +16,7 @@ from django.db.models import QuerySet
 
 from api.common import selection
 from core.models import DocumentKind, DocumentPosition
+from core.services.documents import alive, positions_in
 
 
 @dataclass(frozen=True)
@@ -33,15 +34,12 @@ def supply_positions(
 ) -> QuerySet[DocumentPosition]:
     """Позиции приёмок, попавшие в период и к поставщику.
 
-    Удалённые и непроведённые исключаются по тем же причинам, что у отгрузок:
-    исчезнувший из учёта документ не должен попадать ни в одну сумму, а по
-    черновику приёмки товар на склад ещё не пришёл и деньги не потрачены.
+    Что считается существующей приёмкой, знает `core.services.documents.alive`:
+    то же утверждение нужно «Поставщикам», которые считают по документам,
+    а не по строкам. Разойдись эти два места — страницы за один период
+    показали бы разные приёмки, и разошлись бы молча.
     """
-    queryset = DocumentPosition.objects.filter(
-        document__kind=DocumentKind.SUPPLY,
-        document__deleted_at__isnull=True,
-        document__applicable=True,
-    )
+    queryset = positions_in(alive(DocumentKind.SUPPLY))
     queryset = selection.within(queryset, date_from, date_to)
 
     if supplier_id:

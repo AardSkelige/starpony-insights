@@ -598,6 +598,175 @@ paths:
                 type: string
                 format: binary
           description: ''
+  /api/suppliers/:
+    get:
+      operationId: suppliers_list
+      description: 'Кто, на какие суммы и как часто поставляет: приёмки, наименования,
+        регулярность поставок и срок от заказа до прихода товара.'
+      summary: Поставщики
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -amount
+          - -last
+          - -lead_time
+          - -materials
+          - -name
+          - -regularity
+          - -supplies
+          - amount
+          - last
+          - lead_time
+          - materials
+          - name
+          - regularity
+          - supplies
+          type: string
+          default: -amount
+          minLength: 1
+        description: |-
+          * `-amount` - -amount
+          * `-last` - -last
+          * `-lead_time` - -lead_time
+          * `-materials` - -materials
+          * `-name` - -name
+          * `-regularity` - -regularity
+          * `-supplies` - -supplies
+          * `amount` - amount
+          * `last` - last
+          * `lead_time` - lead_time
+          * `materials` - materials
+          * `name` - name
+          * `regularity` - regularity
+          * `supplies` - supplies
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 10
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Suppliers'
+          description: ''
+  /api/suppliers/xlsx/:
+    get:
+      operationId: suppliers_xlsx
+      description: Та же выборка, что на экране, целиком. Вторым листом — каждая поставка
+        отдельной строкой.
+      summary: Поставщики — выгрузка в Excel
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -amount
+          - -last
+          - -lead_time
+          - -materials
+          - -name
+          - -regularity
+          - -supplies
+          - amount
+          - last
+          - lead_time
+          - materials
+          - name
+          - regularity
+          - supplies
+          type: string
+          default: -amount
+          minLength: 1
+        description: |-
+          * `-amount` - -amount
+          * `-last` - -last
+          * `-lead_time` - -lead_time
+          * `-materials` - -materials
+          * `-name` - -name
+          * `-regularity` - -regularity
+          * `-supplies` - -supplies
+          * `amount` - amount
+          * `last` - last
+          * `lead_time` - lead_time
+          * `materials` - materials
+          * `name` - name
+          * `regularity` - regularity
+          * `supplies` - supplies
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 10
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+          description: ''
   /api/supplies/materials/:
     get:
       operationId: supply_materials_list
@@ -949,6 +1118,32 @@ paths:
           description: ''
 components:
   schemas:
+    AgentShare:
+      type: object
+      description: |-
+        Контрагент с количеством: и покупатель, и получатель бесплатного.
+
+        Один тип на оба блока — поля совпадают до буквы, а два близнеца в схеме
+        дали бы фронтенду два типа, под которые пишутся два компонента.
+      properties:
+        agent_id:
+          type: integer
+        name:
+          type: string
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        revenue_kopecks:
+          type: integer
+        documents_count:
+          type: integer
+      required:
+      - agent_id
+      - documents_count
+      - name
+      - quantity
+      - revenue_kopecks
     ChannelShare:
       type: object
       description: Доля канала в продажах товара. Основа полос в раскрытии строки.
@@ -1009,6 +1204,45 @@ components:
       required:
       - database
       - status
+    LeadTime:
+      type: object
+      description: |-
+        Медиана в днях вместе с тем, из чего она получена.
+
+        Один тип на регулярность и на срок поставки: поля у них совпадают
+        до буквы, и два близнеца в схеме дали бы фронтенду два типа, под которые
+        пишутся два компонента. Так уже расходился блок «Склад».
+
+        Названия полей нейтральны к смыслу (`days`, а не `interval_days`)
+        именно поэтому: подпись даёт колонка, а не контракт.
+      properties:
+        days:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,1})?$
+          nullable: true
+        measurements:
+          type: integer
+        min_days:
+          type: integer
+          nullable: true
+        max_days:
+          type: integer
+          nullable: true
+        average_days:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,1})?$
+          nullable: true
+        unlinked:
+          type: integer
+      required:
+      - average_days
+      - days
+      - max_days
+      - measurements
+      - min_days
+      - unlinked
     Login:
       type: object
       properties:
@@ -1024,6 +1258,10 @@ components:
       description: |-
         На сколько хватит остатка при нынешнем расходе.
 
+        Один тип на два раздела: «Материалы в отгрузках» отвечают им на «надолго
+        ли хватит», «Материалы в приёмках» — на «пора ли закупать». Вопрос разный,
+        число одно, и разойтись оно не имеет права.
+
         Первая половина порога закупки (`PRD.md` §5.9): `minimumBalance` пуст
         у всех 314 позиций, а расход за период против свободного остатка
         берётся из фактов учёта.
@@ -1031,6 +1269,10 @@ components:
         **Это не прогноз**, и подсказка на экране обязана это сказать: средний
         расход выбранного периода, а не тренд. Меняешь период — меняется число.
       properties:
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
         per_day:
           type: string
           format: decimal
@@ -1047,6 +1289,7 @@ components:
       - days_of_period
       - level
       - per_day
+      - quantity
     MaterialDistribution:
       type: object
       properties:
@@ -1282,28 +1525,6 @@ components:
       required:
       - moment
       - price_kopecks
-    ProductDocument:
-      type: object
-      properties:
-        number:
-          type: string
-        moment:
-          type: string
-          format: date-time
-        agent:
-          type: string
-        quantity:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
-        total_kopecks:
-          type: integer
-      required:
-      - agent
-      - moment
-      - number
-      - quantity
-      - total_kopecks
     Profile:
       type: object
       properties:
@@ -1372,6 +1593,29 @@ components:
       - price_kopecks
       - quantity
       - supplier
+    Recipients:
+      type: object
+      description: Крупнейшие контрагенты плюс свёрнутый хвост.
+      properties:
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentShare'
+        rest_agents_count:
+          type: integer
+        rest_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+      required:
+      - agents
+      - quantity
+      - rest_agents_count
+      - rest_quantity
     Refused:
       type: object
       properties:
@@ -1382,6 +1626,42 @@ components:
       required:
       - detail
       - retry_after_seconds
+    Regularity:
+      type: object
+      description: |-
+        Медиана в днях вместе с тем, из чего она получена.
+
+        Один тип на регулярность и на срок поставки: поля у них совпадают
+        до буквы, и два близнеца в схеме дали бы фронтенду два типа, под которые
+        пишутся два компонента. Так уже расходился блок «Склад».
+
+        Названия полей нейтральны к смыслу (`days`, а не `interval_days`)
+        именно поэтому: подпись даёт колонка, а не контракт.
+      properties:
+        days:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,1})?$
+          nullable: true
+        measurements:
+          type: integer
+        min_days:
+          type: integer
+          nullable: true
+        max_days:
+          type: integer
+          nullable: true
+        average_days:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,1})?$
+          nullable: true
+      required:
+      - average_days
+      - days
+      - max_days
+      - measurements
+      - min_days
     ShipmentMaterialDetail:
       type: object
       properties:
@@ -1593,18 +1873,26 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ChannelShare'
-        documents:
-          type: array
-          items:
-            $ref: '#/components/schemas/ProductDocument'
+        timeline:
+          $ref: '#/components/schemas/Timeline'
+        buyers:
+          allOf:
+          - $ref: '#/components/schemas/Recipients'
+          nullable: true
+        free:
+          allOf:
+          - $ref: '#/components/schemas/Recipients'
+          nullable: true
         stock:
           allOf:
           - $ref: '#/components/schemas/Stock'
           nullable: true
       required:
+      - buyers
       - channels
-      - documents
+      - free
       - stock
+      - timeline
     ShipmentProductRow:
       type: object
       properties:
@@ -1742,6 +2030,42 @@ components:
       - quantity
       - reserved
       - stock_days
+    SupplierMaterial:
+      type: object
+      properties:
+        name:
+          type: string
+        amount_kopecks:
+          type: integer
+        share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+      required:
+      - amount_kopecks
+      - name
+      - share
+    SupplierMaterials:
+      type: object
+      description: |-
+        Что именно берём у поставщика: крупнейшие плюс свёрнутый хвост.
+
+        По суммам, а не по количествам: у материалов разные единицы — граммы
+        против штук, — и сложить их нельзя. Деньги единственное, что у них общее.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierMaterial'
+        rest_count:
+          type: integer
+        rest_amount_kopecks:
+          type: integer
+      required:
+      - items
+      - rest_amount_kopecks
+      - rest_count
     SupplierPrice:
       type: object
       description: |-
@@ -1793,6 +2117,135 @@ components:
       - quantity
       - supplier_id
       - supplies_count
+    SupplierRow:
+      type: object
+      properties:
+        supplier_id:
+          type: integer
+        name:
+          type: string
+        supplies_count:
+          type: integer
+        delivery_days:
+          type: integer
+        amount_kopecks:
+          type: integer
+        amount_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+        first_moment:
+          type: string
+          format: date-time
+        last_moment:
+          type: string
+          format: date-time
+        materials_count:
+          type: integer
+        positions_count:
+          type: integer
+        free_positions_count:
+          type: integer
+        regularity:
+          $ref: '#/components/schemas/Regularity'
+        lead_time:
+          $ref: '#/components/schemas/LeadTime'
+        materials:
+          $ref: '#/components/schemas/SupplierMaterials'
+      required:
+      - amount_kopecks
+      - amount_share
+      - delivery_days
+      - first_moment
+      - free_positions_count
+      - last_moment
+      - lead_time
+      - materials
+      - materials_count
+      - name
+      - positions_count
+      - regularity
+      - supplier_id
+      - supplies_count
+    Suppliers:
+      type: object
+      properties:
+        count:
+          type: integer
+        synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        totals:
+          $ref: '#/components/schemas/SuppliersTotals'
+        coverage:
+          $ref: '#/components/schemas/SuppliersCoverage'
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierRow'
+      required:
+      - count
+      - coverage
+      - results
+      - synced_at
+      - totals
+    SuppliersCoverage:
+      type: object
+      description: Сводка — про выборку приёмок целиком. Поиск её не трогает.
+      properties:
+        suppliers_count:
+          type: integer
+        supplies_count:
+          type: integer
+        amount_kopecks:
+          type: integer
+        positions_count:
+          type: integer
+        materials_count:
+          type: integer
+        free_positions_count:
+          type: integer
+        with_regularity_count:
+          type: integer
+        with_lead_time_count:
+          type: integer
+        unlinked_supplies_count:
+          type: integer
+      required:
+      - amount_kopecks
+      - free_positions_count
+      - materials_count
+      - positions_count
+      - suppliers_count
+      - supplies_count
+      - unlinked_supplies_count
+      - with_lead_time_count
+      - with_regularity_count
+    SuppliersTotals:
+      type: object
+      description: Итог под таблицей — про то, что в ней видно, с учётом поиска.
+      properties:
+        suppliers_count:
+          type: integer
+        supplies_count:
+          type: integer
+        amount_kopecks:
+          type: integer
+        amount_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+        materials_count:
+          type: integer
+      required:
+      - amount_kopecks
+      - amount_share
+      - materials_count
+      - suppliers_count
+      - supplies_count
     SupplyMaterialDetail:
       type: object
       properties:
@@ -1834,9 +2287,12 @@ components:
           allOf:
           - $ref: '#/components/schemas/Stock'
           nullable: true
+        coverage:
+          $ref: '#/components/schemas/MaterialCoverage'
       required:
       - amount_kopecks
       - avg_price_kopecks
+      - coverage
       - free_quantity
       - history
       - material
@@ -2093,6 +2549,48 @@ components:
       required:
       - running
       - started_at
+    Timeline:
+      type: object
+      description: |-
+        Продажи во времени. Заменило журнал последних отгрузок.
+
+        Шаг подбирается под период на сервере и приходит подписью: два места,
+        решающие это по-своему, разъедутся, а человек обязан видеть, в чём мерят,
+        иначе смена шага читается как смена данных.
+      properties:
+        step:
+          type: string
+        step_label:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelinePoint'
+      required:
+      - points
+      - step
+      - step_label
+    TimelinePoint:
+      type: object
+      description: 'Один столбик: начало промежутка и что в него попало.'
+      properties:
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        revenue_kopecks:
+          type: integer
+      required:
+      - end
+      - quantity
+      - revenue_kopecks
+      - start
     WithoutPlanRow:
       type: object
       description: |-

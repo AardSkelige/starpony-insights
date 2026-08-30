@@ -5,7 +5,6 @@
 """
 
 import pytest
-from django.db import connection
 
 from moysklad.sync.lock import advisory_lock
 

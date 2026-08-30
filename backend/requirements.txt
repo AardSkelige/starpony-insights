@@ -26,3 +26,4 @@ gunicorn==26.2.0
 pytest==9.0.2
 pytest-django==4.14.0
 responses==0.26.3
+ruff==0.16.5

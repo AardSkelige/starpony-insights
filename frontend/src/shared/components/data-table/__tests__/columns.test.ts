@@ -9,6 +9,10 @@ import {
   totalsFor as productTotals,
 } from "@/sections/shipments-products/columns"
 import {
+  COLUMNS as SUPPLIER_COLUMNS,
+  totalsFor as supplierTotals,
+} from "@/sections/suppliers/columns"
+import {
   COLUMNS as SUPPLY_COLUMNS,
   totalsFor as supplyTotals,
 } from "@/sections/supplies-materials/columns"
@@ -64,6 +68,21 @@ const TABLES = [
     // подстрочник «в т.ч. даром» требует объяснения не меньше: без него
     // разница между количеством и оплаченным количеством не читается.
     computed: ["quantity", "amount", "price", "change", "supplies"],
+  },
+  {
+    name: "Поставщики",
+    columns: SUPPLIER_COLUMNS as Column<unknown>[],
+    totals: supplierTotals({
+      suppliers_count: 23,
+      supplies_count: 95,
+      amount_kopecks: 90407611,
+      amount_share: "1.00000000",
+      materials_count: 212,
+    }),
+    // «Поставок» здесь взято из учёта как есть, но подстрочник «дней
+    // поставок» требует объяснения не меньше: без него непонятно, почему
+    // приёмок четырнадцать, а промежутков считается одиннадцать.
+    computed: ["supplies", "share", "materials", "regularity", "lead_time"],
   },
 ]
 

@@ -49,6 +49,21 @@
 }
 
 :root {
+    /* Повороты, приглушение и проявление. 180мс сохраняют связь между
+       состояниями, но не задерживают частые действия в рабочем инструменте. */
+    --transition-quick: 180ms;
+    /* Раскрытие разбора строки. 240мс хватает увидеть источник панели,
+       не превращая каждое открытие в ожидание. */
+    --transition-panel: 240ms;
+    /* Рост сравнительных величин. 400мс дают прочитать направление,
+       но весь ряд появляется одним движением. */
+    --transition-reveal: 400ms;
+    /* Подсветка свежего числа. 1200мс хватает найти изменение взглядом,
+       после чего фон полностью освобождает данные. */
+    --transition-flash: 1200ms;
+    /* Непрерывный ход синхронизации. 900мс читаются как работа,
+       а не как резкое вращение при двадцатисекундном прогоне. */
+    --transition-progress: 900ms;
     /* Смена экрана и темы. 500мс — заметно, но не успевает надоесть
        при частой навигации. */
     --transition-screen: 500ms;
@@ -150,6 +165,53 @@
    скорости в одном интерфейсе читаются как несогласованность, а искать их
    потом пришлось бы по всем файлам. */
 @media not (prefers-reduced-motion: reduce) {
+  .motion-opacity-transition {
+    transition: opacity var(--transition-quick) var(--transition-screen-ease);
+  }
+
+  .motion-transform-transition {
+    transition: transform var(--transition-quick) var(--transition-screen-ease);
+  }
+
+  .motion-panel-height {
+    transition: height var(--transition-panel) var(--transition-screen-ease);
+  }
+
+  .motion-content-reveal,
+  .motion-detail-content > * {
+    animation: motion-content-reveal var(--transition-quick)
+      var(--transition-screen-ease) both;
+  }
+
+  .motion-data-flash {
+    animation: motion-data-flash var(--transition-flash)
+      var(--transition-screen-ease);
+  }
+
+  .motion-refresh-spin {
+    animation: motion-refresh-spin var(--transition-progress) linear infinite;
+  }
+
+  .motion-sync-pulse {
+    animation: motion-sync-pulse var(--transition-flash) ease-in-out infinite
+      alternate;
+  }
+
+  .motion-bar-reveal {
+    transform-origin: left;
+    animation: motion-bar-reveal var(--transition-reveal)
+      var(--transition-screen-ease) both;
+  }
+
+  .motion-timeline-reveal {
+    transform-origin: bottom;
+    animation-name: motion-timeline-reveal;
+    animation-duration: calc(var(--transition-reveal) * 0.7);
+    animation-delay: calc(var(--transition-reveal) * 0.3 * var(--motion-order));
+    animation-timing-function: var(--transition-screen-ease);
+    animation-fill-mode: both;
+  }
+
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation-duration: var(--transition-screen);
@@ -157,9 +219,44 @@
   }
 }
 
+@keyframes motion-content-reveal {
+  from { opacity: 0; }
+}
+
+@keyframes motion-data-flash {
+  from { background-color: color-mix(in oklab, var(--primary) 16%, transparent); }
+  to { background-color: transparent; }
+}
+
+@keyframes motion-refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes motion-sync-pulse {
+  from { opacity: 0.62; }
+  to { opacity: 1; }
+}
+
+@keyframes motion-bar-reveal {
+  from { transform: scaleX(0); }
+}
+
+@keyframes motion-timeline-reveal {
+  from { transform: scaleY(0); }
+}
+
 /* При выключенной анимации переход мгновенный: это не украшение,
-   а требование к доступности. */
+   а требование к доступности.
+
+   Но подсветка свежего числа — не украшение, а единственный ответ на вопрос
+   «что принёс прогон»: отключить её вместе с движением значит отобрать
+   сам сигнал. Поэтому она остаётся, только не затухает сама, а держится
+   до следующего запроса — так же, как её держит `useChangedCells`. */
 @media (prefers-reduced-motion: reduce) {
+  .motion-data-flash {
+    background-color: color-mix(in oklab, var(--primary) 16%, transparent);
+  }
+
   ::view-transition-group(*),
   ::view-transition-old(*),
   ::view-transition-new(*) {

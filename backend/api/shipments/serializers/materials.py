@@ -9,6 +9,7 @@
 from rest_framework import serializers
 
 from api.common.serializers import (
+    MaterialCoverageSerializer,
     FilterOptionSerializer,
     MaterialHeadSerializer,
     StockSerializer,
@@ -168,30 +169,6 @@ class MaterialRestSerializer(serializers.Serializer):
 
     products_count = serializers.IntegerField()
     quantity = serializers.DecimalField(max_digits=18, decimal_places=6)
-
-
-class MaterialCoverageSerializer(serializers.Serializer):
-    """На сколько хватит остатка при нынешнем расходе.
-
-    Первая половина порога закупки (`PRD.md` §5.9): `minimumBalance` пуст
-    у всех 314 позиций, а расход за период против свободного остатка
-    берётся из фактов учёта.
-
-    **Это не прогноз**, и подсказка на экране обязана это сказать: средний
-    расход выбранного периода, а не тренд. Меняешь период — меняется число.
-    """
-
-    # Средний расход за сутки — рядом с ответом, чтобы формула собиралась
-    # из полученного, а не пересчитывалась на фронте.
-    per_day = serializers.DecimalField(max_digits=18, decimal_places=3)
-    days_of_period = serializers.IntegerField()
-    # `null` — остатка в отчёте нет (36 материалов из 161) или расхода
-    # за период не было. Ноль означал бы «кончился», а это другое
-    # утверждение об учёте.
-    days_left = serializers.IntegerField(allow_null=True)
-    # `none` / `ok` / `low` / `critical`. Считается на сервере: пороги
-    # и текст предупреждения обязаны меняться вместе.
-    level = serializers.CharField()
 
 
 class MaterialRateSerializer(serializers.Serializer):

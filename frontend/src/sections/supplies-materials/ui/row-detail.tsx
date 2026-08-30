@@ -9,6 +9,7 @@ import {
 import { PurchasesSection } from "@/sections/supplies-materials/ui/purchase-list"
 import { SuppliersSection } from "@/sections/supplies-materials/ui/supplier-list"
 import type { TableSelection } from "@/shared/api/table-query"
+import { CoverageSection } from "@/shared/components/detail/coverage"
 import { FailedPanel } from "@/shared/components/detail/failed-panel"
 import { StockSection } from "@/shared/components/detail/stock"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
@@ -55,6 +56,7 @@ export function RowDetail({
           {repeatRowNumbers ? <TotalsSection row={row} /> : null}
           <PriceSection detail={detail} row={row} bare />
           <StockSection detail={detail} uom={row.uom} emptyNote={NO_STOCK} />
+          <CoverageSection detail={detail} uom={row.uom} bare />
         </TabsContent>
 
         <TabsContent value="purchases">
@@ -75,16 +77,20 @@ export function RowDetail({
   }
 
   return (
-    <div className="grid gap-x-8 gap-y-5 p-4 lg:grid-cols-2">
-      {/* Слева цена и график — то, ради чего строку раскрывают. */}
-      <div className="flex min-w-0 flex-col gap-5">
+    <div className="grid gap-x-6 gap-y-4 p-4 lg:grid-cols-2">
+      {/* Ведущий блок — «Запас», и он стоит первым слева. Страница отвечает
+          на «что закупали», а спрашивают с неё «что пора закупить»: остаток
+          сам по себе этого не говорит — «989 штук» много или мало, зависит
+          от того, уходят они за неделю или за год. */}
+      <div className="flex min-w-0 flex-col gap-4">
         {repeatRowNumbers ? <TotalsSection row={row} /> : null}
+        <CoverageSection detail={detail} uom={row.uom} lead />
         <PriceSection detail={detail} row={row} />
-        <PurchasesSection detail={detail} row={row} />
       </div>
-      <div className="flex min-w-0 flex-col gap-5">
-        <SuppliersSection detail={detail} row={row} />
+      <div className="flex min-w-0 flex-col gap-4">
+        <PurchasesSection detail={detail} row={row} />
         <StockSection detail={detail} uom={row.uom} />
+        <SuppliersSection detail={detail} row={row} />
       </div>
     </div>
   )

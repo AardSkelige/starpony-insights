@@ -16,6 +16,7 @@ import { AppShell } from "@/app/layout/app-shell"
 import { LoginPage } from "@/sections/login/page"
 import { ShipmentMaterialsPage } from "@/sections/shipments-materials/page"
 import { ShipmentProductsPage } from "@/sections/shipments-products/page"
+import { SuppliersPage } from "@/sections/suppliers/page"
 import { SupplyMaterialsPage } from "@/sections/supplies-materials/page"
 import { ApiError } from "@/shared/api/client"
 import { fetchProfile, sessionKeys } from "@/shared/auth/session"
@@ -174,6 +175,7 @@ const router = createBrowserRouter([
           { path: "shipments/products", element: <ShipmentProductsPage /> },
           { path: "shipments/materials", element: <ShipmentMaterialsPage /> },
           { path: "supplies/materials", element: <SupplyMaterialsPage /> },
+          { path: "suppliers", element: <SuppliersPage /> },
           { path: "*", element: <Placeholder title="Раздел" /> },
         ],
       },

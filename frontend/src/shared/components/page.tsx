@@ -8,7 +8,13 @@ import * as React from "react"
  * каждый раз искать, где здесь кнопка обновления.
  */
 export function Page({ children }: { children: React.ReactNode }) {
-  return <div className="flex flex-1 flex-col gap-4">{children}</div>
+  // `min-w-0` обязателен, хотя ничего не задаёт на глаз. Без него ребёнок
+  // флекс-контейнера имеет `min-width: auto` и распирает родителя своим
+  // содержимым — то есть таблица шире экрана уводит вбок **всю страницу**,
+  // вместе с шапкой и фильтрами, вместо того чтобы прокручиваться внутри
+  // своей рамки. `overflow-x-auto` у таблицы без этого не работает вовсе;
+  // до первой колонки с нижней границей ширины это было не видно.
+  return <div className="flex min-w-0 flex-1 flex-col gap-4">{children}</div>
 }
 
 /**

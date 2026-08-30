@@ -27,6 +27,7 @@ export const COLUMNS: Column<SupplyMaterialRow>[] = [
     key: "name",
     label: "Материал",
     sortKey: "name",
+    changeValue: (row) => [row.name, row.code, row.article],
     render: (row) => (
       <span className="flex min-w-0 flex-col">
         {/* Название переносится в две строки, а не обрезается в одну:
@@ -55,6 +56,13 @@ export const COLUMNS: Column<SupplyMaterialRow>[] = [
     label: "Закуплено",
     numeric: true,
     sortKey: "quantity",
+    changeValue: (row) => [
+      row.quantity,
+      row.uom,
+      row.free_quantity,
+      row.paid_quantity,
+      row.mixed_uom,
+    ],
     render: (row) => (
       <span className="flex flex-col items-end">
         <span>{formatQuantity(row.quantity, row.uom)}</span>
@@ -87,6 +95,7 @@ export const COLUMNS: Column<SupplyMaterialRow>[] = [
     label: "Сумма",
     numeric: true,
     sortKey: "amount",
+    changeValue: (row) => row.amount_kopecks,
     render: (row) =>
       row.amount_kopecks > 0 ? (
         formatMoney(row.amount_kopecks)
@@ -106,6 +115,7 @@ export const COLUMNS: Column<SupplyMaterialRow>[] = [
     label: "Цена",
     numeric: true,
     sortKey: "last_price",
+    changeValue: (row) => [row.prices, row.last_price_kopecks, row.uom],
     render: (row) => (
       <span className="flex items-center justify-end gap-2">
         <PriceSpark prices={row.prices} />
@@ -132,6 +142,14 @@ export const COLUMNS: Column<SupplyMaterialRow>[] = [
     label: "Динамика",
     numeric: true,
     sortKey: "change",
+    changeValue: (row) => [
+      row.price_change,
+      row.previous_price_kopecks,
+      row.last_price_kopecks,
+      row.previous_quantity,
+      row.last_quantity,
+      row.uom,
+    ],
     render: (row) => (
       <PriceChange
         change={row.price_change}
@@ -159,6 +177,7 @@ export const COLUMNS: Column<SupplyMaterialRow>[] = [
     numeric: true,
     sortKey: "supplies",
     hideOn: ["narrow"],
+    changeValue: (row) => [row.supplies_count, row.suppliers_count],
     render: (row) => (
       <span className="flex flex-col items-end">
         <span>{String(row.supplies_count)}</span>
