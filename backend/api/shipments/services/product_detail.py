@@ -118,6 +118,7 @@ def _recipients(queryset) -> dict | None:
 
     shown = rows[:AGENT_LIMIT]
     rest = rows[AGENT_LIMIT:]
+    notes = _notes_by_agent(queryset, [row["document__agent_id"] for row in shown])
     return {
         "agents": [
             {
@@ -125,6 +126,11 @@ def _recipients(queryset) -> dict | None:
                 # React считал бы двух разных контрагентов одной строкой.
                 "agent_id": row["document__agent_id"],
                 "name": row["document__agent__name"],
+                # Комментарии заказов — то самое «зачем». Пишутся людьми
+                # живым языком, и потому не раскладываются по категориям:
+                # «на призы на ЧР-2026 по конкуру» человек прочтёт быстрее,
+                # чем поймёт код справочника.
+                "notes": notes.get(row["document__agent_id"], []),
                 "quantity": row["quantity"],
                 "revenue_kopecks": row["revenue_kopecks"],
                 "documents_count": row["documents_count"],
@@ -135,6 +141,37 @@ def _recipients(queryset) -> dict | None:
         "rest_quantity": sum((row["quantity"] for row in rest), Decimal(0)),
         "quantity": sum((row["quantity"] for row in rows), Decimal(0)),
     }
+
+
+def _notes_by_agent(queryset, agent_ids: list[int]) -> dict[int, list[str]]:
+    """Комментарии заказов, по одному набору на контрагента.
+
+    **Комментарий берётся из заказа, а не из отгрузки.** В отгрузке пишут про
+    накладные расходы («самовывоз», «доставку оплачивал получатель»), а зачем
+    товар ушёл — пишут в заказе, из которого она выросла. Проверено на боевых:
+    у всех 53 отгрузок с нулевой ценой заказ есть, и комментарий тоже.
+
+    Повторы схлопываются: три отгрузки одного заказа несут один текст.
+    """
+    if not agent_ids:
+        return {}
+
+    rows = (
+        queryset.filter(document__agent_id__in=agent_ids)
+        .exclude(document__customer_order__description="")
+        .values("document__agent_id", "document__customer_order__description")
+        .distinct()
+    )
+
+    collected: dict[int, list[str]] = {}
+    for row in rows:
+        note = (row["document__customer_order__description"] or "").strip()
+        if not note:
+            continue
+        bucket = collected.setdefault(row["document__agent_id"], [])
+        if note not in bucket:
+            bucket.append(note)
+    return collected
 
 
 def detail(filters: Filters, product_id: int) -> dict:

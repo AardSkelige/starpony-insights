@@ -457,3 +457,77 @@ class TestRecipientsAreGroupedById:
         result = product_detail.buyers(products.Filters(), product.pk)
 
         assert result["agents"][0]["name"] == "ООО «Крупный»"
+
+
+class TestOrderNotes:
+    """Комментарий берётся из заказа, а не из отгрузки.
+
+    В отгрузке пишут про накладные расходы («самовывоз», «доставку оплачивал
+    получатель»), а зачем товар ушёл — пишут в заказе. На боевых данных
+    у всех 53 отгрузок с нулевой ценой заказ есть, и комментарий тоже:
+    «на призы на ЧР-2026 по конкуру», «подарок потенциальному оптовику»,
+    «замена взамен вытекшей бутылки».
+    """
+
+    def test_note_comes_from_the_order_not_the_shipment(
+        self, make_product, make_demand, make_agent, run
+    ):
+        from core.models import Document, DocumentKind
+
+        product = make_product()
+        club = make_agent("ООО «Хорсека Резорт»")
+        order = Document.objects.create(
+            ms_id="cafe0000-0000-0000-0000-000000000001",
+            kind=DocumentKind.CUSTOMER_ORDER,
+            number="З-00001",
+            moment=moscow(2026, 6, 1),
+            agent=club,
+            description="Лена: на призы на ЧР-2026 по конкуру.",
+            last_seen_run=run,
+        )
+        demand = make_demand(buyer=club)
+        demand.customer_order = order
+        demand.description = "Накладные расходы 0 — самовывоз."
+        demand.save(update_fields=["customer_order", "description"])
+        position(demand, product, 10, 0)
+
+        free = product_detail.free_recipients(products.Filters(), product.pk)
+
+        assert free["agents"][0]["notes"] == ["Лена: на призы на ЧР-2026 по конкуру."]
+
+    def test_repeated_orders_do_not_repeat_the_note(
+        self, make_product, make_demand, make_agent, run
+    ):
+        """Три отгрузки одного заказа несут один текст — печатать его трижды
+        значит превратить объяснение в шум."""
+        from core.models import Document, DocumentKind
+
+        product = make_product()
+        club = make_agent("Клуб")
+        order = Document.objects.create(
+            ms_id="cafe0000-0000-0000-0000-000000000002",
+            kind=DocumentKind.CUSTOMER_ORDER,
+            number="З-00002",
+            moment=moscow(2026, 6, 1),
+            agent=club,
+            description="Лена: спонсорство.",
+            last_seen_run=run,
+        )
+        for _ in range(3):
+            demand = make_demand(buyer=club)
+            demand.customer_order = order
+            demand.save(update_fields=["customer_order"])
+            position(demand, product, 2, 0)
+
+        free = product_detail.free_recipients(products.Filters(), product.pk)
+
+        assert free["agents"][0]["notes"] == ["Лена: спонсорство."]
+
+    def test_missing_order_is_not_an_error(self, make_product, make_demand):
+        """Отгрузка без заказа — просто отгрузка без объяснения, а не сбой."""
+        product = make_product()
+        position(make_demand(), product, 5, 0)
+
+        free = product_detail.free_recipients(products.Filters(), product.pk)
+
+        assert free["agents"][0]["notes"] == []

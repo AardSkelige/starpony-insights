@@ -76,6 +76,12 @@ class AgentShareSerializer(serializers.Serializer):
     quantity = serializers.DecimalField(max_digits=18, decimal_places=3)
     revenue_kopecks = serializers.IntegerField()
     documents_count = serializers.IntegerField()
+    # Комментарии заказов — «зачем ушло». Написаны людьми живым языком:
+    # «на призы на ЧР-2026 по конкуру», «подарок потенциальному оптовику»,
+    # «замена взамен вытекшей бутылки». По категориям не раскладываются
+    # намеренно: справочник, который надо заполнять руками, заполнять
+    # перестанут, а комментарии пишут и так — у всех 53 нулевых отгрузок.
+    notes = serializers.ListField(child=serializers.CharField(), required=False)
 
 
 class RecipientsSerializer(serializers.Serializer):

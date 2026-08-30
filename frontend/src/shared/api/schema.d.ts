@@ -367,6 +367,7 @@ export interface components {
             quantity: string;
             revenue_kopecks: number;
             documents_count: number;
+            notes?: string[];
         };
         /** @description Доля канала в продажах товара. Основа полос в раскрытии строки. */
         ChannelShare: {

@@ -17,6 +17,14 @@ export type Bar = {
    * а это уточняет «какая часть» — читается вторым, а не наравне.
    */
   secondary?: string
+  /**
+   * Строки под полосой — то, чего числом не сказать.
+   *
+   * Появились ради комментариев заказов: «на призы на ЧР-2026 по конкуру»
+   * объясняет отгрузку без оплаты лучше любой категории. Не в подсказке
+   * по наведению, а на виду: ради этого текста блок и открывают.
+   */
+  notes?: string[]
 }
 
 /**
@@ -55,7 +63,8 @@ export function BarList({
   return (
     <div className="flex flex-col gap-1.5">
       {bars.map((bar) => (
-        <Tooltip key={bar.key}>
+        <div key={bar.key} className="flex min-w-0 flex-col gap-0.5">
+        <Tooltip>
           <TooltipTrigger
             render={
               <div className="flex items-center gap-3 text-sm">
@@ -92,6 +101,19 @@ export function BarList({
           />
           {bar.hint ? <TooltipContent>{bar.hint}</TooltipContent> : null}
         </Tooltip>
+        {bar.notes?.length ? (
+          <div className="flex min-w-0 flex-col gap-0.5 pb-1">
+            {bar.notes.map((note) => (
+              // Текст переносится целиком, а не обрезается: «Лена: на призы
+              // на ЧР-2026 по конкуру. + ПАКЕТЫ. + ОТКРЫТКИ» после обрезки
+              // теряет ровно ту часть, ради которой его и читают.
+              <p key={note} className="text-xs whitespace-normal text-muted-foreground">
+                {note}
+              </p>
+            ))}
+          </div>
+        ) : null}
+        </div>
       ))}
     </div>
   )

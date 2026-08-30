@@ -1138,6 +1138,10 @@ components:
           type: integer
         documents_count:
           type: integer
+        notes:
+          type: array
+          items:
+            type: string
       required:
       - agent_id
       - documents_count

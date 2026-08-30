@@ -134,6 +134,12 @@ def sync_documents(
         str(d.ms_id): d
         for d in Document.objects.filter(kind=DocumentKind.PURCHASE_ORDER)
     }
+    # Заказы покупателей — только для отгрузок. Нужны за комментарием:
+    # в отгрузке пишут про накладные расходы, а причину пишут в заказе.
+    customer_orders = {
+        str(d.ms_id): d
+        for d in Document.objects.filter(kind=DocumentKind.CUSTOMER_ORDER)
+    }
 
     params = {"limit": POSITIONS_LIMIT}
     if with_positions:
@@ -191,7 +197,11 @@ def sync_documents(
                     "number": row.get("name", ""),
                     "moment": moment,
                     "agent": agent,
+                    "description": row.get("description") or "",
                     "purchase_order": order,
+                    "customer_order": customer_orders.get(
+                        ms_id_from(row.get("customerOrder"))
+                    ),
                     "sales_channel": channels.get(ms_id_from(row.get("salesChannel"))),
                     # round, а не int: суммы приходят типом Float, и усечение
                     # превратило бы 1234.9999999 в 1234 — расхождение с учётом
@@ -255,6 +265,22 @@ def sync_documents(
 
 def sync_demands(client: MoySkladClient, run: SyncRun) -> EntityOutcome:
     return sync_documents(client, run, kind=DocumentKind.DEMAND, path="/entity/demand")
+
+
+def sync_customer_orders(client: MoySkladClient, run: SyncRun) -> EntityOutcome:
+    """Заказы покупателей — только шапки, и обязательно до отгрузок.
+
+    Позиции не нужны: что отгрузили, известно из самой отгрузки. Нужен
+    комментарий — в нём написано, **зачем** товар ушёл, и для отгрузок
+    без оплаты это единственный ответ.
+    """
+    return sync_documents(
+        client,
+        run,
+        kind=DocumentKind.CUSTOMER_ORDER,
+        path="/entity/customerorder",
+        with_positions=False,
+    )
 
 
 def sync_purchase_orders(client: MoySkladClient, run: SyncRun) -> EntityOutcome:
