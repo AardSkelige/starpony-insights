@@ -13,6 +13,7 @@ import {
 import { CloudOff } from "lucide-react"
 
 import { AppShell } from "@/app/layout/app-shell"
+import { ChannelsPage } from "@/sections/channels/page"
 import { LoginPage } from "@/sections/login/page"
 import { ShipmentMaterialsPage } from "@/sections/shipments-materials/page"
 import { ShipmentProductsPage } from "@/sections/shipments-products/page"
@@ -176,6 +177,7 @@ const router = createBrowserRouter([
           { path: "shipments/materials", element: <ShipmentMaterialsPage /> },
           { path: "supplies/materials", element: <SupplyMaterialsPage /> },
           { path: "suppliers", element: <SuppliersPage /> },
+          { path: "channels", element: <ChannelsPage /> },
           { path: "*", element: <Placeholder title="Раздел" /> },
         ],
       },

@@ -36,14 +36,15 @@ export type Bar = {
  * единственный свободный канал впустую. В утверждённом макете полосы были
  * разноцветными — это как раз тот случай.
  *
- * Цвет — `primary`, а не `chart-*`: в теме `nova` палитра графиков нейтральная
- * и одинаковая в светлой и тёмной теме, поэтому `chart-1` на белом фоне даёт
- * контраст 1.48, а `chart-5` на тёмном — 1.31, при пороге 3:1. У `primary`
- * проверка проходит в обеих темах.
+ * Цвет — `primary`, а не `chart-*`. Палитра графиков различает **серии**,
+ * а серия здесь одна: брать из неё слот значит объявить полосам разную
+ * природу, которой у них нет.
  */
 export function BarList({
   bars,
   wideLabels = false,
+  multilineLabels = false,
+  numbersOnHover = false,
 }: {
   bars: Bar[]
   /**
@@ -56,6 +57,32 @@ export function BarList({
    * потерять того, о ком строка.
    */
   wideLabels?: boolean
+  /**
+   * Подпись переносится на две строки вместо обрезки многоточием.
+   *
+   * Нужна там, где имена различаются **концом**, а не началом: пять товаров
+   * канала — «Кондиционер для гривы и хвоста Табак-Ваниль 500 мл», «…
+   * Кокосовое молоко 500 мл», «… Персик-Банан 500 мл» — после обрезки
+   * превращаются в пять одинаковых строк «Кондиционер для гривы и х…».
+   * Полоса при этом честно показывает разные величины, и список читается
+   * как ошибка данных.
+   *
+   * Не по умолчанию: у коротких имён (каналы, поставщики) вторая строка
+   * пустует и разрежает список без пользы.
+   */
+  multilineLabels?: boolean
+  /**
+   * Числа уезжают в подсказку, на виду остаются подпись и полоса.
+   *
+   * Список из пяти строк с суммой и долей у каждой — это таблица, которую
+   * читают числами; вопрос же к нему один: **кто из них главный**. На него
+   * отвечает длина, и колонка цифр рядом только соревнуется с ней за
+   * внимание. Точная сумма нужна редко и достаётся наведением.
+   *
+   * Не по умолчанию: там, где список и есть ответ в деньгах — полосы
+   * каналов над таблицей, — числа остаются на виду.
+   */
+  numbersOnHover?: boolean
 }) {
   const max = Math.max(...bars.map((bar) => bar.value), 0)
   if (max <= 0) return null
@@ -70,8 +97,11 @@ export function BarList({
               <div className="flex items-center gap-3 text-sm">
                 <span
                   className={cn(
-                    "shrink-0 truncate text-xs text-muted-foreground",
-                    wideLabels ? "w-44" : "w-24"
+                    "shrink-0 text-xs text-muted-foreground",
+                    wideLabels ? "w-44" : "w-24",
+                    multilineLabels
+                      ? "line-clamp-2 whitespace-normal"
+                      : "truncate"
                   )}
                 >
                   {bar.label}
@@ -88,18 +118,30 @@ export function BarList({
                     сумму «23 350,00 ₽». Колонка чисел обязана выравниваться
                     по правому краю, поэтому ширина фиксированная: подгонка
                     по содержимому дала бы рваный столбец. */}
-                <span className="w-24 shrink-0 text-right text-xs whitespace-nowrap tabular-nums">
-                  {bar.display}
-                </span>
-                {bar.secondary ? (
-                  <span className="w-12 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
-                    {bar.secondary}
-                  </span>
-                ) : null}
+                {numbersOnHover ? null : (
+                  <>
+                    <span className="w-24 shrink-0 text-right text-xs whitespace-nowrap tabular-nums">
+                      {bar.display}
+                    </span>
+                    {bar.secondary ? (
+                      <span className="w-12 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                        {bar.secondary}
+                      </span>
+                    ) : null}
+                  </>
+                )}
               </div>
             }
           />
-          {bar.hint ? <TooltipContent>{bar.hint}</TooltipContent> : null}
+          {/* Подсказка собирает то, чего нет на виду. Со спрятанными числами
+              она обязательна — иначе точную сумму негде посмотреть вовсе. */}
+          {numbersOnHover || bar.hint ? (
+            <TooltipContent>
+              {numbersOnHover
+                ? [bar.display, bar.secondary, bar.hint].filter(Boolean).join(" · ")
+                : bar.hint}
+            </TooltipContent>
+          ) : null}
         </Tooltip>
         {bar.notes?.length ? (
           <div className="flex min-w-0 flex-col gap-0.5 pb-1">

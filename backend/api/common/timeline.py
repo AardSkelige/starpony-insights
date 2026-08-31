@@ -1,4 +1,14 @@
-"""Продажи во времени: столбики по дням, неделям или месяцам.
+"""Время столбиками: по дням, неделям или месяцам.
+
+Общее основание двух разделов. «Товары в отгрузках» рисуют этим ряд продаж
+одного товара, «Каналы продаж» — выручку по каналам стопкой; вопрос у обоих
+один — **растёт или падает**, и корзины у них обязаны совпадать. Разойдись
+шаг между страницами, август у одной начинался бы первого числа,
+а у другой — с понедельника.
+
+Здесь только корзины: как выбрать шаг, куда падает дата, где границы
+столбика. Что в корзине суммируется, знает раздел — у отгрузок это штуки
+и деньги позиций, у каналов деньги документов.
 
 Отвечает на вопрос, на который до сих пор не отвечало ничто на странице, —
 **растёт или падает**. Журнал последних десяти отгрузок его не заменял:
@@ -92,6 +102,29 @@ def _floor(day: date, step: str) -> date:
     return day.replace(day=1)
 
 
+def bucket_of(day: date, step: str) -> date:
+    """В какую корзину падает день. Начало корзины и есть её имя."""
+    return _floor(day, step)
+
+
+def buckets(start: date, end: date, step: str) -> list[tuple[date, date]]:
+    """Границы всех корзин периода — включая пустые.
+
+    Пустые промежутки нужны так же, как заполненные: месяц без продаж —
+    это факт, а не отсутствие данных. Выбрось его, и провал превратится
+    в непрерывный ряд, где ничего не случилось.
+
+    Конец корзины — последний её день, а не первый день следующей:
+    «29.06 – 05.07» читается как неделя, «29.06 – 06.07» — как восемь дней.
+    """
+    out: list[tuple[date, date]] = []
+    cursor = _floor(start, step)
+    while cursor <= end:
+        out.append((cursor, _next(cursor, step) - timedelta(days=1)))
+        cursor = _next(cursor, step)
+    return out
+
+
 def of(positions, *, date_from: date | None, date_to: date | None) -> Timeline:
     """Продажи по столбикам за период выборки.
 
@@ -133,12 +166,8 @@ def of(positions, *, date_from: date | None, date_to: date | None) -> Timeline:
     }
 
     points: list[dict] = []
-    cursor = _floor(start, step)
-    while cursor <= end:
+    for cursor, closes in buckets(start, end, step):
         row = found.get(cursor)
-        # Последний день промежутка, а не первый день следующего: «29.06 –
-        # 05.07» читается как неделя, «29.06 – 06.07» — как восемь дней.
-        closes = _next(cursor, step) - timedelta(days=1)
         points.append(
             {
                 # Крайние корзины подрезаются границами **фильтра**: выборка
@@ -156,6 +185,5 @@ def of(positions, *, date_from: date | None, date_to: date | None) -> Timeline:
                 "revenue_kopecks": row["revenue_kopecks"] if row else 0,
             }
         )
-        cursor = _next(cursor, step)
 
     return Timeline(step=step, step_label=label, points=points)

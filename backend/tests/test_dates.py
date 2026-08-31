@@ -180,7 +180,7 @@ class TestCoverageSpanAtNight:
 def test_night_shipment_is_not_lost_by_the_timeline(db):
     """Столбики теряли отгрузку целиком: границы ряда считались по UTC,
     а корзины `Trunc*` — по московской, и цикл до последней не доходил."""
-    from api.shipments.services import timeline
+    from api.common import timeline
     from core.models import DocumentPosition, Product, Uom
 
     run = SyncRun.objects.create(kind=SyncKind.DOCUMENTS)

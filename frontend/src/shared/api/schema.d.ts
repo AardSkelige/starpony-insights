@@ -74,6 +74,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/channels/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Каналы продаж
+         * @description Где продаём и сколько это приносит: выручка и её доля, число отгрузок, средний чек с разбросом, покупатели и ассортимент канала, а также выручка по каналам во времени.
+         */
+        get: operations["channels_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/xlsx/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Каналы продаж — выгрузка в Excel
+         * @description Та же выборка, что на экране, целиком. Вторым листом — каждая отгрузка отдельной строкой.
+         */
+        get: operations["channels_xlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/shipments/materials/": {
         parameters: {
             query?: never;
@@ -369,6 +409,25 @@ export interface components {
             documents_count: number;
             notes?: string[];
         };
+        ChannelRow: {
+            channel_id: number;
+            name: string;
+            slot: number | null;
+            shipments_count: number;
+            revenue_kopecks: number;
+            /** Format: decimal */
+            revenue_share: string | null;
+            /** Format: date-time */
+            first_moment: string;
+            /** Format: date-time */
+            last_moment: string;
+            receipt: components["schemas"]["Receipt"];
+            buyers_count: number;
+            products_count: number;
+            buyers: components["schemas"]["ChannelTop"];
+            products: components["schemas"]["ChannelTop"];
+            dynamics: number[];
+        };
         /** @description Доля канала в продажах товара. Основа полос в раскрытии строки. */
         ChannelShare: {
             id: number | null;
@@ -377,11 +436,109 @@ export interface components {
             quantity: string;
             revenue_kopecks: number;
         };
+        /**
+         * @description Канал в полосах над таблицей: две доли одного канала рядом.
+         *
+         *     Отдельный тип, а не строка таблицы: полосам не нужны ни списки
+         *     покупателей, ни ряд по времени, а строк тут всегда все — поиск и страница
+         *     их не сужают.
+         */
+        ChannelStanding: {
+            channel_id: number;
+            name: string;
+            slot: number | null;
+            revenue_kopecks: number;
+            /** Format: decimal */
+            revenue_share: string | null;
+            shipments_count: number;
+            /** Format: decimal */
+            shipments_share: string | null;
+        };
+        /** @description Крупнейшие плюс свёрнутый хвост: слагаемые обязаны складываться. */
+        ChannelTop: {
+            items: components["schemas"]["ChannelTopItem"][];
+            rest_count: number;
+            rest_revenue_kopecks: number;
+        };
+        /**
+         * @description Строка списка «кто покупает» и «что покупают».
+         *
+         *     Один тип на оба списка: поля совпадают до буквы, и два близнеца в схеме
+         *     дали бы фронтенду два типа, под которые пишутся два компонента.
+         *     Так уже расходился блок «Склад».
+         *
+         *     Имя не `ChannelShare`: такой компонент в схеме уже есть — доля канала
+         *     в продажах товара на странице отгрузок. Генератор схемы предупреждает
+         *     о столкновении, но собирает её всё равно, и фронтенд получил бы неверные
+         *     типы, ничего об этом не узнав.
+         */
+        ChannelTopItem: {
+            name: string;
+            revenue_kopecks: number;
+            /** Format: decimal */
+            share: string | null;
+            note: string;
+        };
+        Channels: {
+            count: number;
+            /** Format: date-time */
+            synced_at: string | null;
+            totals: components["schemas"]["ChannelsTotals"];
+            coverage: components["schemas"]["ChannelsCoverage"];
+            standings: components["schemas"]["ChannelStanding"][];
+            dynamics: components["schemas"]["Dynamics"];
+            results: components["schemas"]["ChannelRow"][];
+        };
+        /** @description Сводка — про выборку отгрузок целиком. Поиск её не трогает. */
+        ChannelsCoverage: {
+            channels_count: number;
+            shipments_count: number;
+            revenue_kopecks: number;
+            unassigned_shipments_count: number;
+            unassigned_revenue_kopecks: number;
+            free_shipments_count: number;
+            buyers_count: number;
+            products_count: number;
+        };
+        /** @description Итог под таблицей — про то, что в ней видно, с учётом поиска. */
+        ChannelsTotals: {
+            channels_count: number;
+            shipments_count: number;
+            revenue_kopecks: number;
+            /** Format: decimal */
+            revenue_share: string | null;
+            buyers_count: number;
+            products_count: number;
+        };
         Csrf: {
             csrfToken: string;
         };
         Detail: {
             detail: string;
+        };
+        /** @description Выручка по каналам во времени — стопка столбиков. */
+        Dynamics: {
+            step: string;
+            step_label: string;
+            series: components["schemas"]["DynamicsSeries"][];
+            points: components["schemas"]["DynamicsPoint"][];
+        };
+        /**
+         * @description Один столбик. Границы обе: одна дата рядом с подписью «по неделям»
+         *     читается как день — так и вышло при первом показе на соседней странице.
+         */
+        DynamicsPoint: {
+            /** Format: date */
+            start: string;
+            /** Format: date */
+            end: string;
+            values: number[];
+        };
+        DynamicsSeries: {
+            channel_id: number | null;
+            name: string;
+            slot: number | null;
+            revenue_kopecks: number;
         };
         /**
          * @description Значение справочника в выпадающем списке фильтров.
@@ -597,6 +754,15 @@ export interface components {
             is_free: boolean;
             /** Format: decimal */
             price_change: string | null;
+        };
+        /** @description Средний чек канала вместе с тем, из чего он получен. */
+        Receipt: {
+            kopecks: number | null;
+            shipments: number;
+            min_kopecks: number | null;
+            max_kopecks: number | null;
+            average_kopecks: number | null;
+            free_shipments: number;
         };
         /** @description Крупнейшие контрагенты плюс свёрнутый хвост. */
         Recipients: {
@@ -1113,6 +1279,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Profile"];
+                };
+            };
+        };
+    };
+    channels_list: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-buyers` - -buyers
+                 *     * `-last` - -last
+                 *     * `-name` - -name
+                 *     * `-products` - -products
+                 *     * `-receipt` - -receipt
+                 *     * `-revenue` - -revenue
+                 *     * `-shipments` - -shipments
+                 *     * `buyers` - buyers
+                 *     * `last` - last
+                 *     * `name` - name
+                 *     * `products` - products
+                 *     * `receipt` - receipt
+                 *     * `revenue` - revenue
+                 *     * `shipments` - shipments
+                 */
+                ordering?: "-buyers" | "-last" | "-name" | "-products" | "-receipt" | "-revenue" | "-shipments" | "buyers" | "last" | "name" | "products" | "receipt" | "revenue" | "shipments";
+                page?: number;
+                page_size?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Channels"];
+                };
+            };
+        };
+    };
+    channels_xlsx: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-buyers` - -buyers
+                 *     * `-last` - -last
+                 *     * `-name` - -name
+                 *     * `-products` - -products
+                 *     * `-receipt` - -receipt
+                 *     * `-revenue` - -revenue
+                 *     * `-shipments` - -shipments
+                 *     * `buyers` - buyers
+                 *     * `last` - last
+                 *     * `name` - name
+                 *     * `products` - products
+                 *     * `receipt` - receipt
+                 *     * `revenue` - revenue
+                 *     * `shipments` - shipments
+                 */
+                ordering?: "-buyers" | "-last" | "-name" | "-products" | "-receipt" | "-revenue" | "-shipments" | "buyers" | "last" | "name" | "products" | "receipt" | "revenue" | "shipments";
+                page?: number;
+                page_size?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
                 };
             };
         };

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  COLUMNS as CHANNEL_COLUMNS,
+  totalsFor as channelTotals,
+} from "@/sections/channels/columns"
+import {
   COLUMNS as MATERIAL_COLUMNS,
   totalsFor as materialTotals,
 } from "@/sections/shipments-materials/columns"
@@ -83,6 +87,22 @@ const TABLES = [
     // поставок» требует объяснения не меньше: без него непонятно, почему
     // приёмок четырнадцать, а промежутков считается одиннадцать.
     computed: ["supplies", "share", "materials", "regularity", "lead_time"],
+  },
+  {
+    name: "Каналы продаж",
+    columns: CHANNEL_COLUMNS as Column<unknown>[],
+    totals: channelTotals({
+      channels_count: 9,
+      shipments_count: 305,
+      revenue_kopecks: 125337245,
+      revenue_share: "1.00000000",
+      buyers_count: 70,
+      products_count: 66,
+    }),
+    // «Отгрузок» и «Покупателей» взяты из учёта как есть, но объяснения
+    // требуют не меньше расчётных: первое несёт подстрочник «даром»,
+    // второе — единицу, которая не человек, а площадка.
+    computed: ["revenue", "share", "shipments", "receipt", "buyers", "products"],
   },
 ]
 

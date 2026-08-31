@@ -86,6 +86,176 @@ paths:
               schema:
                 $ref: '#/components/schemas/Profile'
           description: ''
+  /api/channels/:
+    get:
+      operationId: channels_list
+      description: 'Где продаём и сколько это приносит: выручка и её доля, число отгрузок,
+        средний чек с разбросом, покупатели и ассортимент канала, а также выручка
+        по каналам во времени.'
+      summary: Каналы продаж
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -buyers
+          - -last
+          - -name
+          - -products
+          - -receipt
+          - -revenue
+          - -shipments
+          - buyers
+          - last
+          - name
+          - products
+          - receipt
+          - revenue
+          - shipments
+          type: string
+          default: -revenue
+          minLength: 1
+        description: |-
+          * `-buyers` - -buyers
+          * `-last` - -last
+          * `-name` - -name
+          * `-products` - -products
+          * `-receipt` - -receipt
+          * `-revenue` - -revenue
+          * `-shipments` - -shipments
+          * `buyers` - buyers
+          * `last` - last
+          * `name` - name
+          * `products` - products
+          * `receipt` - receipt
+          * `revenue` - revenue
+          * `shipments` - shipments
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 10
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Channels'
+          description: ''
+  /api/channels/xlsx/:
+    get:
+      operationId: channels_xlsx
+      description: Та же выборка, что на экране, целиком. Вторым листом — каждая отгрузка
+        отдельной строкой.
+      summary: Каналы продаж — выгрузка в Excel
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -buyers
+          - -last
+          - -name
+          - -products
+          - -receipt
+          - -revenue
+          - -shipments
+          - buyers
+          - last
+          - name
+          - products
+          - receipt
+          - revenue
+          - shipments
+          type: string
+          default: -revenue
+          minLength: 1
+        description: |-
+          * `-buyers` - -buyers
+          * `-last` - -last
+          * `-name` - -name
+          * `-products` - -products
+          * `-receipt` - -receipt
+          * `-revenue` - -revenue
+          * `-shipments` - -shipments
+          * `buyers` - buyers
+          * `last` - last
+          * `name` - name
+          * `products` - products
+          * `receipt` - receipt
+          * `revenue` - revenue
+          * `shipments` - shipments
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 10
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+          description: ''
   /api/shipments/materials/:
     get:
       operationId: shipment_materials_list
@@ -1148,6 +1318,60 @@ components:
       - name
       - quantity
       - revenue_kopecks
+    ChannelRow:
+      type: object
+      properties:
+        channel_id:
+          type: integer
+        name:
+          type: string
+        slot:
+          type: integer
+          nullable: true
+        shipments_count:
+          type: integer
+        revenue_kopecks:
+          type: integer
+        revenue_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+        first_moment:
+          type: string
+          format: date-time
+        last_moment:
+          type: string
+          format: date-time
+        receipt:
+          $ref: '#/components/schemas/Receipt'
+        buyers_count:
+          type: integer
+        products_count:
+          type: integer
+        buyers:
+          $ref: '#/components/schemas/ChannelTop'
+        products:
+          $ref: '#/components/schemas/ChannelTop'
+        dynamics:
+          type: array
+          items:
+            type: integer
+      required:
+      - buyers
+      - buyers_count
+      - channel_id
+      - dynamics
+      - first_moment
+      - last_moment
+      - name
+      - products
+      - products_count
+      - receipt
+      - revenue_kopecks
+      - revenue_share
+      - shipments_count
+      - slot
     ChannelShare:
       type: object
       description: Доля канала в продажах товара. Основа полос в раскрытии строки.
@@ -1168,6 +1392,176 @@ components:
       - name
       - quantity
       - revenue_kopecks
+    ChannelStanding:
+      type: object
+      description: |-
+        Канал в полосах над таблицей: две доли одного канала рядом.
+
+        Отдельный тип, а не строка таблицы: полосам не нужны ни списки
+        покупателей, ни ряд по времени, а строк тут всегда все — поиск и страница
+        их не сужают.
+      properties:
+        channel_id:
+          type: integer
+        name:
+          type: string
+        slot:
+          type: integer
+          nullable: true
+        revenue_kopecks:
+          type: integer
+        revenue_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+        shipments_count:
+          type: integer
+        shipments_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+      required:
+      - channel_id
+      - name
+      - revenue_kopecks
+      - revenue_share
+      - shipments_count
+      - shipments_share
+      - slot
+    ChannelTop:
+      type: object
+      description: 'Крупнейшие плюс свёрнутый хвост: слагаемые обязаны складываться.'
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelTopItem'
+        rest_count:
+          type: integer
+        rest_revenue_kopecks:
+          type: integer
+      required:
+      - items
+      - rest_count
+      - rest_revenue_kopecks
+    ChannelTopItem:
+      type: object
+      description: |-
+        Строка списка «кто покупает» и «что покупают».
+
+        Один тип на оба списка: поля совпадают до буквы, и два близнеца в схеме
+        дали бы фронтенду два типа, под которые пишутся два компонента.
+        Так уже расходился блок «Склад».
+
+        Имя не `ChannelShare`: такой компонент в схеме уже есть — доля канала
+        в продажах товара на странице отгрузок. Генератор схемы предупреждает
+        о столкновении, но собирает её всё равно, и фронтенд получил бы неверные
+        типы, ничего об этом не узнав.
+      properties:
+        name:
+          type: string
+        revenue_kopecks:
+          type: integer
+        share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+        note:
+          type: string
+      required:
+      - name
+      - note
+      - revenue_kopecks
+      - share
+    Channels:
+      type: object
+      properties:
+        count:
+          type: integer
+        synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        totals:
+          $ref: '#/components/schemas/ChannelsTotals'
+        coverage:
+          $ref: '#/components/schemas/ChannelsCoverage'
+        standings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelStanding'
+        dynamics:
+          $ref: '#/components/schemas/Dynamics'
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelRow'
+      required:
+      - count
+      - coverage
+      - dynamics
+      - results
+      - standings
+      - synced_at
+      - totals
+    ChannelsCoverage:
+      type: object
+      description: Сводка — про выборку отгрузок целиком. Поиск её не трогает.
+      properties:
+        channels_count:
+          type: integer
+        shipments_count:
+          type: integer
+        revenue_kopecks:
+          type: integer
+        unassigned_shipments_count:
+          type: integer
+        unassigned_revenue_kopecks:
+          type: integer
+        free_shipments_count:
+          type: integer
+        buyers_count:
+          type: integer
+        products_count:
+          type: integer
+      required:
+      - buyers_count
+      - channels_count
+      - free_shipments_count
+      - products_count
+      - revenue_kopecks
+      - shipments_count
+      - unassigned_revenue_kopecks
+      - unassigned_shipments_count
+    ChannelsTotals:
+      type: object
+      description: Итог под таблицей — про то, что в ней видно, с учётом поиска.
+      properties:
+        channels_count:
+          type: integer
+        shipments_count:
+          type: integer
+        revenue_kopecks:
+          type: integer
+        revenue_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+        buyers_count:
+          type: integer
+        products_count:
+          type: integer
+      required:
+      - buyers_count
+      - channels_count
+      - products_count
+      - revenue_kopecks
+      - revenue_share
+      - shipments_count
     Csrf:
       type: object
       properties:
@@ -1182,6 +1576,65 @@ components:
           type: string
       required:
       - detail
+    Dynamics:
+      type: object
+      description: Выручка по каналам во времени — стопка столбиков.
+      properties:
+        step:
+          type: string
+        step_label:
+          type: string
+        series:
+          type: array
+          items:
+            $ref: '#/components/schemas/DynamicsSeries'
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/DynamicsPoint'
+      required:
+      - points
+      - series
+      - step
+      - step_label
+    DynamicsPoint:
+      type: object
+      description: |-
+        Один столбик. Границы обе: одна дата рядом с подписью «по неделям»
+        читается как день — так и вышло при первом показе на соседней странице.
+      properties:
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+        values:
+          type: array
+          items:
+            type: integer
+      required:
+      - end
+      - start
+      - values
+    DynamicsSeries:
+      type: object
+      properties:
+        channel_id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+        slot:
+          type: integer
+          nullable: true
+        revenue_kopecks:
+          type: integer
+      required:
+      - channel_id
+      - name
+      - revenue_kopecks
+      - slot
     FilterOption:
       type: object
       description: |-
@@ -1597,6 +2050,33 @@ components:
       - price_kopecks
       - quantity
       - supplier
+    Receipt:
+      type: object
+      description: Средний чек канала вместе с тем, из чего он получен.
+      properties:
+        kopecks:
+          type: integer
+          nullable: true
+        shipments:
+          type: integer
+        min_kopecks:
+          type: integer
+          nullable: true
+        max_kopecks:
+          type: integer
+          nullable: true
+        average_kopecks:
+          type: integer
+          nullable: true
+        free_shipments:
+          type: integer
+      required:
+      - average_kopecks
+      - free_shipments
+      - kopecks
+      - max_kopecks
+      - min_kopecks
+      - shipments
     Recipients:
       type: object
       description: Крупнейшие контрагенты плюс свёрнутый хвост.

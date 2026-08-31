@@ -13,7 +13,7 @@ from decimal import Decimal
 from django.db.models import Count, DecimalField, Sum, Value
 from django.db.models.functions import Coalesce
 
-from api.shipments.services import timeline
+from api.common import timeline
 from api.shipments.services.products import Filters, positions
 from core.services.stock import stock_of
 

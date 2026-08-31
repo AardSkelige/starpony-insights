@@ -5,7 +5,8 @@ from decimal import Decimal
 
 import pytest
 
-from api.shipments.services import product_detail, products, timeline
+from api.common import timeline
+from api.shipments.services import product_detail, products
 from tests.shipments.conftest import moscow, position
 
 pytestmark = pytest.mark.django_db
