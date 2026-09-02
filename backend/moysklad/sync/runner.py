@@ -88,7 +88,7 @@ class SyncSession:
         return bool(self._outcomes) and all(o.ok for o in self._outcomes.values())
 
 
-def mark_missing_as_deleted(model, run: SyncRun) -> int:
+def mark_missing_as_deleted(model, run: SyncRun, *, keep_ms_ids=()) -> int:
     """Пометить удалённым всё, чего не было в этом прогоне.
 
     Вызывается **только после успешного** обхода сущности. Оборвавшаяся
@@ -97,8 +97,17 @@ def mark_missing_as_deleted(model, run: SyncRun) -> int:
 
     Строки не удаляются физически: на них могут ссылаться данные,
     введённые людьми.
+
+    `keep_ms_ids` — то, что пришло из учёта, но было **осознанно пропущено**
+    (например, договор, чьего контрагента нет в зеркале). Без этого пропуск
+    выглядел бы исчезновением: строка не получила штамп прогона, попала бы
+    под пометку и была бы посчитана в «помечено удалёнными». Отчёт заявлял бы,
+    что документ исчез из учёта, хотя он там есть, — и та же потеря считалась
+    бы дважды, ведь у пропусков свой счётчик.
     """
     missing = model.objects.filter(deleted_at__isnull=True).exclude(last_seen_run=run)
+    if keep_ms_ids:
+        missing = missing.exclude(ms_id__in=keep_ms_ids)
     return missing.update(deleted_at=timezone.now())
 
 

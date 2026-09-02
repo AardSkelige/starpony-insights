@@ -17,6 +17,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.models import (
+    Contract,
     Counterparty,
     Document,
     DocumentKind,
@@ -27,7 +28,12 @@ from core.models import (
 )
 from moysklad.client import MoySkladClient
 from moysklad.limits import ApiDisabledRisk
-from moysklad.parsing import parse_datetime, parse_decimal, parse_kopecks
+from moysklad.parsing import (
+    attribute_int,
+    parse_datetime,
+    parse_decimal,
+    parse_kopecks,
+)
 from moysklad.sync.references import ms_id_from
 from moysklad.sync.runner import (
     EntityOutcome,
@@ -41,6 +47,10 @@ logger = logging.getLogger(__name__)
 # на глубину expand, и 100 позиций в документе — величина с большим запасом:
 # в боевых данных максимум около двух десятков.
 POSITIONS_LIMIT = 100
+
+# Доп. поле отгрузки с индивидуальным сроком отсрочки. По названию,
+# а не по идентификатору: идентификатор свой в каждом аккаунте.
+INDIVIDUAL_DEFERRAL_FIELD = "Индивидуальный срок (дней)"
 
 
 @transaction.atomic
@@ -122,6 +132,11 @@ def sync_documents(
     skipped_documents = 0
     skipped_positions = 0
     unlinked_supplies = 0
+    # Идентификаторы того, что пришло из учёта, но было пропущено. Пропуск —
+    # не исчезновение: такая строка не получает штамп прогона и без этого
+    # списка попала бы под пометку удаления — то есть выпала бы из всех
+    # расчётов разом, хотя документ в учёте есть.
+    skipped_ids: list[str] = []
 
     products = {str(p.ms_id): p for p in Product.objects.all()}
     uoms = {str(u.ms_id): u for u in Uom.objects.all()}
@@ -140,6 +155,9 @@ def sync_documents(
         str(d.ms_id): d
         for d in Document.objects.filter(kind=DocumentKind.CUSTOMER_ORDER)
     }
+    # Договоры — ради одного различия: по договору комиссии товар уходит
+    # на реализацию, и долг возникает не по отгрузке, а по отчёту комиссионера.
+    contracts = {str(c.ms_id): c for c in Contract.objects.all()}
 
     params = {"limit": POSITIONS_LIMIT}
     if with_positions:
@@ -160,6 +178,7 @@ def sync_documents(
                     row.get("name"),
                 )
                 skipped_documents += 1
+                skipped_ids.append(row["id"])
                 continue
 
             moment = parse_datetime(row.get("moment"))
@@ -172,6 +191,7 @@ def sync_documents(
                     row.get("name"), row.get("moment"),
                 )
                 skipped_documents += 1
+                skipped_ids.append(row["id"])
                 continue
 
             order_ms_id = ms_id_from(row.get("purchaseOrder"))
@@ -203,6 +223,10 @@ def sync_documents(
                         ms_id_from(row.get("customerOrder"))
                     ),
                     "sales_channel": channels.get(ms_id_from(row.get("salesChannel"))),
+                    "contract": contracts.get(ms_id_from(row.get("contract"))),
+                    "deferral_days": attribute_int(
+                        row.get("attributes"), INDIVIDUAL_DEFERRAL_FIELD
+                    ),
                     # round, а не int: суммы приходят типом Float, и усечение
                     # превратило бы 1234.9999999 в 1234 — расхождение с учётом
                     # на копейку там, где оно обязано сходиться в ноль.
@@ -235,9 +259,18 @@ def sync_documents(
 
     # Пометка исчезнувших — только по своему виду документов: отгрузки
     # и приёмки живут в одной таблице, и общая пометка снесла бы соседей.
+    #
+    # Пропущенные из неё исключаются. Документ, чей контрагент не доехал
+    # в зеркало, в учёте существует — а пометка убрала бы его из выручки,
+    # маржи и каналов продаж молча. Хуже того, восстановиться сам он бы уже
+    # не смог: `restore_returned` снимает пометку только с того, что видели
+    # в этом прогоне, а пропущенный штампа не получает — и остался бы
+    # удалённым навсегда, пока причина пропуска держится.
     missing = Document.objects.filter(
         kind=kind, deleted_at__isnull=True
     ).exclude(last_seen_run=run)
+    if skipped_ids:
+        missing = missing.exclude(ms_id__in=skipped_ids)
     outcome.marked_deleted = missing.update(deleted_at=timezone.now())
     outcome.extra = {
         "skipped_documents": skipped_documents,
@@ -296,3 +329,22 @@ def sync_purchase_orders(client: MoySkladClient, run: SyncRun) -> EntityOutcome:
 
 def sync_supplies(client: MoySkladClient, run: SyncRun) -> EntityOutcome:
     return sync_documents(client, run, kind=DocumentKind.SUPPLY, path="/entity/supply")
+
+
+def sync_commission_reports(client: MoySkladClient, run: SyncRun) -> EntityOutcome:
+    """Полученные отчёты комиссионера — только шапки.
+
+    По ним, а не по отгрузкам, возникает долг комиссионера: товар уходит
+    на реализацию, и `payedSum` у отгрузки по договору комиссии
+    не заполняется никогда.
+
+    Позиции не нужны: вопрос раздела — «сколько должны и с какого числа»,
+    а не «что именно продано». В учёте таких отчётов 12.
+    """
+    return sync_documents(
+        client,
+        run,
+        kind=DocumentKind.COMMISSION_REPORT,
+        path="/entity/commissionreportin",
+        with_positions=False,
+    )

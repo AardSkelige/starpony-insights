@@ -59,6 +59,46 @@ def parse_decimal(value, *, kopecks_to_units: bool = False) -> Decimal | None:
     return result / 100 if kopecks_to_units else result
 
 
+def attribute_int(attributes, name: str) -> int | None:
+    """Целое из доп. поля по его названию. `None` — поля нет или оно пусто.
+
+    По названию, а не по идентификатору: идентификатор доп. поля свой
+    в каждом аккаунте, и зашитый в код он превратил бы перенос системы
+    на другой аккаунт в поиск пустых значений.
+
+    Ноль — это ответ («платят сразу»), а отсутствие — незнание, и путать
+    их нельзя: `deferral_days=0` даёт срок оплаты в день отгрузки,
+    а `None` означает, что об отсрочке не договаривались вовсе.
+    """
+    for attribute in attributes or []:
+        if attribute.get("name") != name:
+            continue
+        value = attribute.get("value")
+        if value is None or value == "":
+            return None
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            logger.warning(
+                "Доп. поле «%s» содержит не число: %r — пропускаем", name, value
+            )
+            return None
+
+        if number < 0:
+            # Отрицательная отсрочка бессмысленна, а поля, куда она едет, —
+            # `PositiveIntegerField`. Пропусти мы её дальше, Postgres ответил
+            # бы `IntegrityError`, а тот ловится широким `except` в синке —
+            # и падала бы не строка, а **вся сущность**: одна опечатка
+            # у одного контрагента остановила бы синхронизацию всех.
+            logger.warning(
+                "Доп. поле «%s» содержит отрицательное число %s — пропускаем",
+                name, number,
+            )
+            return None
+        return number
+    return None
+
+
 def parse_kopecks(value) -> int:
     """Сумма документа в целые копейки.
 

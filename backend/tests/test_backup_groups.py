@@ -17,6 +17,7 @@ OUR_APPS = {"core", "api", "moysklad"}
 EXEMPT = {
     "DocumentPosition",  # существует только внутри документа, каскадом
     "ProcessingPlanMaterial",  # существует только внутри техкарты, каскадом
+    "WritebackChange",  # строка журнала, существует только внутри прогона
 }
 
 
@@ -71,4 +72,16 @@ def test_human_data_is_not_empty():
 def test_snapshot_group_holds_sync_history():
     """История синхронизаций безвозвратна: заново её не получить."""
     snapshot = models_by_backup_group()[BackupGroup.SNAPSHOT]
-    assert {"SyncRun", "SyncEntityResult"} <= {m.__name__ for m in snapshot}
+    assert {"SyncRun", "SyncEntityResult", "WritebackRun"} <= {
+        m.__name__ for m in snapshot
+    }
+
+
+def test_writeback_switch_is_human_data():
+    """Выключатель обратной записи вводят люди, и он обязан пережить восстановление.
+
+    Попади он в группу зеркала — восстановление из бэкапа молча вернуло бы
+    запись в учёт тому, кто её выключил из-за поломки.
+    """
+    human = models_by_backup_group()[BackupGroup.HUMAN]
+    assert "WritebackSwitch" in {model.__name__ for model in human}

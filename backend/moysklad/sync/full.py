@@ -14,6 +14,7 @@ from moysklad.client import MoySkladClient
 from moysklad.limits import ApiDisabledRisk
 from moysklad.sync.catalog import sync_products, sync_uoms
 from moysklad.sync.documents import (
+    sync_commission_reports,
     sync_customer_orders,
     sync_demands,
     sync_purchase_orders,
@@ -21,7 +22,11 @@ from moysklad.sync.documents import (
 )
 from moysklad.sync.lock import advisory_lock
 from moysklad.sync.production import sync_processing_plans
-from moysklad.sync.references import sync_counterparties, sync_sales_channels
+from moysklad.sync.references import (
+    sync_contracts,
+    sync_counterparties,
+    sync_sales_channels,
+)
 from moysklad.sync.runner import SyncSession
 
 logger = logging.getLogger(__name__)
@@ -35,16 +40,23 @@ LOCK_NAME = "sync:documents"
 # Заказы — перед документами, которые на них ссылаются: приёмка на заказ
 # поставщику, отгрузка на заказ покупателя. В обратном порядке связь
 # не установилась бы ни у одной из них.
+#
+# Договоры — после контрагентов и до документов по той же причине: договор
+# висит на контрагенте, а отгрузка и отчёт комиссионера ссылаются на договор.
+# Ошибка порядка здесь тихая и дорогая — весь товар, ушедший на реализацию,
+# попал бы в «Сроки оплаты» как долг.
 ENTITIES = (
     ("uom", sync_uoms),
     ("product", sync_products),
     ("processingplan", sync_processing_plans),
     ("counterparty", sync_counterparties),
+    ("contract", sync_contracts),
     ("saleschannel", sync_sales_channels),
     ("customerorder", sync_customer_orders),
     ("demand", sync_demands),
     ("purchaseorder", sync_purchase_orders),
     ("supply", sync_supplies),
+    ("commissionreportin", sync_commission_reports),
 )
 
 

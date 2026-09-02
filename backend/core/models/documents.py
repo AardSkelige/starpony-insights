@@ -33,12 +33,15 @@ class DocumentKind(models.TextChoices):
     SUPPLY = "supply", "Приёмка"
     PURCHASE_ORDER = "purchase_order", "Заказ поставщику"
     CUSTOMER_ORDER = "customer_order", "Заказ покупателя"
+    # Долг комиссионера возникает по нему, а не по отгрузке: товар ушёл
+    # на реализацию, и `payedSum` у отгрузки не заполнится никогда.
+    COMMISSION_REPORT = "commission_report", "Отчёт комиссионера"
 
 
 class Document(MirrorModel):
     backup_group = BackupGroup.MIRROR
 
-    kind = models.CharField("Вид", max_length=16, choices=DocumentKind, db_index=True)
+    kind = models.CharField("Вид", max_length=24, choices=DocumentKind, db_index=True)
     number = models.CharField("Номер", max_length=64)
     moment = models.DateTimeField("Дата документа", db_index=True)
 
@@ -105,6 +108,24 @@ class Document(MirrorModel):
         blank=True,
         related_name="demands",
         verbose_name="Заказ покупателя",
+    )
+
+    # Договор, по которому идёт документ. Нужен ради одного различия: по
+    # договору комиссии товар уходит на реализацию, `payedSum` не заполняется,
+    # и долг возникает по отчёту комиссионера, а не по отгрузке.
+    contract = models.ForeignKey(
+        "core.Contract",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="documents",
+        verbose_name="Договор",
+    )
+
+    # Индивидуальный срок отсрочки из доп. поля отгрузки. Побеждает срок
+    # контрагента: договорённость по конкретной отгрузке точнее общей.
+    deferral_days = models.PositiveIntegerField(
+        "Индивидуальная отсрочка, дней", null=True, blank=True
     )
 
     class Meta:

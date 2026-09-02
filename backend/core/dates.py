@@ -36,6 +36,17 @@ def local_date(moment: datetime) -> date:
     return timezone.localtime(moment).date()
 
 
+def today() -> date:
+    """Сегодня по местному календарю.
+
+    Отдельно от `date.today()`: тот берёт день у часового пояса машины,
+    а в контейнере это UTC. Между полуночью и тремя ночи по Москве
+    «сегодня» разошлось бы с датами документов ровно на день — и просрочка
+    считалась бы на сутки меньше, чем есть.
+    """
+    return timezone.localdate()
+
+
 def days_between(earlier: datetime, later: datetime) -> int:
     """Сколько календарных дней прошло. Один день, а не двадцать четыре часа.
 

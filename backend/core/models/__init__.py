@@ -1,12 +1,20 @@
 from core.models.base import BackupGroup, DomainModel, models_by_backup_group
 from core.models.access import User, UserPageAccess
 from core.models.catalog import Product, ProductKind, Uom
+from core.models.contract import Contract, ContractType
 from core.models.counterparty import Counterparty, SalesChannel
 from core.models.documents import Document, DocumentKind, DocumentPosition
 from core.models.mirror import MirrorModel, MirrorQuerySet
 from core.models.production import ProcessingPlan, ProcessingPlanMaterial
 from core.models.stock import Stock
 from core.models.sync import SyncEntityResult, SyncKind, SyncRun, SyncStatus
+from core.models.writeback import (
+    WritebackChange,
+    WritebackKind,
+    WritebackRun,
+    WritebackStatus,
+    WritebackSwitch,
+)
 
 __all__ = [
     "BackupGroup",
@@ -17,6 +25,8 @@ __all__ = [
     "Product",
     "ProductKind",
     "Uom",
+    "Contract",
+    "ContractType",
     "Counterparty",
     "SalesChannel",
     "Document",
@@ -31,4 +41,9 @@ __all__ = [
     "SyncKind",
     "SyncRun",
     "SyncStatus",
+    "WritebackChange",
+    "WritebackKind",
+    "WritebackRun",
+    "WritebackStatus",
+    "WritebackSwitch",
 ]
