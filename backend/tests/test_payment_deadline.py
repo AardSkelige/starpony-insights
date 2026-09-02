@@ -23,6 +23,7 @@ from core.models import (
 )
 from core.services.payment_deadline import (
     DebtGroup,
+    consigned,
     debt_from,
     debts,
     deferral_for,
@@ -344,3 +345,106 @@ class TestExplanation:
     ):
         debt = debt_from(make_document(make_agent()), today=TODAY)
         assert "не указана" in debt.explanation
+
+
+class TestAge:
+    """Возраст долга: сколько дней документ висит неоплаченным.
+
+    Не срок и не просрочка. Срок без отсрочки посчитать не из чего,
+    а возраст есть всегда — на нём и держится страница, пока поля в учёте
+    не заполнены.
+    """
+
+    def test_age_counts_calendar_days(self, make_agent, make_document):
+        debt = debt_from(make_document(make_agent()), today=TODAY)
+        assert debt.age_days == 13
+
+    def test_age_is_local_not_utc(self, make_agent, make_document):
+        """Документ, проведённый ночью по Москве, не на день старше себя.
+
+        `moment.date()` у значения **из базы** даёт UTC-дату: отгрузка
+        в 01:00 по Москве числилась бы предыдущим днём, и возраст вырос бы
+        ровно на сутки — тихо.
+
+        Считается через `debts`, а не через созданный объект: у только что
+        созданной модели в памяти лежит момент с московским поясом, и `.date()`
+        у него отвечает правильно **случайно**. Проверка на покраснение это
+        и вскрыла — тест проходил, не проверяя ничего.
+        """
+        make_document(
+            make_agent(), moment=datetime(2026, 8, 20, 1, 0, tzinfo=MOSCOW)
+        )
+
+        assert [row.age_days for row in debts(today=TODAY)] == [13]
+
+    def test_future_document_is_not_younger_than_today(
+        self, make_agent, make_document
+    ):
+        """Документ будущей датой не бывает моложе нуля дней.
+
+        МойСклад разрешает провести отгрузку завтрашним числом. Без нижней
+        границы возраст ушёл бы в минус: «−3 дня» в колонке читается как сбой,
+        а полка возраста приняла бы такой долг за самый свежий — то есть
+        будущая отгрузка выглядела бы благополучнее вчерашней.
+        """
+        future = make_document(
+            make_agent(), moment=datetime(2026, 9, 5, 12, 0, tzinfo=MOSCOW)
+        )
+
+        assert debt_from(future, today=TODAY).age_days == 0
+
+    def test_age_exists_without_a_deferral(self, make_agent, make_document):
+        """Срока нет, возраст есть — в этом весь смысл."""
+        debt = debt_from(make_document(make_agent()), today=TODAY)
+
+        assert debt.due_date is None
+        assert debt.group == DebtGroup.UNDATED
+        assert debt.age_days == 13
+
+
+class TestConsigned:
+    """Товар, отгруженный по договору комиссии, — обратная сторона `debts`."""
+
+    def test_returns_what_debts_leaves_out(
+        self, make_agent, make_contract, make_document
+    ):
+        """Одна отгрузка не может быть и долгом, и товаром на реализации.
+
+        Посчитать оба значило бы посчитать один и тот же товар дважды:
+        деньги по нему придут отчётом комиссионера, а он уже в долге.
+        """
+        agent = make_agent("КРМОО «Каприоль»")
+        contract = make_contract(agent, contract_type=ContractType.COMMISSION)
+        make_document(agent, contract=contract, total=400_000)
+        make_document(
+            agent,
+            kind=DocumentKind.COMMISSION_REPORT,
+            contract=contract,
+            total=80_000,
+        )
+
+        assert [row.debt_kopecks for row in debts(today=TODAY)] == [80_000]
+        assert [row.debt_kopecks for row in consigned(today=TODAY)] == [400_000]
+
+    def test_commission_report_is_never_consignment(
+        self, make_agent, make_contract, make_document
+    ):
+        """Отчёт идёт по тому же договору комиссии, но он и есть долг."""
+        agent = make_agent()
+        contract = make_contract(agent, contract_type=ContractType.COMMISSION)
+        make_document(
+            agent, kind=DocumentKind.COMMISSION_REPORT, contract=contract
+        )
+
+        assert consigned(today=TODAY) == []
+        assert len(debts(today=TODAY)) == 1
+
+    def test_sales_contract_is_not_consignment(
+        self, make_agent, make_contract, make_document
+    ):
+        agent = make_agent()
+        make_document(
+            agent, contract=make_contract(agent, contract_type=ContractType.SALES)
+        )
+
+        assert consigned(today=TODAY) == []

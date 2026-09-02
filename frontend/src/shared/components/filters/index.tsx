@@ -38,6 +38,11 @@ import {
  * таблицы: выбери его фильтром, и в ней останется одна строка, а переключиться
  * будет нечем, кроме сброса. Там фильтров два: период и поиск.
  *
+ * **Периода тоже может не быть.** У «Сроков оплаты» долг — это состояние
+ * на сегодня, а не итог за отрезок: выбери человек «август», и долг возрастом
+ * 93 дня исчез бы с экрана — фильтр спрятал бы ровно то, ради чего страницу
+ * открывают. Там фильтр один: поиск.
+ *
  * **На телефоне поля стоят в столбик прямо на странице, а не в выдвижной
  * панели.** Панель была ошибкой: чтобы найти позицию, приходилось нажать
  * «Фильтры», дождаться анимации, ввести запрос и закрыть панель — четыре
@@ -72,6 +77,15 @@ type Props = {
   onChange: (patch: Partial<FilterValue>) => void
   onReset: () => void
   picker?: Picker
+  /**
+   * Сужается ли выборка периодом.
+   *
+   * `false` у «Сроков оплаты»: там показано состояние на сегодня, и период
+   * не сужал бы выборку, а прятал часть долга. Поле не просто скрывается —
+   * его значение перестаёт считаться применённым фильтром, иначе кнопка
+   * «Сбросить» появлялась бы из-за дат, которых на экране нет.
+   */
+  period?: boolean
   /** Что ищут на этой странице — подсказка в поле и подпись для чтения с экрана. */
   searchPlaceholder: string
   searchLabel: string
@@ -88,11 +102,13 @@ export function Filters({
   onChange,
   onReset,
   picker,
+  period = true,
   searchPlaceholder,
   searchLabel,
 }: Props) {
   const dirty =
-    Boolean(value.dateFrom || value.dateTo || value.pickId) || value.search !== ""
+    Boolean((period && (value.dateFrom || value.dateTo)) || value.pickId) ||
+    value.search !== ""
 
   return (
     <>
@@ -110,7 +126,7 @@ export function Filters({
         />
       </div>
 
-      <PeriodField value={value} onChange={onChange} />
+      {period ? <PeriodField value={value} onChange={onChange} /> : null}
 
       {picker ? <PickerField value={value} onChange={onChange} picker={picker} /> : null}
 

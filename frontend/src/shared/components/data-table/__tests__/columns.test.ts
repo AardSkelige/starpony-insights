@@ -5,6 +5,10 @@ import {
   totalsFor as channelTotals,
 } from "@/sections/channels/columns"
 import {
+  COLUMNS as DEADLINE_COLUMNS,
+  totalsFor as deadlineTotals,
+} from "@/sections/deadlines/columns"
+import {
   COLUMNS as MATERIAL_COLUMNS,
   totalsFor as materialTotals,
 } from "@/sections/shipments-materials/columns"
@@ -103,6 +107,25 @@ const TABLES = [
     // требуют не меньше расчётных: первое несёт подстрочник «даром»,
     // второе — единицу, которая не человек, а площадка.
     computed: ["revenue", "share", "shipments", "receipt", "buyers", "products"],
+  },
+  {
+    name: "Сроки оплаты",
+    columns: DEADLINE_COLUMNS as Column<unknown>[],
+    totals: deadlineTotals({
+      counterparties_count: 2,
+      documents_count: 24,
+      debt_kopecks: 17636015,
+      debt_share: "1.00000000",
+      oldest_age_days: 93,
+    }),
+    // «Просрочено» — расчётное вдвойне: считается из отсрочки, которой
+    // ни у кого нет, и прочерк там означает «посчитать не из чего»,
+    // а не «срок соблюдён». Без подсказки это не прочитать.
+    // «Долг» взят из учёта вычитанием, но объяснения требует не меньше
+    // расчётных: из него исключены отгрузки по комиссии, и без формулы
+    // разница с суммой отгруженного выглядит потерянными деньгами.
+    // «Старейший долг» — вообще не срок, и сказать это может только подсказка.
+    computed: ["debt", "share", "overdue", "oldest"],
   },
 ]
 

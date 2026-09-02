@@ -114,6 +114,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/deadlines/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Сроки оплаты
+         * @description Кто должен, сколько и как давно. Три суммы отдельно: дебиторка, расчёты через площадку и товар, отгруженный по договору комиссии — складывать их нельзя, «нам должны» означает только первую.
+         */
+        get: operations["deadlines_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/deadlines/{agent_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Долг контрагента — из чего сложился
+         * @description Неоплаченные документы контрагента с возрастом и сроком оплаты, плюс товар, отгруженный ему по договору комиссии.
+         */
+        get: operations["deadlines_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/deadlines/xlsx/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Сроки оплаты — выгрузка в Excel
+         * @description Та же выборка, что на экране, целиком. Вторым листом — каждый неоплаченный документ отдельной строкой.
+         */
+        get: operations["deadlines_xlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/shipments/materials/": {
         parameters: {
             query?: never;
@@ -395,6 +455,23 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * @description Полка возраста: сколько денег лежит без движения столько-то дней.
+         *
+         *     Полки упорядочены и приходят всегда все четыре, включая пустые:
+         *     пропущенная корзина превращает шкалу в произвольный набор столбиков,
+         *     а «между 15 и 60 днями ничего нет» — это ответ, и он должен быть виден.
+         */
+        AgeShelf: {
+            key: string;
+            label: string;
+            up_to_days: number | null;
+            fresh: boolean;
+            count: number;
+            debt_kopecks: number;
+            /** Format: decimal */
+            share: string | null;
+        };
+        /**
          * @description Контрагент с количеством: и покупатель, и получатель бесплатного.
          *
          *     Один тип на оба блока — поля совпадают до буквы, а два близнеца в схеме
@@ -510,8 +587,126 @@ export interface components {
             buyers_count: number;
             products_count: number;
         };
+        /**
+         * @description Товар, отгруженный по договору комиссии. Долгом не считается.
+         *
+         *     Ноль — обычный случай: договор комиссии есть у двоих из 107
+         *     контрагентов. Показывается ради одного вопроса — «почему долг такой
+         *     маленький при таких отгрузках».
+         */
+        Consignment: {
+            count: number;
+            kopecks: number;
+            contracts: string[];
+            /** Format: date */
+            first_moment: string | null;
+        };
         Csrf: {
             csrfToken: string;
+        };
+        DeadlineDetail: {
+            agent_id: number;
+            name: string;
+            is_marketplace: boolean;
+            deferral_days: number | null;
+            debt_kopecks: number;
+            documents_count: number;
+            oldest_age_days: number;
+            documents: components["schemas"]["DeadlineDocument"][];
+            rest_count: number;
+            rest_debt_kopecks: number;
+            consignment: components["schemas"]["Consignment"];
+        };
+        DeadlineDocument: {
+            number: string;
+            kind: string;
+            kind_label: string;
+            /** Format: date-time */
+            moment: string;
+            age_days: number;
+            total_kopecks: number;
+            paid_kopecks: number;
+            debt_kopecks: number;
+            /** Format: date */
+            due_date: string | null;
+            days_left: number | null;
+            group: string;
+            explanation: string;
+            channel: string;
+            description: string;
+        };
+        DeadlineRow: {
+            agent_id: number;
+            name: string;
+            is_marketplace: boolean;
+            deferral_days: number | null;
+            debt_kopecks: number;
+            /** Format: decimal */
+            debt_share: string | null;
+            documents_count: number;
+            oldest_age_days: number;
+            newest_age_days: number;
+            aging: components["schemas"]["AgeShelf"][];
+            kinds: {
+                [key: string]: number;
+            };
+            channels: string[];
+            groups: components["schemas"]["DebtGroup"][];
+        };
+        Deadlines: {
+            count: number;
+            /** Format: date-time */
+            synced_at: string | null;
+            aging: components["schemas"]["AgeShelf"][];
+            totals: components["schemas"]["DeadlinesTotals"];
+            coverage: components["schemas"]["DeadlinesCoverage"];
+            marketplaces: components["schemas"]["DeadlineRow"][];
+            results: components["schemas"]["DeadlineRow"][];
+        };
+        /**
+         * @description Вся картина расчётов. Поиск её не трогает.
+         *
+         *     Три суммы рядом отвечают на вопрос, который иначе задают вслух каждый
+         *     раз: почему «не оплачено» в учёте и «нам должны» — разные числа.
+         */
+        DeadlinesCoverage: {
+            counterparties_count: number;
+            documents_count: number;
+            debt_kopecks: number;
+            marketplaces_count: number;
+            marketplace_documents_count: number;
+            marketplace_kopecks: number;
+            consignment_count: number;
+            consignment_kopecks: number;
+            consignment_counterparties_count: number;
+            with_deferral_count: number;
+            counterparties_total: number;
+            overdue_count: number;
+            overdue_kopecks: number;
+            soon_count: number;
+            soon_kopecks: number;
+        };
+        /** @description Итог под таблицей — про то, что в ней видно, с учётом поиска. */
+        DeadlinesTotals: {
+            counterparties_count: number;
+            documents_count: number;
+            debt_kopecks: number;
+            /** Format: decimal */
+            debt_share: string | null;
+            oldest_age_days: number | null;
+        };
+        /**
+         * @description Группа срока: просрочено, скоро истекает, в норме, без отсрочки.
+         *
+         *     Сегодня всё до последнего документа лежит в «без оформленной отсрочки».
+         *     Группы включатся сами, когда в учёте появятся дни отсрочки, — поэтому
+         *     поле есть в контракте с первого дня, а не добавляется потом.
+         */
+        DebtGroup: {
+            key: string;
+            label: string;
+            count: number;
+            debt_kopecks: number;
         };
         Detail: {
             detail: string;
@@ -1347,6 +1542,102 @@ export interface operations {
                  *     * `shipments` - shipments
                  */
                 ordering?: "-buyers" | "-last" | "-name" | "-products" | "-receipt" | "-revenue" | "-shipments" | "buyers" | "last" | "name" | "products" | "receipt" | "revenue" | "shipments";
+                page?: number;
+                page_size?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+        };
+    };
+    deadlines_list: {
+        parameters: {
+            query?: {
+                /**
+                 * @description * `-debt` - -debt
+                 *     * `-documents` - -documents
+                 *     * `-name` - -name
+                 *     * `-oldest` - -oldest
+                 *     * `debt` - debt
+                 *     * `documents` - documents
+                 *     * `name` - name
+                 *     * `oldest` - oldest
+                 */
+                ordering?: "-debt" | "-documents" | "-name" | "-oldest" | "debt" | "documents" | "name" | "oldest";
+                page?: number;
+                page_size?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Deadlines"];
+                };
+            };
+        };
+    };
+    deadlines_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeadlineDetail"];
+                };
+            };
+            /** @description No response body */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deadlines_xlsx: {
+        parameters: {
+            query?: {
+                /**
+                 * @description * `-debt` - -debt
+                 *     * `-documents` - -documents
+                 *     * `-name` - -name
+                 *     * `-oldest` - -oldest
+                 *     * `debt` - debt
+                 *     * `documents` - documents
+                 *     * `name` - name
+                 *     * `oldest` - oldest
+                 */
+                ordering?: "-debt" | "-documents" | "-name" | "-oldest" | "debt" | "documents" | "name" | "oldest";
                 page?: number;
                 page_size?: number;
                 search?: string;

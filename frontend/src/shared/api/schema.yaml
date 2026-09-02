@@ -256,6 +256,153 @@ paths:
                 type: string
                 format: binary
           description: ''
+  /api/deadlines/:
+    get:
+      operationId: deadlines_list
+      description: 'Кто должен, сколько и как давно. Три суммы отдельно: дебиторка,
+        расчёты через площадку и товар, отгруженный по договору комиссии — складывать
+        их нельзя, «нам должны» означает только первую.'
+      summary: Сроки оплаты
+      parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -debt
+          - -documents
+          - -name
+          - -oldest
+          - debt
+          - documents
+          - name
+          - oldest
+          type: string
+          default: -debt
+          minLength: 1
+        description: |-
+          * `-debt` - -debt
+          * `-documents` - -documents
+          * `-name` - -name
+          * `-oldest` - -oldest
+          * `debt` - debt
+          * `documents` - documents
+          * `name` - name
+          * `oldest` - oldest
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 10
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deadlines'
+          description: ''
+  /api/deadlines/{agent_id}/:
+    get:
+      operationId: deadlines_detail
+      description: Неоплаченные документы контрагента с возрастом и сроком оплаты,
+        плюс товар, отгруженный ему по договору комиссии.
+      summary: Долг контрагента — из чего сложился
+      parameters:
+      - in: path
+        name: agent_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeadlineDetail'
+          description: ''
+        '404':
+          description: No response body
+  /api/deadlines/xlsx/:
+    get:
+      operationId: deadlines_xlsx
+      description: Та же выборка, что на экране, целиком. Вторым листом — каждый неоплаченный
+        документ отдельной строкой.
+      summary: Сроки оплаты — выгрузка в Excel
+      parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -debt
+          - -documents
+          - -name
+          - -oldest
+          - debt
+          - documents
+          - name
+          - oldest
+          type: string
+          default: -debt
+          minLength: 1
+        description: |-
+          * `-debt` - -debt
+          * `-documents` - -documents
+          * `-name` - -name
+          * `-oldest` - -oldest
+          * `debt` - debt
+          * `documents` - documents
+          * `name` - name
+          * `oldest` - oldest
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 10
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+          description: ''
   /api/shipments/materials/:
     get:
       operationId: shipment_materials_list
@@ -1288,6 +1435,41 @@ paths:
           description: ''
 components:
   schemas:
+    AgeShelf:
+      type: object
+      description: |-
+        Полка возраста: сколько денег лежит без движения столько-то дней.
+
+        Полки упорядочены и приходят всегда все четыре, включая пустые:
+        пропущенная корзина превращает шкалу в произвольный набор столбиков,
+        а «между 15 и 60 днями ничего нет» — это ответ, и он должен быть виден.
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        up_to_days:
+          type: integer
+          nullable: true
+        fresh:
+          type: boolean
+        count:
+          type: integer
+        debt_kopecks:
+          type: integer
+        share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+      required:
+      - count
+      - debt_kopecks
+      - fresh
+      - key
+      - label
+      - share
+      - up_to_days
     AgentShare:
       type: object
       description: |-
@@ -1562,6 +1744,32 @@ components:
       - revenue_kopecks
       - revenue_share
       - shipments_count
+    Consignment:
+      type: object
+      description: |-
+        Товар, отгруженный по договору комиссии. Долгом не считается.
+
+        Ноль — обычный случай: договор комиссии есть у двоих из 107
+        контрагентов. Показывается ради одного вопроса — «почему долг такой
+        маленький при таких отгрузках».
+      properties:
+        count:
+          type: integer
+        kopecks:
+          type: integer
+        contracts:
+          type: array
+          items:
+            type: string
+        first_moment:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - contracts
+      - count
+      - first_moment
+      - kopecks
     Csrf:
       type: object
       properties:
@@ -1569,6 +1777,284 @@ components:
           type: string
       required:
       - csrfToken
+    DeadlineDetail:
+      type: object
+      properties:
+        agent_id:
+          type: integer
+        name:
+          type: string
+        is_marketplace:
+          type: boolean
+        deferral_days:
+          type: integer
+          nullable: true
+        debt_kopecks:
+          type: integer
+        documents_count:
+          type: integer
+        oldest_age_days:
+          type: integer
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeadlineDocument'
+        rest_count:
+          type: integer
+        rest_debt_kopecks:
+          type: integer
+        consignment:
+          $ref: '#/components/schemas/Consignment'
+      required:
+      - agent_id
+      - consignment
+      - debt_kopecks
+      - deferral_days
+      - documents
+      - documents_count
+      - is_marketplace
+      - name
+      - oldest_age_days
+      - rest_count
+      - rest_debt_kopecks
+    DeadlineDocument:
+      type: object
+      properties:
+        number:
+          type: string
+        kind:
+          type: string
+        kind_label:
+          type: string
+        moment:
+          type: string
+          format: date-time
+        age_days:
+          type: integer
+        total_kopecks:
+          type: integer
+        paid_kopecks:
+          type: integer
+        debt_kopecks:
+          type: integer
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        days_left:
+          type: integer
+          nullable: true
+        group:
+          type: string
+        explanation:
+          type: string
+        channel:
+          type: string
+        description:
+          type: string
+      required:
+      - age_days
+      - channel
+      - days_left
+      - debt_kopecks
+      - description
+      - due_date
+      - explanation
+      - group
+      - kind
+      - kind_label
+      - moment
+      - number
+      - paid_kopecks
+      - total_kopecks
+    DeadlineRow:
+      type: object
+      properties:
+        agent_id:
+          type: integer
+        name:
+          type: string
+        is_marketplace:
+          type: boolean
+        deferral_days:
+          type: integer
+          nullable: true
+        debt_kopecks:
+          type: integer
+        debt_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+        documents_count:
+          type: integer
+        oldest_age_days:
+          type: integer
+        newest_age_days:
+          type: integer
+        aging:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgeShelf'
+        kinds:
+          type: object
+          additionalProperties:
+            type: integer
+        channels:
+          type: array
+          items:
+            type: string
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/DebtGroup'
+      required:
+      - agent_id
+      - aging
+      - channels
+      - debt_kopecks
+      - debt_share
+      - deferral_days
+      - documents_count
+      - groups
+      - is_marketplace
+      - kinds
+      - name
+      - newest_age_days
+      - oldest_age_days
+    Deadlines:
+      type: object
+      properties:
+        count:
+          type: integer
+        synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        aging:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgeShelf'
+        totals:
+          $ref: '#/components/schemas/DeadlinesTotals'
+        coverage:
+          $ref: '#/components/schemas/DeadlinesCoverage'
+        marketplaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeadlineRow'
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeadlineRow'
+      required:
+      - aging
+      - count
+      - coverage
+      - marketplaces
+      - results
+      - synced_at
+      - totals
+    DeadlinesCoverage:
+      type: object
+      description: |-
+        Вся картина расчётов. Поиск её не трогает.
+
+        Три суммы рядом отвечают на вопрос, который иначе задают вслух каждый
+        раз: почему «не оплачено» в учёте и «нам должны» — разные числа.
+      properties:
+        counterparties_count:
+          type: integer
+        documents_count:
+          type: integer
+        debt_kopecks:
+          type: integer
+        marketplaces_count:
+          type: integer
+        marketplace_documents_count:
+          type: integer
+        marketplace_kopecks:
+          type: integer
+        consignment_count:
+          type: integer
+        consignment_kopecks:
+          type: integer
+        consignment_counterparties_count:
+          type: integer
+        with_deferral_count:
+          type: integer
+        counterparties_total:
+          type: integer
+        overdue_count:
+          type: integer
+        overdue_kopecks:
+          type: integer
+        soon_count:
+          type: integer
+        soon_kopecks:
+          type: integer
+      required:
+      - consignment_count
+      - consignment_counterparties_count
+      - consignment_kopecks
+      - counterparties_count
+      - counterparties_total
+      - debt_kopecks
+      - documents_count
+      - marketplace_documents_count
+      - marketplace_kopecks
+      - marketplaces_count
+      - overdue_count
+      - overdue_kopecks
+      - soon_count
+      - soon_kopecks
+      - with_deferral_count
+    DeadlinesTotals:
+      type: object
+      description: Итог под таблицей — про то, что в ней видно, с учётом поиска.
+      properties:
+        counterparties_count:
+          type: integer
+        documents_count:
+          type: integer
+        debt_kopecks:
+          type: integer
+        debt_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+        oldest_age_days:
+          type: integer
+          nullable: true
+      required:
+      - counterparties_count
+      - debt_kopecks
+      - debt_share
+      - documents_count
+      - oldest_age_days
+    DebtGroup:
+      type: object
+      description: |-
+        Группа срока: просрочено, скоро истекает, в норме, без отсрочки.
+
+        Сегодня всё до последнего документа лежит в «без оформленной отсрочки».
+        Группы включатся сами, когда в учёте появятся дни отсрочки, — поэтому
+        поле есть в контракте с первого дня, а не добавляется потом.
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        count:
+          type: integer
+        debt_kopecks:
+          type: integer
+      required:
+      - count
+      - debt_kopecks
+      - key
+      - label
     Detail:
       type: object
       properties:

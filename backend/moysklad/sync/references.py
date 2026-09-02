@@ -72,6 +72,11 @@ def sync_counterparties(client: MoySkladClient, run: SyncRun) -> EntityOutcome:
                     "deferral_days": attribute_int(
                         row.get("attributes"), DEFERRAL_FIELD
                     ),
+                    # Группы контрагента. Из них читается признак площадки:
+                    # у маркетплейса выплата приходит реестром и в учёт
+                    # не заводится, поэтому его отгрузки не долг в том же
+                    # смысле, что отгрузки покупателю.
+                    "tags": list(row.get("tags") or []),
                     "ms_updated": parse_datetime(row.get("updated")),
                 },
             )

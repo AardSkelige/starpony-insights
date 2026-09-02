@@ -28,6 +28,8 @@
     --color-input: var(--input);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
+    --color-warning: var(--warning);
+    --color-success: var(--success);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
@@ -87,6 +89,25 @@
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
     --destructive: oklch(0.577 0.245 27.325);
+    /* Статусные цвета. Их у shadcn нет, и это ровно те два токена, что
+       переезжают к нам из макета (`DESIGN.md` §0): «хорошо» и «есть о чём
+       предупредить». Категориальной палитрой они не являются и сериями
+       не различают — не путать с `--chart-*`.
+
+       Заведены 02.09 после того, как выяснилось: `text-warning`, `bg-success`
+       и `border-warning/40` уже стояли в восьми местах `shared/components/`,
+       а самих переменных не существовало. Классы молча не красили ничего —
+       предупреждения блока «Запас» на двух сданных страницах были бесцветными,
+       и заметить это можно было только сравнив с макетом.
+
+       Прогнано `scripts/validate_palette.js` из скила `dataviz` на обеих
+       поверхностях: контраст к фону ≥ 3:1 и в светлой, и в тёмной — это
+       и есть требование к статусному цвету. Проверка на дальтонизм у него
+       про категориальные палитры и здесь неприменима: **статус никогда
+       не передаётся цветом в одиночку**, рядом всегда текст («просрочен
+       на 41 день», «хватит на 3 дня»). */
+    --warning: oklch(0.646 0.164 70);
+    --success: oklch(0.585 0.156 152);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
     --ring: oklch(0.708 0 0);
@@ -143,6 +164,10 @@
     --accent: oklch(0.269 0 0);
     --accent-foreground: oklch(0.985 0 0);
     --destructive: oklch(0.704 0.191 22.216);
+    /* Тёмная тема — свой шаг, а не осветление светлого: контраст меряется
+       к другой поверхности (`#171717` против `#ffffff`). */
+    --warning: oklch(0.769 0.145 75);
+    --success: oklch(0.696 0.14 155);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.556 0 0);

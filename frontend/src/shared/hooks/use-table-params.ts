@@ -24,6 +24,7 @@ export function useTableParams({
   defaultSort,
   sortKeys,
   pickerKey,
+  period = true,
 }: {
   defaultSort: string
   /**
@@ -47,10 +48,20 @@ export function useTableParams({
    * строка таблицы. Тогда в адрес не попадает ни параметра, ни его следа.
    */
   pickerKey?: string
+  /**
+   * Сужает ли эта страница выборку периодом.
+   *
+   * `false` у «Сроков оплаты»: долг — состояние на сегодня. Тогда даты
+   * не заводятся в адресе вовсе и не считаются применённым фильтром —
+   * иначе ссылка вида `?from=2026-08-01`, оставшаяся от соседней страницы,
+   * давала бы пустое состояние «попробуйте изменить фильтр» при том, что
+   * поля периода на экране нет, кнопки «Сбросить» тоже, а сам период
+   * в запрос не уходит. Человеку предлагают поменять то, чего он не видит.
+   */
+  period?: boolean
 }) {
   const [params, setParams] = useQueryStates({
-    from: parseAsString,
-    to: parseAsString,
+    ...(period ? { from: parseAsString, to: parseAsString } : {}),
     ...(pickerKey ? { [pickerKey]: parseAsInteger } : {}),
     q: parseAsString.withDefault(""),
     page: parseAsInteger.withDefault(1),
@@ -60,9 +71,14 @@ export function useTableParams({
     size: parseAsInteger.withDefault(DEFAULT_PAGE_SIZE),
   })
 
+  // Приведение то же и по той же причине, что у справочника ниже: набор
+  // ключей зависит от того, есть ли у страницы период, а `useQueryStates`
+  // выводит их статически.
+  const dates = params as unknown as { from?: string | null; to?: string | null }
+
   const filters: FilterValue = {
-    dateFrom: params.from,
-    dateTo: params.to,
+    dateFrom: period ? (dates.from ?? null) : null,
+    dateTo: period ? (dates.to ?? null) : null,
     // Приведение неизбежно: набор ключей теперь зависит от того, есть ли
     // у страницы справочник, а `useQueryStates` выводит их статически
     // и про условный ключ ничего не знает.
@@ -102,8 +118,8 @@ export function useTableParams({
       // Любая смена фильтра возвращает на первую страницу: остаться на пятой
       // в выборке, где всего две, — это пустой экран без объяснения.
       setParams({
-        ...(patch.dateFrom !== undefined ? { from: patch.dateFrom } : {}),
-        ...(patch.dateTo !== undefined ? { to: patch.dateTo } : {}),
+        ...(period && patch.dateFrom !== undefined ? { from: patch.dateFrom } : {}),
+        ...(period && patch.dateTo !== undefined ? { to: patch.dateTo } : {}),
         ...(pickerKey && patch.pickId !== undefined
           ? { [pickerKey]: patch.pickId }
           : {}),
@@ -112,19 +128,18 @@ export function useTableParams({
       })
       setExpanded(null)
     },
-    [setParams, pickerKey]
+    [setParams, pickerKey, period]
   )
 
   const resetFilters = React.useCallback(() => {
     setParams({
-      from: null,
-      to: null,
+      ...(period ? { from: null, to: null } : {}),
       ...(pickerKey ? { [pickerKey]: null } : {}),
       q: "",
       page: 1,
     })
     setExpanded(null)
-  }, [setParams, pickerKey])
+  }, [setParams, pickerKey, period])
 
   const changeSort = React.useCallback(
     (key: string, numeric: boolean) => {
@@ -171,8 +186,11 @@ export function useTableParams({
     page: params.page,
     pageSize,
     /** Сколько фильтров применено — число на кнопке «Фильтры» на телефоне. */
+    // Считается по тем фильтрам, что на странице **есть**. Период
+    // на странице без периода в счёт не идёт: иначе пустое состояние
+    // предлагало бы изменить фильтр, которого человек не видит.
     activeCount: [
-      filters.dateFrom || filters.dateTo,
+      period && (filters.dateFrom || filters.dateTo),
       filters.pickId,
       filters.search,
     ].filter(Boolean).length,

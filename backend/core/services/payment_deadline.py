@@ -62,6 +62,12 @@ class Debt:
     due_date: date | None
     days_left: int | None
     group: DebtGroup
+    # Сколько дней документ висит неоплаченным. Не срок и не просрочка:
+    # факт учёта, который существует **всегда** — в отличие от срока оплаты,
+    # которого без отсрочки нет вовсе. Отсрочка не проставлена ни у одного
+    # из 107 контрагентов, и без возраста страница не смогла бы отделить
+    # вчерашнюю отгрузку от той, что висит с апреля.
+    age_days: int
 
     @property
     def debt_kopecks(self) -> int:
@@ -148,6 +154,15 @@ def debt_from(document: Document, *, today: date) -> Debt:
         due_date=due_date,
         days_left=days_left,
         group=classify(days_left),
+        # Тот же местный календарь, что и у срока: разойдись они, документ,
+        # проведённый ночью, был бы на день моложе своего же срока оплаты.
+        #
+        # Не ниже нуля: МойСклад разрешает провести документ будущей датой,
+        # и без ограничения возраст уходил бы в минус. «−3 дня» в колонке
+        # читается как сбой, а полка возраста принимала такой долг за самый
+        # свежий — то есть будущая отгрузка выглядела бы благополучнее
+        # вчерашней.
+        age_days=max((today - local_date(document.moment)).days, 0),
     )
 
 
@@ -165,7 +180,9 @@ def unpaid_documents() -> QuerySet[Document]:
         # Строго меньше суммы: переплату долгом не считаем, а равенство —
         # это полностью оплаченный документ.
         .filter(paid_kopecks__lt=F("total_kopecks"))
-        .select_related("agent", "contract")
+        # Канал продаж — здесь, а не по месту: без него разбор строки
+        # стоил бы запроса на каждый из 189 документов.
+        .select_related("agent", "contract", "sales_channel")
         .order_by("moment")
     )
 
@@ -193,6 +210,26 @@ def debts(*, today: date | None = None) -> list[Debt]:
             debt.days_left if debt.days_left is not None else 0,
         ),
     )
+
+
+def consigned(*, today: date | None = None) -> list[Debt]:
+    """Отгрузки по договору комиссии: товар ушёл на реализацию.
+
+    Обратная сторона `debts` — то, что она отсеивает, и по той же причине.
+    Долгом это не является: `payedSum` у такой отгрузки не заполняется
+    никогда, деньги приходят отчётом комиссионера, и он в долг уже включён.
+    Посчитать оба значило бы посчитать один и тот же товар дважды.
+
+    Отдельной функцией, а не флагом у `debts`: вызывающему нужно то или
+    другое, и признак в сигнатуре означал бы, что где-то он выставлен
+    наугад. На вопрос «где мои 452 696 ₽» отвечает эта функция.
+    """
+    today = today or local_today()
+    return [
+        debt_from(document, today=today)
+        for document in unpaid_documents()
+        if is_commission_shipment(document)
+    ]
 
 
 def totals(rows: list[Debt]) -> dict[DebtGroup, dict]:

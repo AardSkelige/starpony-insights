@@ -5,6 +5,17 @@ from django.db import models
 from core.models.base import BackupGroup
 from core.models.mirror import MirrorModel
 
+# Группа контрагента, которой в учёте помечены маркетплейсы. Признак берётся
+# из учёта, а не заводится у нас: человек уже ведёт эти группы руками,
+# и второй список тех же контрагентов разошёлся бы с первым.
+#
+# Почему это важно именно здесь: площадка платит реестром раз в несколько
+# недель, и выплата в учёт не заводится вовсе — у «Интернет Решений» ни одного
+# платежа на 236 235 ₽ отгрузок. Считать это долгом наравне с покупателем,
+# который просто не заплатил, значит утопить настоящую дебиторку: на 02.09
+# это 314 470 ₽ площадок против 123 044 ₽ живого долга.
+MARKETPLACE_TAG = "маркетплейсы"
+
 
 class Counterparty(MirrorModel):
     backup_group = BackupGroup.MIRROR
@@ -25,6 +36,12 @@ class Counterparty(MirrorModel):
         "Отсрочка, дней", null=True, blank=True
     )
 
+    # Группы контрагента из учёта — как есть, списком строк. Зеркало, а не
+    # разбор: сегодня из них читается один признак (маркетплейс), но группы
+    # заводит человек, и следующая понадобившаяся не потребует ни миграции,
+    # ни повторного синка.
+    tags = models.JSONField("Группы", default=list, blank=True)
+
     class Meta:
         verbose_name = "Контрагент"
         verbose_name_plural = "Контрагенты"
@@ -32,6 +49,18 @@ class Counterparty(MirrorModel):
 
     def __str__(self) -> str:
         return self.name
+
+    @property
+    def is_marketplace(self) -> bool:
+        """Расчёты идут через площадку, а не напрямую.
+
+        Сравнение без учёта регистра и пробелов: группу набирает человек,
+        и «Маркетплейсы» с заглавной — та же группа, а не другая.
+        """
+        return any(
+            str(tag).strip().casefold() == MARKETPLACE_TAG
+            for tag in (self.tags or [])
+        )
 
 
 class SalesChannel(MirrorModel):
