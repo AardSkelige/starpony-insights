@@ -93,7 +93,24 @@ jobs:
           # то есть отдать его процессу, которому он не нужен.
           script: |
             set -e
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            docker pull "$IMAGE"
+
+            # Повторы для сетевых шагов — причина та же, что в deploy-backend.yml:
+            # связь сервера с ghcr.io рвётся примерно в каждой пятой попытке,
+            # и docker падает с "TLS handshake timeout".
+            retry() {
+              local attempt=1 max=5
+              until "$@"; do
+                if [ "$attempt" -ge "$max" ]; then
+                  echo "Не удалось за $max попыток: $*" >&2
+                  return 1
+                fi
+                echo "Попытка $attempt из $max не удалась, повтор через $((attempt * 5)) с"
+                sleep $((attempt * 5))
+                attempt=$((attempt + 1))
+              done
+            }
+
+            retry bash -c 'echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin'
+            retry docker pull "$IMAGE"
             docker run --rm -v starpony_static:/target "$IMAGE"
             docker image prune -f

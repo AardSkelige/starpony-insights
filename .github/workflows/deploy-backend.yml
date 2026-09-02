@@ -183,7 +183,29 @@ jobs:
           envs: GHCR_TOKEN,GHCR_USER
           script: |
             set -e
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+            # Связь сервера с ghcr.io рвётся примерно в каждой пятой попытке:
+            # измерено 02.09.2026 — из пяти запросов подряд четыре прошли
+            # за 0.2-0.5 с, а один завис на 20 с (TLS-рукопожатие 7.5 с
+            # и обрыв). У docker таймаут короткий, и он попадает в эти окна:
+            # два деплоя Horse Bio подряд упали с "TLS handshake timeout".
+            #
+            # Повторяем только сетевые шаги. Локальные заворачивать в retry
+            # нельзя: настоящая ошибка спряталась бы за повторами.
+            retry() {
+              local attempt=1 max=5
+              until "$@"; do
+                if [ "$attempt" -ge "$max" ]; then
+                  echo "Не удалось за $max попыток: $*" >&2
+                  return 1
+                fi
+                echo "Попытка $attempt из $max не удалась, повтор через $((attempt * 5)) с"
+                sleep $((attempt * 5))
+                attempt=$((attempt + 1))
+              done
+            }
+
+            retry bash -c 'echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin'
             cd /root/starpony
             # Скрипт расписания приезжает без права на запуск: scp его теряет.
             # Ошибку не глушим: молча пропущенный chmod всплыл бы ночью,
@@ -191,7 +213,7 @@ jobs:
             # в журнале деплоя.
             test -f /root/starpony/deploy/cron/starpony-sync.sh
             chmod +x /root/starpony/deploy/cron/starpony-sync.sh
-            docker compose -f docker-compose.prod.yml pull
+            retry docker compose -f docker-compose.prod.yml pull
             # --force-recreate, а не restart: перезапуск не перечитывает env_file,
             # и контейнер поднимется со старыми переменными. А после перезагрузки
             # сервера сеть Docker получает новый идентификатор, и старый контейнер
