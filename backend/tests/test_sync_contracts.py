@@ -245,14 +245,23 @@ class TestDocumentFields:
         assert report.kind == DocumentKind.COMMISSION_REPORT
         assert report.unpaid_kopecks == 200000
 
-    def test_commission_reports_go_without_positions(self, run, agent):
-        """Позиции не нужны: вопрос раздела — «сколько должны», а не «за что»."""
+    def test_commission_reports_come_with_positions(self, run, agent):
+        """Позиции нужны: отгрузка на реализацию — ещё не продажа.
+
+        «Срокам оплаты» хватало шапки — им важно «сколько должны», а не
+        «за что». «Прибыльности» шапки мало: разница между отгруженным
+        по комиссии и проданным комиссионером — 281 126 ₽ на 02.09,
+        и без позиций её не разложить по товарам, а значит и не пометить
+        строку словами «отгружено, ещё не продано».
+
+        Решение изменено 02.09; прежний тест стерёг обратное утверждение.
+        """
         client = FakeClient({"/entity/commissionreportin": []})
 
         sync_commission_reports(client, run)
 
         _, params = client.calls[0]
-        assert "expand" not in (params or {})
+        assert (params or {}).get("expand") == "positions"
 
     def test_marking_deleted_does_not_touch_neighbours(self, run, agent):
         """Пометка исчезнувших идёт по своему виду документов.

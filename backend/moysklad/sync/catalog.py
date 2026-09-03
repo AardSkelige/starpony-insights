@@ -18,9 +18,17 @@ logger = logging.getLogger(__name__)
 
 
 def folder_path(row: dict) -> str:
-    """Путь группы товара — по нему выводится линейка продукции."""
+    """Путь группы товара — по нему выводится линейка продукции.
+
+    Собирается из двух полей, а не берётся из одного. `pathName` — это путь
+    **до** группы, без её собственного имени: у товара в «Готовая продукция /
+    Репеллент» там лежит «Готовая продукция». Взять его одно значило бы
+    свалить все 90 товаров готовой продукции в одну группу и потерять семь
+    линеек учёта — а поле при этом выглядит заполненным, и потеря молчит.
+    """
     folder = row.get("productFolder") or {}
-    return folder.get("pathName") or folder.get("name") or ""
+    parts = [folder.get("pathName") or "", folder.get("name") or ""]
+    return "/".join(part for part in parts if part)
 
 
 def sync_uoms(client: MoySkladClient, run: SyncRun) -> EntityOutcome:

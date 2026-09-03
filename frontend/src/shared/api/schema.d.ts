@@ -174,6 +174,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profitability/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Прибыльность
+         * @description На чём зарабатываем и на чём теряем: выручка, себестоимость на момент продажи, прибыль и маржа по каждому товару. Отдельно — маржа через площадки, у которой не вычтена их комиссия, товар на реализации и то, что отдано даром.
+         */
+        get: operations["profitability_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profitability/xlsx/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Прибыльность — выгрузка в Excel
+         * @description Та же выборка, что на экране, целиком. Вторым листом — линейки продукции: вопрос «на какой линейке зарабатываем» решается по группам, а не по товарам.
+         */
+        get: operations["profitability_xlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/shipments/materials/": {
         parameters: {
             query?: never;
@@ -746,6 +786,25 @@ export interface components {
             id: number;
             name: string;
         };
+        /**
+         * @description Товар, изрядная часть которого уходит без оплаты.
+         *
+         *     Доля от отгруженного, а не штуки: сто штук Репеллента из четырёхсот
+         *     и семьдесят три Шампуня из ста тридцати девяти — разные истории,
+         *     и вторая заметнее, хотя число меньше.
+         */
+        GivenAway: {
+            product_id: number;
+            name: string;
+            article: string;
+            /** Format: decimal */
+            free_quantity: string;
+            /** Format: decimal */
+            shipped_quantity: string;
+            free_cost_kopecks: number;
+            /** Format: decimal */
+            share: string;
+        };
         Health: {
             status: string;
             database: string;
@@ -926,6 +985,119 @@ export interface components {
             full_name: string;
             is_superuser: boolean;
             pages: components["schemas"]["Page"][];
+        };
+        Profitability: {
+            count: number;
+            /** Format: date-time */
+            synced_at: string | null;
+            totals: components["schemas"]["ProfitabilityTotals"];
+            coverage: components["schemas"]["ProfitabilityCoverage"];
+            marketplaces: components["schemas"]["ProfitabilityMarketplaces"];
+            families: components["schemas"]["ProfitabilityFamily"][];
+            losses: components["schemas"]["ProfitabilityRow"][];
+            results: components["schemas"]["ProfitabilityRow"][];
+        };
+        /**
+         * @description Полнота расчёта: что осталось за пределами маржи и почему.
+         *
+         *     Поиск её не сужает: это ответ на «полное ли то, что показано».
+         */
+        ProfitabilityCoverage: {
+            basis: string;
+            with_free: boolean;
+            free_products_count: number;
+            /** Format: decimal */
+            free_quantity: string;
+            free_cost_kopecks: number;
+            unsold_products_count: number;
+            /** Format: decimal */
+            unsold_quantity: string;
+            unsold_kopecks: number;
+            hidden_products_count: number;
+            sold_revenue_kopecks: number;
+            shipped_revenue_kopecks: number;
+            most_given_away: components["schemas"]["GivenAway"][];
+        };
+        /** @description Линейка продукции — последнее звено пути группы в номенклатуре. */
+        ProfitabilityFamily: {
+            name: string;
+            products_count: number;
+            revenue_kopecks: number;
+            cost_kopecks: number;
+            profit_kopecks: number;
+            /** Format: decimal */
+            margin: string | null;
+        };
+        /**
+         * @description Две маржи, из которых верна одна.
+         *
+         *     Комиссия площадок в учёт не заводится вовсе: Озон и ПМТ удерживают её
+         *     при выплате, отдельного документа с ней нет. Значит маржа по площадкам
+         *     завышена ровно на их процент — на 02.09 это 85,3 % против 60,2 %
+         *     по прямым продажам, и у Озона 90,5 %.
+         */
+        ProfitabilityMarketplaces: {
+            marketplace_products_count: number;
+            /** Format: decimal */
+            marketplace_quantity: string;
+            marketplace_revenue_kopecks: number;
+            marketplace_cost_kopecks: number;
+            marketplace_profit_kopecks: number;
+            /** Format: decimal */
+            marketplace_margin: string | null;
+            direct_revenue_kopecks: number;
+            direct_cost_kopecks: number;
+            direct_profit_kopecks: number;
+            /** Format: decimal */
+            direct_margin: string | null;
+        };
+        ProfitabilityRow: {
+            product_id: number;
+            name: string;
+            article: string;
+            code: string;
+            folder: string;
+            uom: string;
+            /** Format: decimal */
+            quantity: string;
+            revenue_kopecks: number;
+            cost_kopecks: number | null;
+            profit_kopecks: number | null;
+            /** Format: decimal */
+            margin: string | null;
+            /** Format: decimal */
+            profit_share: string | null;
+            /** Format: decimal */
+            unit_cost_kopecks: string | null;
+            cost_is_estimated: boolean;
+            /** Format: decimal */
+            free_quantity: string;
+            free_cost_kopecks: number;
+            /** Format: decimal */
+            marketplace_quantity: string;
+            marketplace_revenue_kopecks: number;
+            marketplace_cost_kopecks: number | null;
+            /** Format: decimal */
+            unsold_quantity: string;
+            unsold_kopecks: number;
+            /** Format: decimal */
+            shipped_quantity: string;
+            shipped_revenue_kopecks: number;
+            /** Format: decimal */
+            sold_quantity: string;
+            sold_revenue_kopecks: number;
+        };
+        /** @description Итог под таблицей — про то, что в ней видно, с учётом поиска. */
+        ProfitabilityTotals: {
+            products_count: number;
+            /** Format: decimal */
+            quantity: string;
+            revenue_kopecks: number;
+            cost_kopecks: number;
+            profit_kopecks: number;
+            /** Format: decimal */
+            margin: string | null;
+            revenue_without_cost_kopecks: number;
         };
         /**
          * @description Одна закупка: документ целиком, а не строка в нём.
@@ -1641,6 +1813,104 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+        };
+    };
+    profitability_list: {
+        parameters: {
+            query?: {
+                /**
+                 * @description sold — деньги за товар: товар по договору комиссии становится проданным с приходом отчёта комиссионера. shipped — всё, что уехало со склада.
+                 *
+                 *     * `sold` - sold
+                 *     * `shipped` - shipped
+                 */
+                basis?: "sold" | "shipped";
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-cost` - -cost
+                 *     * `-margin` - -margin
+                 *     * `-name` - -name
+                 *     * `-profit` - -profit
+                 *     * `-quantity` - -quantity
+                 *     * `-revenue` - -revenue
+                 *     * `cost` - cost
+                 *     * `margin` - margin
+                 *     * `name` - name
+                 *     * `profit` - profit
+                 *     * `quantity` - quantity
+                 *     * `revenue` - revenue
+                 */
+                ordering?: "-cost" | "-margin" | "-name" | "-profit" | "-quantity" | "-revenue" | "cost" | "margin" | "name" | "profit" | "quantity" | "revenue";
+                page?: number;
+                page_size?: number;
+                search?: string;
+                /** @description Считать ли товар, отданный даром. По умолчанию нет: у него есть себестоимость и нет выручки, и он тянет маржу вниз у каждого четвёртого товара. */
+                with_free?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Profitability"];
+                };
+            };
+        };
+    };
+    profitability_xlsx: {
+        parameters: {
+            query?: {
+                /**
+                 * @description sold — деньги за товар: товар по договору комиссии становится проданным с приходом отчёта комиссионера. shipped — всё, что уехало со склада.
+                 *
+                 *     * `sold` - sold
+                 *     * `shipped` - shipped
+                 */
+                basis?: "sold" | "shipped";
+                date_from?: string | null;
+                date_to?: string | null;
+                /**
+                 * @description * `-cost` - -cost
+                 *     * `-margin` - -margin
+                 *     * `-name` - -name
+                 *     * `-profit` - -profit
+                 *     * `-quantity` - -quantity
+                 *     * `-revenue` - -revenue
+                 *     * `cost` - cost
+                 *     * `margin` - margin
+                 *     * `name` - name
+                 *     * `profit` - profit
+                 *     * `quantity` - quantity
+                 *     * `revenue` - revenue
+                 */
+                ordering?: "-cost" | "-margin" | "-name" | "-profit" | "-quantity" | "-revenue" | "cost" | "margin" | "name" | "profit" | "quantity" | "revenue";
+                page?: number;
+                page_size?: number;
+                search?: string;
+                /** @description Считать ли товар, отданный даром. По умолчанию нет: у него есть себестоимость и нет выручки, и он тянет маржу вниз у каждого четвёртого товара. */
+                with_free?: boolean;
             };
             header?: never;
             path?: never;

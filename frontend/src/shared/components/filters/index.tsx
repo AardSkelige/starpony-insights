@@ -1,3 +1,4 @@
+import type * as React from "react"
 import { ru } from "date-fns/locale"
 import { CalendarDays, ChevronDown, Search, X } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
@@ -89,6 +90,21 @@ type Props = {
   /** Что ищут на этой странице — подсказка в поле и подпись для чтения с экрана. */
   searchPlaceholder: string
   searchLabel: string
+  /**
+   * Свои переключатели страницы — встают в тот же ряд, перед «Сбросить».
+   *
+   * Заведён для «Прибыльности»: там выборку сужает не только период
+   * и поиск, но и **база расчёта** («Продано» против «Отгружено») с признаком
+   * «без подарков». Оба меняют показанные числа так же, как период, — значит
+   * их место рядом с ним, а не отдельной строкой над таблицей: два ряда
+   * управления читаются как два разных по важности набора.
+   *
+   * Слотом, а не полем в `FilterValue`: у остальных девяти страниц такого
+   * выбора нет, и общий тип обзавёлся бы полями, которые никто не заполняет.
+   * Сброс их не трогает — «Сбросить» убирает **сужение выборки**, а база
+   * расчёта не сужает её, а меняет вопрос.
+   */
+  extra?: React.ReactNode
 }
 
 const ALL = "all"
@@ -105,6 +121,7 @@ export function Filters({
   period = true,
   searchPlaceholder,
   searchLabel,
+  extra,
 }: Props) {
   const dirty =
     Boolean((period && (value.dateFrom || value.dateTo)) || value.pickId) ||
@@ -129,6 +146,8 @@ export function Filters({
       {period ? <PeriodField value={value} onChange={onChange} /> : null}
 
       {picker ? <PickerField value={value} onChange={onChange} picker={picker} /> : null}
+
+      {extra}
 
       {dirty ? (
         <Button

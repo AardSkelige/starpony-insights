@@ -6,6 +6,7 @@ from core.models.counterparty import Counterparty, SalesChannel
 from core.models.documents import Document, DocumentKind, DocumentPosition
 from core.models.mirror import MirrorModel, MirrorQuerySet
 from core.models.production import ProcessingPlan, ProcessingPlanMaterial
+from core.models.profit import ProfitDay
 from core.models.stock import Stock
 from core.models.sync import SyncEntityResult, SyncKind, SyncRun, SyncStatus
 from core.models.writeback import (
@@ -36,6 +37,7 @@ __all__ = [
     "MirrorQuerySet",
     "ProcessingPlan",
     "ProcessingPlanMaterial",
+    "ProfitDay",
     "Stock",
     "SyncEntityResult",
     "SyncKind",

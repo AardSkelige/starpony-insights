@@ -21,6 +21,7 @@ from moysklad.sync.documents import (
     sync_supplies,
 )
 from moysklad.sync.lock import advisory_lock
+from moysklad.sync.profit import sync_profit
 from moysklad.sync.production import sync_processing_plans
 from moysklad.sync.references import (
     sync_contracts,
@@ -57,6 +58,9 @@ ENTITIES = (
     ("purchaseorder", sync_purchase_orders),
     ("supply", sync_supplies),
     ("commissionreportin", sync_commission_reports),
+    # Прибыльность — последней: она читает даты отгрузок, чтобы понять,
+    # с какого дня начинать, и до них зеркало этого не знает.
+    ("profit", sync_profit),
 )
 
 

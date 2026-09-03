@@ -248,3 +248,75 @@ class TestStockOf:
         Stock.objects.create(product=product, quantity=Decimal("1.000"))
 
         assert stock_of(product.pk)["stock_days"] is None
+
+
+class TestReportRequest:
+    """Что именно спрашивается у отчёта остатков.
+
+    `/report/stock/all` фильтрует по двум независимым признакам: `stockMode`
+    — по остатку, `quantityMode` — по **доступному**. И умолчания у них
+    разные: у первого `all`, у второго `nonEmpty`. Передав только первый,
+    мы получали отчёт без позиций с нулевым доступным остатком — на боевых
+    данных 57 строк из 315.
+
+    Потеря была полной и тихой: у 35 из 59 проданных товаров строки остатка
+    не появлялось вовсе, и «Порог закупки» не видел ровно то, что кончилось.
+    """
+
+    def test_asks_for_positions_without_available_stock(self):
+        """Оба режима обязаны стоять в фильтре, иначе кончившееся исчезает."""
+        from moysklad.sync.stock import sync_stock
+
+        seen = []
+
+        class RecordingClient:
+            def iterate(self, path, params=None):
+                seen.append((path, params))
+                return iter(())
+
+        run = SyncRun.objects.create(kind=SyncKind.STATE)
+        sync_stock(RecordingClient(), run)
+
+        (path, params), = seen
+        assert path == "/report/stock/all"
+        # Оба через точку с запятой, как требует API: отдельным параметром
+        # запроса режим молча игнорируется.
+        assert params["filter"] == "stockMode=all;quantityMode=all"
+
+    def test_zero_stock_position_is_recorded(self):
+        """Кончившийся товар получает строку с нулём, а не отсутствие строки.
+
+        Разница видна на «Пороге закупки»: «нет строки» читается как «нет
+        данных», а ноль — как «кончился», и закупать надо именно его.
+        """
+        from moysklad.sync.stock import sync_stock
+
+        run = SyncRun.objects.create(kind=SyncKind.STATE)
+        product = Product.objects.create(
+            ms_id="33333333-3333-3333-3333-333333333333",
+            name="Кондиционер Персик-Банан 500 мл",
+            last_seen_run=run,
+        )
+
+        class FakeClient:
+            def iterate(self, path, params=None):
+                yield {
+                    "meta": {
+                        "href": "https://api.moysklad.ru/api/remap/1.2/entity/"
+                        f"product/{product.ms_id}"
+                    },
+                    "stock": 0,
+                    "reserve": 0,
+                    "inTransit": 0,
+                    "price": 0,
+                    "stockDays": 0,
+                }
+
+        sync_stock(FakeClient(), run)
+
+        stock = Stock.objects.get(product=product)
+        assert stock.quantity == 0
+        # Себестоимости у кончившегося товара нет: FIFO считается по тому,
+        # что лежит на складе. Ноль здесь — «неизвестна», и маржа по такому
+        # товару берётся из отчёта прибыльности, а не отсюда.
+        assert stock.cost_kopecks == 0

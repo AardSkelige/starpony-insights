@@ -1,3 +1,5 @@
+import type * as React from "react"
+
 import { Filters, type FilterValue, type Picker } from "@/shared/components/filters"
 import { Toolbar } from "@/shared/components/page"
 
@@ -32,6 +34,8 @@ export function FiltersBar(props: {
   /** Что ищут на этой странице — подсказка в поле и подпись для чтения с экрана. */
   searchPlaceholder: string
   searchLabel: string
+  /** Свои переключатели страницы — в тот же ряд. См. `Filters`. */
+  extra?: React.ReactNode
 }) {
   return (
     <Toolbar>

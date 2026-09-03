@@ -9,7 +9,7 @@ from decimal import Decimal
 import pytest
 
 from core.models import Product, SyncKind, SyncRun, Uom
-from moysklad.sync.catalog import uom_from_ref
+from moysklad.sync.catalog import folder_path, uom_from_ref
 
 pytestmark = pytest.mark.django_db
 
@@ -74,3 +74,34 @@ class TestProductFields:
         )
         product.refresh_from_db()
         assert product.min_balance == Decimal("0.300")
+
+
+class TestFolderPath:
+    """Путь группы товара — по нему выводится линейка продукции.
+
+    Ошибка здесь была тихой и стоила целой страницы: `pathName` — это путь
+    **до** группы, без её собственного имени. Код брал его вместо полного
+    пути, и все 90 товаров готовой продукции складывались в одну «Готовую
+    продукцию». Семь линеек учёта — шампуни, кондиционеры, репеллент,
+    амуниция, бытовая химия и две собачьих — исчезали целиком, а поле
+    при этом выглядело заполненным.
+    """
+
+    def test_keeps_the_group_name_itself(self):
+        """«Готовая продукция» + «Репеллент» = «Готовая продукция/Репеллент»."""
+        row = {"productFolder": {"pathName": "Готовая продукция", "name": "Репеллент"}}
+        assert folder_path(row) == "Готовая продукция/Репеллент"
+
+    def test_top_level_group_has_no_prefix(self):
+        """Группа в корне: пути до неё нет, и лишнего разделителя быть не должно."""
+        row = {"productFolder": {"pathName": "", "name": "Хоз. товары"}}
+        assert folder_path(row) == "Хоз. товары"
+
+    def test_nested_group_keeps_the_whole_path(self):
+        row = {"productFolder": {"pathName": "Хоз. товары/Упаковка", "name": "Короба"}}
+        assert folder_path(row) == "Хоз. товары/Упаковка/Короба"
+
+    @pytest.mark.parametrize("row", [{}, {"productFolder": None}, {"productFolder": {}}])
+    def test_product_without_a_group_gives_empty(self, row):
+        """Товар вне групп — обычное состояние: услуги лежат в корне."""
+        assert folder_path(row) == ""

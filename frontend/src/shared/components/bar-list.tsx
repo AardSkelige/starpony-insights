@@ -25,6 +25,18 @@ export type Bar = {
    * по наведению, а на виду: ради этого текста блок и открывают.
    */
   notes?: string[]
+  /**
+   * Тон полосы. По умолчанию все полосы одного цвета — и это правило
+   * остаётся: категории не упорядочены, и красить их значило бы второй раз
+   * закодировать то, что показывает длина.
+   *
+   * Исключение ровно одно, и оно не про категорию, а про **надёжность
+   * числа**: маржа через площадку завышена на её комиссию, которой нет
+   * в учёте. Это состояние, а не имя, — поэтому берётся `warning`, цвет
+   * статуса, и **всегда вместе с подписью**: цветом в одиночку такое
+   * не говорят (`DESIGN.md` §1).
+   */
+  tone?: "default" | "warning" | "destructive"
 }
 
 /**
@@ -84,7 +96,20 @@ export function BarList({
    */
   numbersOnHover?: boolean
 }) {
-  const max = Math.max(...bars.map((bar) => bar.value), 0)
+  /**
+   * Длина считается от модуля и никогда не уходит в минус.
+   *
+   * `width: -38%` — невалидное объявление: браузер выбрасывает его целиком,
+   * и полоса, будучи блоком внутри дорожки, растягивается **во всю длину**.
+   * Убыточная линейка рисовалась самой длинной в списке и читалась как
+   * лучшая. Ошибка тихая: ни в консоли, ни в тестах ничего.
+   *
+   * Клампится здесь, а не у вызывающего: правило одно на все списки,
+   * а забыть его у одного из них легко — так и вышло.
+   */
+  const length = (bar: Bar) => Math.max(bar.value, 0)
+
+  const max = Math.max(...bars.map(length), 0)
   if (max <= 0) return null
 
   return (
@@ -94,11 +119,22 @@ export function BarList({
         <Tooltip>
           <TooltipTrigger
             render={
-              <div className="flex items-center gap-3 text-sm">
+              // На телефоне подпись занимает свою строку, а полоса
+              // с числами переносится на следующую. В 112 точек имена,
+              // различающиеся **концом**, обрезаются в неотличимые:
+              // «Репеллент для лошадей Против…» дважды подряд — это
+              // 500 мл и 3000 мл. Найдено снимком телефона.
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                 <span
                   className={cn(
                     "shrink-0 text-xs text-muted-foreground",
-                    wideLabels ? "w-44" : "w-24",
+                    "max-sm:w-full",
+                    // Ширины разные на телефоне и на большом экране.
+                    // 176 точек подписи, 96 числа и 48 доли не помещаются
+                    // в 390 вместе с дорожкой: полоса схлопывалась в ноль,
+                    // и список превращался в таблицу без картинки.
+                    // Найдено снимком телефона, а не чтением кода.
+                    wideLabels ? "w-28 sm:w-44" : "w-20 sm:w-24",
                     multilineLabels
                       ? "line-clamp-2 whitespace-normal"
                       : "truncate"
@@ -110,8 +146,15 @@ export function BarList({
                     кроме друг друга, и доля от целого не читается. */}
                 <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-[3px] bg-muted">
                   <span
-                    className="motion-bar-reveal block h-full rounded-r-[3px] bg-primary"
-                    style={{ width: `${(bar.value / max) * 100}%` }}
+                    className={cn(
+                      "motion-bar-reveal block h-full rounded-r-[3px]",
+                      bar.tone === "warning"
+                        ? "bg-warning"
+                        : bar.tone === "destructive"
+                          ? "bg-destructive"
+                          : "bg-primary"
+                    )}
+                    style={{ width: `${(length(bar) / max) * 100}%` }}
                   />
                 </span>
                 {/* Ширина под самое длинное, что сюда попадает, — денежную
@@ -120,11 +163,11 @@ export function BarList({
                     по содержимому дала бы рваный столбец. */}
                 {numbersOnHover ? null : (
                   <>
-                    <span className="w-24 shrink-0 text-right text-xs whitespace-nowrap tabular-nums">
+                    <span className="w-20 shrink-0 text-right text-xs whitespace-nowrap tabular-nums sm:w-24">
                       {bar.display}
                     </span>
                     {bar.secondary ? (
-                      <span className="w-12 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                      <span className="w-11 shrink-0 text-right text-xs text-muted-foreground tabular-nums sm:w-12">
                         {bar.secondary}
                       </span>
                     ) : null}

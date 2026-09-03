@@ -403,6 +403,214 @@ paths:
                 type: string
                 format: binary
           description: ''
+  /api/profitability/:
+    get:
+      operationId: profitability_list
+      description: 'На чём зарабатываем и на чём теряем: выручка, себестоимость на
+        момент продажи, прибыль и маржа по каждому товару. Отдельно — маржа через
+        площадки, у которой не вычтена их комиссия, товар на реализации и то, что
+        отдано даром.'
+      summary: Прибыльность
+      parameters:
+      - in: query
+        name: basis
+        schema:
+          enum:
+          - sold
+          - shipped
+          type: string
+          default: sold
+          minLength: 1
+        description: |-
+          sold — деньги за товар: товар по договору комиссии становится проданным с приходом отчёта комиссионера. shipped — всё, что уехало со склада.
+
+          * `sold` - sold
+          * `shipped` - shipped
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -cost
+          - -margin
+          - -name
+          - -profit
+          - -quantity
+          - -revenue
+          - cost
+          - margin
+          - name
+          - profit
+          - quantity
+          - revenue
+          type: string
+          default: -profit
+          minLength: 1
+        description: |-
+          * `-cost` - -cost
+          * `-margin` - -margin
+          * `-name` - -name
+          * `-profit` - -profit
+          * `-quantity` - -quantity
+          * `-revenue` - -revenue
+          * `cost` - cost
+          * `margin` - margin
+          * `name` - name
+          * `profit` - profit
+          * `quantity` - quantity
+          * `revenue` - revenue
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 10
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      - in: query
+        name: with_free
+        schema:
+          type: boolean
+          default: false
+        description: 'Считать ли товар, отданный даром. По умолчанию нет: у него есть
+          себестоимость и нет выручки, и он тянет маржу вниз у каждого четвёртого
+          товара.'
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profitability'
+          description: ''
+  /api/profitability/xlsx/:
+    get:
+      operationId: profitability_xlsx
+      description: 'Та же выборка, что на экране, целиком. Вторым листом — линейки
+        продукции: вопрос «на какой линейке зарабатываем» решается по группам, а не
+        по товарам.'
+      summary: Прибыльность — выгрузка в Excel
+      parameters:
+      - in: query
+        name: basis
+        schema:
+          enum:
+          - sold
+          - shipped
+          type: string
+          default: sold
+          minLength: 1
+        description: |-
+          sold — деньги за товар: товар по договору комиссии становится проданным с приходом отчёта комиссионера. shipped — всё, что уехало со склада.
+
+          * `sold` - sold
+          * `shipped` - shipped
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -cost
+          - -margin
+          - -name
+          - -profit
+          - -quantity
+          - -revenue
+          - cost
+          - margin
+          - name
+          - profit
+          - quantity
+          - revenue
+          type: string
+          default: -profit
+          minLength: 1
+        description: |-
+          * `-cost` - -cost
+          * `-margin` - -margin
+          * `-name` - -name
+          * `-profit` - -profit
+          * `-quantity` - -quantity
+          * `-revenue` - -revenue
+          * `cost` - cost
+          * `margin` - margin
+          * `name` - name
+          * `profit` - profit
+          * `quantity` - quantity
+          * `revenue` - revenue
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 10
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      - in: query
+        name: with_free
+        schema:
+          type: boolean
+          default: false
+        description: 'Считать ли товар, отданный даром. По умолчанию нет: у него есть
+          себестоимость и нет выручки, и он тянет маржу вниз у каждого четвёртого
+          товара.'
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+          description: ''
   /api/shipments/materials/:
     get:
       operationId: shipment_materials_list
@@ -2137,6 +2345,43 @@ components:
       required:
       - id
       - name
+    GivenAway:
+      type: object
+      description: |-
+        Товар, изрядная часть которого уходит без оплаты.
+
+        Доля от отгруженного, а не штуки: сто штук Репеллента из четырёхсот
+        и семьдесят три Шампуня из ста тридцати девяти — разные истории,
+        и вторая заметнее, хотя число меньше.
+      properties:
+        product_id:
+          type: integer
+        name:
+          type: string
+        article:
+          type: string
+        free_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        shipped_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        free_cost_kopecks:
+          type: integer
+        share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,8})?$
+      required:
+      - article
+      - free_cost_kopecks
+      - free_quantity
+      - name
+      - product_id
+      - share
+      - shipped_quantity
     Health:
       type: object
       properties:
@@ -2489,6 +2734,301 @@ components:
       - is_superuser
       - pages
       - username
+    Profitability:
+      type: object
+      properties:
+        count:
+          type: integer
+        synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        totals:
+          $ref: '#/components/schemas/ProfitabilityTotals'
+        coverage:
+          $ref: '#/components/schemas/ProfitabilityCoverage'
+        marketplaces:
+          $ref: '#/components/schemas/ProfitabilityMarketplaces'
+        families:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProfitabilityFamily'
+        losses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProfitabilityRow'
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProfitabilityRow'
+      required:
+      - count
+      - coverage
+      - families
+      - losses
+      - marketplaces
+      - results
+      - synced_at
+      - totals
+    ProfitabilityCoverage:
+      type: object
+      description: |-
+        Полнота расчёта: что осталось за пределами маржи и почему.
+
+        Поиск её не сужает: это ответ на «полное ли то, что показано».
+      properties:
+        basis:
+          type: string
+        with_free:
+          type: boolean
+        free_products_count:
+          type: integer
+        free_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        free_cost_kopecks:
+          type: integer
+        unsold_products_count:
+          type: integer
+        unsold_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        unsold_kopecks:
+          type: integer
+        hidden_products_count:
+          type: integer
+        sold_revenue_kopecks:
+          type: integer
+        shipped_revenue_kopecks:
+          type: integer
+        most_given_away:
+          type: array
+          items:
+            $ref: '#/components/schemas/GivenAway'
+      required:
+      - basis
+      - free_cost_kopecks
+      - free_products_count
+      - free_quantity
+      - hidden_products_count
+      - most_given_away
+      - shipped_revenue_kopecks
+      - sold_revenue_kopecks
+      - unsold_kopecks
+      - unsold_products_count
+      - unsold_quantity
+      - with_free
+    ProfitabilityFamily:
+      type: object
+      description: Линейка продукции — последнее звено пути группы в номенклатуре.
+      properties:
+        name:
+          type: string
+        products_count:
+          type: integer
+        revenue_kopecks:
+          type: integer
+        cost_kopecks:
+          type: integer
+        profit_kopecks:
+          type: integer
+        margin:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,8})?$
+          nullable: true
+      required:
+      - cost_kopecks
+      - margin
+      - name
+      - products_count
+      - profit_kopecks
+      - revenue_kopecks
+    ProfitabilityMarketplaces:
+      type: object
+      description: |-
+        Две маржи, из которых верна одна.
+
+        Комиссия площадок в учёт не заводится вовсе: Озон и ПМТ удерживают её
+        при выплате, отдельного документа с ней нет. Значит маржа по площадкам
+        завышена ровно на их процент — на 02.09 это 85,3 % против 60,2 %
+        по прямым продажам, и у Озона 90,5 %.
+      properties:
+        marketplace_products_count:
+          type: integer
+        marketplace_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        marketplace_revenue_kopecks:
+          type: integer
+        marketplace_cost_kopecks:
+          type: integer
+        marketplace_profit_kopecks:
+          type: integer
+        marketplace_margin:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,8})?$
+          nullable: true
+        direct_revenue_kopecks:
+          type: integer
+        direct_cost_kopecks:
+          type: integer
+        direct_profit_kopecks:
+          type: integer
+        direct_margin:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,8})?$
+          nullable: true
+      required:
+      - direct_cost_kopecks
+      - direct_margin
+      - direct_profit_kopecks
+      - direct_revenue_kopecks
+      - marketplace_cost_kopecks
+      - marketplace_margin
+      - marketplace_products_count
+      - marketplace_profit_kopecks
+      - marketplace_quantity
+      - marketplace_revenue_kopecks
+    ProfitabilityRow:
+      type: object
+      properties:
+        product_id:
+          type: integer
+        name:
+          type: string
+        article:
+          type: string
+        code:
+          type: string
+        folder:
+          type: string
+        uom:
+          type: string
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        revenue_kopecks:
+          type: integer
+        cost_kopecks:
+          type: integer
+          nullable: true
+        profit_kopecks:
+          type: integer
+          nullable: true
+        margin:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,8})?$
+          nullable: true
+        profit_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,8})?$
+          nullable: true
+        unit_cost_kopecks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+          nullable: true
+        cost_is_estimated:
+          type: boolean
+        free_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        free_cost_kopecks:
+          type: integer
+        marketplace_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        marketplace_revenue_kopecks:
+          type: integer
+        marketplace_cost_kopecks:
+          type: integer
+          nullable: true
+        unsold_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        unsold_kopecks:
+          type: integer
+        shipped_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        shipped_revenue_kopecks:
+          type: integer
+        sold_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        sold_revenue_kopecks:
+          type: integer
+      required:
+      - article
+      - code
+      - cost_is_estimated
+      - cost_kopecks
+      - folder
+      - free_cost_kopecks
+      - free_quantity
+      - margin
+      - marketplace_cost_kopecks
+      - marketplace_quantity
+      - marketplace_revenue_kopecks
+      - name
+      - product_id
+      - profit_kopecks
+      - profit_share
+      - quantity
+      - revenue_kopecks
+      - shipped_quantity
+      - shipped_revenue_kopecks
+      - sold_quantity
+      - sold_revenue_kopecks
+      - unit_cost_kopecks
+      - unsold_kopecks
+      - unsold_quantity
+      - uom
+    ProfitabilityTotals:
+      type: object
+      description: Итог под таблицей — про то, что в ней видно, с учётом поиска.
+      properties:
+        products_count:
+          type: integer
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        revenue_kopecks:
+          type: integer
+        cost_kopecks:
+          type: integer
+        profit_kopecks:
+          type: integer
+        margin:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,8})?$
+          nullable: true
+        revenue_without_cost_kopecks:
+          type: integer
+      required:
+      - cost_kopecks
+      - margin
+      - products_count
+      - profit_kopecks
+      - quantity
+      - revenue_kopecks
+      - revenue_without_cost_kopecks
     Purchase:
       type: object
       description: |-

@@ -30,11 +30,18 @@ def sync_stock(client: MoySkladClient, run: SyncRun) -> EntityOutcome:
     seen: set[int] = set()
 
     try:
-        # stockMode передаётся внутри filter, а не отдельным параметром.
-        # Отдельным он молча игнорируется: сейчас это незаметно, потому что
-        # `all` и есть значение по умолчанию, но при смене на positiveOnly
-        # отчёт продолжил бы отдавать всё.
-        for row in client.iterate("/report/stock/all", {"filter": "stockMode=all"}):
+        # Оба режима внутри filter, а не отдельными параметрами: отдельными
+        # они молча игнорируются.
+        #
+        # Их обязательно два. `stockMode` фильтрует по остатку, `quantityMode`
+        # — по **доступному**, и умолчания у них разные: `all` у первого,
+        # `nonEmpty` у второго. С одним лишь `stockMode` отчёт отдавал 258
+        # строк вместо 315: 57 позиций с нулевым доступным остатком выпадали
+        # целиком, и строки остатка у них не появлялось вовсе. Именно эти
+        # позиции и нужны «Порогу закупки» — кончившееся, а не лежащее.
+        for row in client.iterate(
+            "/report/stock/all", {"filter": "stockMode=all;quantityMode=all"}
+        ):
             outcome.fetched += 1
 
             product = products.get(ms_id_from(row))

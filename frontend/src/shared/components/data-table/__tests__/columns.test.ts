@@ -13,6 +13,10 @@ import {
   totalsFor as materialTotals,
 } from "@/sections/shipments-materials/columns"
 import {
+  COLUMNS as PROFITABILITY_COLUMNS,
+  totalsFor as profitabilityTotals,
+} from "@/sections/profitability/columns"
+import {
   COLUMNS as PRODUCT_COLUMNS,
   totalsFor as productTotals,
 } from "@/sections/shipments-products/columns"
@@ -126,6 +130,25 @@ const TABLES = [
     // разница с суммой отгруженного выглядит потерянными деньгами.
     // «Старейший долг» — вообще не срок, и сказать это может только подсказка.
     computed: ["debt", "share", "overdue", "oldest"],
+  },
+  {
+    name: "Прибыльность",
+    columns: PROFITABILITY_COLUMNS as Column<unknown>[],
+    totals: profitabilityTotals({
+      products_count: 53,
+      quantity: "1435.000",
+      revenue_kopecks: 101142445,
+      cost_kopecks: 30762712,
+      profit_kopecks: 70379733,
+      margin: "0.69583000",
+      revenue_without_cost_kopecks: 0,
+    }),
+    // «Выручка» и «Себестоимость» взяты из отчёта как есть, но объяснения
+    // требуют не меньше расчётных: первая не включает товар, лежащий
+    // на реализации, вторая берётся на момент продажи и подрезается долей
+    // платных штук. Без формулы и то, и другое читается как ошибка.
+    // «Продано» объяснено подстрочником «даром» прямо в ячейке.
+    computed: ["revenue", "cost", "profit", "margin"],
   },
 ]
 
