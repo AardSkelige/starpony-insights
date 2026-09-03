@@ -14,6 +14,7 @@
 
 import logging
 
+from django.db import models
 from django.utils import timezone
 
 from core.models import (
@@ -31,6 +32,21 @@ logger = logging.getLogger(__name__)
 # из 315, обычный — от двух до двенадцати. Тридцать — это вдвое больше
 # худшего наблюдавшегося случая и втрое меньше того, что вызывает подозрение.
 DEFAULT_CHANGE_LIMIT = 30
+
+
+class SkipReason(models.TextChoices):
+    """Почему запись пропущена. Обязательна у каждого пропуска.
+
+    Без обязательности следующий вид записи её забудет, и «пропущено N»
+    снова станет числом, по которому нельзя отличить «нечего менять»
+    от «не работает». Именно так и вышло у себестоимости.
+    """
+
+    # Записывать нечего: исходного числа нет. У себестоимости это позиции
+    # без остатка — FIFO неизвестен, и таких постоянно около сотни из 315.
+    UNKNOWN = "unknown", "значение неизвестно"
+    # В учёте уже стоит то же самое. Нормальное состояние между движениями.
+    EQUAL = "equal", "уже совпадает"
 
 
 class WritebackDisabled(RuntimeError):
@@ -79,8 +95,16 @@ class WritebackSession:
     def note_considered(self, count: int = 1) -> None:
         self.run.considered += count
 
-    def note_skipped(self, count: int = 1) -> None:
+    def note_skipped(self, reason: SkipReason, count: int = 1) -> None:
+        """Пропустить позицию, назвав причину.
+
+        Причина — обязательный довод, а не удобство: см. `SkipReason`.
+        """
         self.run.skipped += count
+        if reason == SkipReason.UNKNOWN:
+            self.run.skipped_unknown += count
+        else:
+            self.run.skipped_equal += count
 
     def record(
         self,
@@ -160,6 +184,7 @@ class WritebackSession:
             update_fields=[
                 "status", "finished_at", "request_count", "error",
                 "considered", "changed", "skipped", "failed",
+                "skipped_unknown", "skipped_equal",
             ]
         )
         return self.run

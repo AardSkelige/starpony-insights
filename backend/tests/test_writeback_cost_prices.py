@@ -219,6 +219,77 @@ class TestWhatGetsWritten:
         assert "attributes" not in client.puts[0][1]
 
 
+class TestSkipBreakdown:
+    """Пропуск с причиной: «нечего менять» и «не работает» — разные вещи.
+
+    Склеенное «изменено 0, пропущено 315» читалось одинаково и так, и так,
+    а отличить их по журналу было нечем: 03.09 на этот вопрос не удалось
+    ответить, не запуская пробный прогон руками.
+    """
+
+    def test_причины_пропуска_считаются_отдельно(self, make_product):
+        # Совпадает — записывать нечего.
+        make_product("11111111-1111-1111-1111-111111111111", "Воск", "18000")
+        # Себестоимости нет вовсе: в зеркале позиции нет.
+        client = FakeClient([
+            {
+                "id": "11111111-1111-1111-1111-111111111111",
+                "name": "Воск",
+                "salePrices": [price(PRICE_TYPE_HREF, 18000)],
+            },
+            {
+                "id": "99999999-9999-9999-9999-999999999999",
+                "name": "Неизвестный",
+                "salePrices": [price(PRICE_TYPE_HREF, 100)],
+            },
+        ])
+
+        run = run_cost_prices_writeback(client)
+
+        assert run.changed == 0
+        assert run.skipped_equal == 1
+        assert run.skipped_unknown == 1
+
+        # И то же самое **из базы**: журнал существует ради того, чтобы
+        # в него смотрели потом. Забудь `_close` перечислить новые поля
+        # в `update_fields`, и в памяти числа были бы верны, а в админке —
+        # нули; проверка по объекту этого не увидела бы.
+        run.refresh_from_db()
+        assert run.skipped_equal == 1
+        assert run.skipped_unknown == 1
+
+    def test_показанное_складывается_в_показанный_итог(self, make_product):
+        """`DESIGN.md` §8: сумма разбивки равна общему числу пропусков.
+
+        Иначе журнал сам себе противоречит, и верить перестают обоим числам.
+        """
+        make_product("11111111-1111-1111-1111-111111111111", "Воск", "18000")
+        make_product("22222222-2222-2222-2222-222222222222", "Основа", "3000")
+
+        client = FakeClient([
+            {
+                "id": "11111111-1111-1111-1111-111111111111",
+                "name": "Воск",
+                "salePrices": [price(PRICE_TYPE_HREF, 18000)],
+            },
+            {
+                "id": "22222222-2222-2222-2222-222222222222",
+                "name": "Основа",
+                "salePrices": [price(PRICE_TYPE_HREF, 2000)],
+            },
+            {
+                "id": "99999999-9999-9999-9999-999999999999",
+                "name": "Неизвестный",
+                "salePrices": [],
+            },
+        ])
+
+        run = run_cost_prices_writeback(client)
+
+        assert run.skipped == run.skipped_unknown + run.skipped_equal
+        assert run.considered == run.changed + run.skipped + run.failed
+
+
 class TestWhatMustNotBeWritten:
     def test_zero_cost_is_never_written(self, make_product):
         """Ноль в остатках означает «FIFO неизвестен», а не «товар бесплатный».

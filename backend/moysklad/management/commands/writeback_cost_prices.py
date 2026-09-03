@@ -59,9 +59,15 @@ class Command(BaseCommand):
 
     def _report(self, run):
         verb = "изменилось бы" if run.dry_run else "изменено"
+        # Пропуск с разбивкой по причине. Склеенное «пропущено 315» читалось
+        # одинаково и как «всё уже сходится», и как «запись не работает»,
+        # а отличить одно от другого было нечем.
         self.stdout.write(
             f"Рассмотрено {run.considered}, {verb} {run.changed}, "
-            f"пропущено {run.skipped}, запросов {run.request_count}"
+            f"пропущено {run.skipped} "
+            f"(без себестоимости {run.skipped_unknown}, "
+            f"уже совпадает {run.skipped_equal}), "
+            f"запросов {run.request_count}"
         )
 
         for change in run.changes.all()[:50]:

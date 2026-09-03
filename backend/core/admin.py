@@ -54,7 +54,11 @@ class WritebackRunAdmin(admin.ModelAdmin):
 
     list_display = (
         "started_at", "kind", "status", "dry_run",
-        "considered", "changed", "skipped", "failed", "request_count",
+        "considered", "changed",
+        # Разбивка пропуска, а не одно число: «изменено 0, пропущено 315»
+        # не отличало «всё уже сходится» от «запись не работает».
+        "skipped_unknown", "skipped_equal",
+        "failed", "request_count",
     )
     list_filter = ("kind", "status", "dry_run")
     date_hierarchy = "started_at"

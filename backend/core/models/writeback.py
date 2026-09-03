@@ -95,6 +95,23 @@ class WritebackRun(DomainModel):
     considered = models.PositiveIntegerField("Рассмотрено", default=0)
     changed = models.PositiveIntegerField("Изменено", default=0)
     skipped = models.PositiveIntegerField("Пропущено", default=0)
+
+    # **Пропуск разбит по причине, потому что склеенный ничего не говорил.**
+    # «Изменено 0, пропущено 315» читается одинаково и как «всё уже сходится»,
+    # и как «запись не работает», а отличить одно от другого по журналу было
+    # нечем: 03.09 на этот вопрос не удалось ответить, не запуская пробный
+    # прогон руками. Тот же приём, что у счётчиков пропусков в синхронизации,
+    # — они дважды вскрыли потерю данных.
+    #
+    # Сумма двух равна `skipped`: показанное обязано складываться
+    # в показанный итог (`DESIGN.md` §8).
+    skipped_unknown = models.PositiveIntegerField(
+        "Пропущено: значение неизвестно", default=0
+    )
+    skipped_equal = models.PositiveIntegerField(
+        "Пропущено: уже совпадает", default=0
+    )
+
     failed = models.PositiveIntegerField("Не удалось записать", default=0)
 
     # Лимит общий с ботом Agent - StarPony. Рост этого числа — первый признак,

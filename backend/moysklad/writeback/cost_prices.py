@@ -26,6 +26,7 @@ from moysklad.client import MoySkladClient
 from moysklad.limits import ApiDisabledRisk
 from moysklad.writeback.journal import (
     ChangeLimitReached,
+    SkipReason,
     WritebackRun,
     WritebackSession,
 )
@@ -193,13 +194,13 @@ def _walk_products(
         if target is None:
             # Остатка нет — FIFO неизвестен. Не ошибка: у 103 позиций из 315
             # так и есть постоянно.
-            session.note_skipped()
+            session.note_skipped(SkipReason.UNKNOWN)
             continue
 
         new_kopecks = _round_kopecks(target)
         old_kopecks = _current_cost(row, price_type["href"])
         if old_kopecks == new_kopecks:
-            session.note_skipped()
+            session.note_skipped(SkipReason.EQUAL)
             continue
 
         name = row.get("name", "—")
