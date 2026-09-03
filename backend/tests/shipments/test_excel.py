@@ -182,3 +182,32 @@ def test_totals_row_declines_the_noun(make_product, make_demand):
     last = sheet.max_row
 
     assert sheet.cell(row=last, column=column_of("name")).value == "Итого · 1 наименование"
+
+
+def test_export_names_the_consignment_part(make_product, make_demand, commission):
+    """Выручка в файле обязана нести ту же оговорку, что полоса на экране.
+
+    Полосы в книге нет, а колонку «Выручка» складывают сводной таблицей
+    первым делом. Без соседнего числа файл утверждает, что товар,
+    лежащий у комиссионера, уже продан: на боевых так сложились бы
+    281 126 ₽ (`CLAUDE.md` §8.0).
+    """
+    product = make_product()
+    position(make_demand(contract=commission), product, "1.000", 30000)
+    position(make_demand(), product, "1.000", 20000)
+
+    sheet = sheet_of(products.Filters())
+    last = sheet.max_row
+
+    assert sheet.cell(row=2, column=column_of("revenue")).value == pytest.approx(500)
+    assert sheet.cell(row=2, column=column_of("consignment")).value == pytest.approx(300)
+    assert sheet.cell(row=last, column=column_of("consignment")).value == pytest.approx(300)
+
+
+def test_export_writes_zero_when_nothing_is_consigned(make_product, make_demand):
+    """Ноль, а не пустая ячейка: пустая читается как «не посчитали»."""
+    position(make_demand(), make_product(), "1.000", 20000)
+
+    sheet = sheet_of(products.Filters())
+
+    assert sheet.cell(row=2, column=column_of("consignment")).value == pytest.approx(0)

@@ -16,7 +16,8 @@ from datetime import date
 from django.db.models import QuerySet
 
 from api.common import selection
-from core.models import DocumentKind, DocumentPosition
+from core.models import Document, DocumentKind, DocumentPosition
+from core.services.documents import alive
 
 
 @dataclass(frozen=True)
@@ -88,3 +89,30 @@ def channels(
         }
         for row in rows
     ]
+
+
+def demands(
+    *,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    channel_id: int | None = None,
+) -> QuerySet[Document]:
+    """Сами отгрузки выборки, а не их позиции.
+
+    Нужны там, где сумма документа — независимый свидетель. Страница считает
+    по позициям, учёт хранит итог в самом документе, и сойтись они обязаны
+    до копейки: разойдутся — значит синхронизация потеряла строку и молчит
+    об этом (`CLAUDE.md` §9).
+
+    Отбор — тот же самый, и это условие правила: сравнивать сумму позиций
+    одного множества с суммой документов другого бессмысленно, а выглядит
+    оно обычной сверкой.
+    """
+    queryset = selection.within(
+        alive(DocumentKind.DEMAND), date_from, date_to, field="moment"
+    )
+
+    if channel_id:
+        queryset = queryset.filter(sales_channel_id=channel_id)
+
+    return queryset

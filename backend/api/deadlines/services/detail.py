@@ -98,7 +98,10 @@ def of(agent_id: int) -> dict | None:
         # есть у двоих из 107.
         "consignment": {
             "count": len(consignment),
-            "kopecks": sum(debt.debt_kopecks for debt in consignment),
+            # Сумма документов, а не остаток к оплате: это отгруженный товар,
+            # а не долг. `debt_kopecks` показал бы ноль у той отгрузки,
+            # по которой комиссионер уже рассчитался, — хотя товар у него.
+            "kopecks": sum(debt.document.total_kopecks for debt in consignment),
             "contracts": sorted(
                 {
                     debt.document.contract.name

@@ -193,7 +193,11 @@ export function AppSidebar({
                         {profile.full_name}
                       </span>
                       <span className="truncate text-xs text-muted-foreground">
-                        {profile.is_superuser ? "Полный доступ" : "Сотрудник"}
+                        {/* Должность, а не права. Собирает её сервер
+                            (`User.sidebar_title`): «Полный доступ» остаётся
+                            запасным вариантом, пока должность не заполнена,
+                            и решать это в двух местах нельзя. */}
+                        {profile.title}
                       </span>
                     </div>
                     <ChevronsUpDown className="ml-auto" />

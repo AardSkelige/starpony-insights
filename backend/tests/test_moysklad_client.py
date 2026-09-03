@@ -137,3 +137,38 @@ class TestPagination:
         )
 
         assert len(list(client.iterate("/entity/product"))) == 1
+
+
+class TestTimeouts:
+    """Срок соединения и срок чтения — разные величины.
+
+    Проверено на живой аварии 03.09: API МойСклада перестал принимать
+    соединения вовсе (порт 443 молчал при живом `online.moysklad.ru`).
+    С единым сроком в минуту прогон «Обновить» растянулся бы на 27 минут —
+    три попытки на девять сущностей, — и вылез за срок, после которого
+    кнопка считает прогон брошенным. То есть страница соврала бы
+    про собственное состояние.
+    """
+
+    def test_сроки_разные(self, client):
+        connect, read = client._timeout
+
+        assert connect < read
+        assert connect <= 15, "соединение либо устанавливается за секунды, либо не установится"
+
+    @responses.activate
+    def test_срок_соединения_уходит_в_запрос(self, client, monkeypatch):
+        """Не украшение поля: `requests` обязан получить оба числа."""
+        responses.get(f"{BASE_URL}/entity/product", json={"rows": []}, headers=limit_headers())
+
+        seen = {}
+        original = client._session.request
+
+        def capture(*args, **kwargs):
+            seen.update(kwargs)
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(client._session, "request", capture)
+        client.get("/entity/product")
+
+        assert seen["timeout"] == (10.0, 60.0)

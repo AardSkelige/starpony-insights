@@ -167,7 +167,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           # Скрипты расписания едут вместе с кодом: иначе они живут только
           # на сервере, и правка теряется при первой же переустановке.
-          source: "docker-compose.prod.yml,deploy/cron/*"
+          source: "docker-compose.prod.yml,deploy/cron/*,deploy/backup/*"
           target: "/root/starpony"
           strip_components: 0
 
@@ -213,6 +213,10 @@ jobs:
             # в журнале деплоя.
             test -f /root/starpony/deploy/cron/starpony-sync.sh
             chmod +x /root/starpony/deploy/cron/starpony-sync.sh
+            # Бэкап — тем же порядком: scp теряет право на запуск, а скрипт,
+            # приехавший без него, cron просто пропустит, ничего не сказав.
+            test -f /root/starpony/deploy/backup/starpony-backup.sh
+            chmod +x /root/starpony/deploy/backup/starpony-backup.sh
             retry docker compose -f docker-compose.prod.yml pull
             # --force-recreate, а не restart: перезапуск не перечитывает env_file,
             # и контейнер поднимется со старыми переменными. А после перезагрузки

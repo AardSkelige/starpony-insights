@@ -35,6 +35,18 @@ import {
 // внутри себя, и горизонтальная полоса честнее, чем список одинаковых строк.
 const NAME_CELL = "w-full min-w-56 max-w-0"
 
+/**
+ * Отбивка числовой колонки слева.
+ *
+ * У ячейки реестра `px-2` с обеих сторон, то есть между двумя числовыми
+ * колонками остаётся 16 точек. Число выровнено вправо и упирается в левый
+ * край соседа: на «Поставщиках» «2» (поставок) и «272 706,29 ₽» (сумма)
+ * читались как одно число «2 272 706,29». Здесь ширина отбивки удваивается —
+ * и только слева: справа число обязано держаться края своей колонки, иначе
+ * разряды соседних строк перестают стоять в столбик.
+ */
+const NUMERIC_CELL = "pl-6"
+
 type Props<Row> = {
   columns: Column<Row>[]
   rows: Row[]
@@ -98,7 +110,12 @@ export function TableView<Row>({
   return (
     // Таблица шире экрана прокручивается внутри себя: горизонтальная полоса
     // у всей страницы уводила бы вместе с таблицей и шапку с фильтрами.
-    <div className="motion-content-reveal overflow-x-auto rounded-lg border">
+    // `bg-card` — подложка под таблицей. В тёмной теме фон страницы почти
+    // чёрный (`--background` 0.145), и таблица на нём читалась как белый
+    // текст по чёрному во всю ширину экрана. Карточка светлее (0.205),
+    // и лист отделяется от фона — так же собран «Расчёт производства».
+    // В светлой теме `--card` равен `--background`, и вид не меняется вовсе.
+    <div className="motion-content-reveal overflow-x-auto rounded-lg border bg-card">
       <Table className={cn("motion-opacity-transition", muted && "opacity-60")}>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -110,9 +127,10 @@ export function TableView<Row>({
                 <TableHead
                   key={column.key}
                   className={cn(
-                    "text-xs font-normal tracking-wide text-muted-foreground uppercase",
+                    "text-xs font-normal text-muted-foreground",
                     column.numeric && "text-right",
-                    index === 0 && NAME_CELL
+                    index === 0 && NAME_CELL,
+                    column.numeric && index > 0 && NUMERIC_CELL
                   )}
                   aria-sort={
                     active ? (sort?.desc ? "descending" : "ascending") : undefined
@@ -129,14 +147,7 @@ export function TableView<Row>({
                         type="button"
                         onClick={() => onSort?.(column.sortKey!, Boolean(column.numeric))}
                         className={cn(
-                          // `uppercase` обязателен здесь, хотя он уже задан
-                          // у `TableHead`: `button` не наследует
-                          // `text-transform`, и заголовки сортируемых колонок
-                          // выходили строчными, а несортируемых — прописными.
-                          // Рядом это читается как две разные таблицы;
-                          // на «Материалах в отгрузках» так и было с самого
-                          // начала, просто несортируемая колонка там одна.
-                          "inline-flex items-center gap-1 rounded-sm uppercase transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                          "inline-flex items-center gap-1 rounded-sm transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                           column.numeric && "flex-row-reverse",
                           active && "text-foreground"
                         )}
@@ -184,6 +195,11 @@ export function TableView<Row>({
                 onClick={clickable ? () => onToggle?.(row) : undefined}
                 className={cn(
                   clickable && "cursor-pointer",
+                  // Наведение усилено вместе с подложкой: `muted/50` считался
+                  // от фона страницы, а над карточкой разница между ними
+                  // остаётся четверть шага и пропадает совсем
+                  // (`DESIGN.md` §15 — наведение, сливающееся с фоном).
+                  "hover:bg-muted/70",
                   // Наведение и выбор — разные состояния, и выбор должен
                   // побеждать: иначе, наведя курсор на раскрытую строку,
                   // человек видит тот же фон, что у любой соседней.
@@ -197,6 +213,7 @@ export function TableView<Row>({
                       column.numeric && "text-right tabular-nums",
                       column.strong && "font-medium",
                       index === 0 && NAME_CELL,
+                      column.numeric && index > 0 && NUMERIC_CELL,
                       changedCells.has(changedCellKey(key, column.key)) &&
                         "motion-data-flash"
                     )}
@@ -247,6 +264,7 @@ export function TableView<Row>({
                   key={column.key}
                   className={cn(
                     column.numeric && "text-right tabular-nums",
+                    column.numeric && index > 0 && NUMERIC_CELL,
                     // `whitespace-normal` обязателен: `TableCell` из реестра
                     // объявляет `whitespace-nowrap`, а ячейка имени —
                     // `max-w-0`. Вместе это значит, что подпись итога никуда

@@ -1,6 +1,7 @@
 import type { Channels } from "@/sections/channels/api"
 import { CollapsibleNote } from "@/shared/components/collapsible-note"
 import { Explain } from "@/shared/components/explain"
+import { SummaryStat } from "@/shared/components/summary-stat"
 import { formatMoney } from "@/shared/lib/format"
 import { withPlural } from "@/shared/lib/plural"
 
@@ -21,7 +22,7 @@ export function Coverage({ coverage }: { coverage: Coverage }) {
   return (
     <CollapsibleNote title="Сводка и охват расчёта" headline={headline(coverage)}>
       <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
-        <Stat
+        <SummaryStat
           label="Выручка выборки"
           value={formatMoney(coverage.revenue_kopecks)}
           note={`${withPlural(coverage.shipments_count, "отгрузка", "отгрузки", "отгрузок")} · ${withPlural(coverage.products_count, "товар", "товара", "товаров")}`}
@@ -34,7 +35,32 @@ export function Coverage({ coverage }: { coverage: Coverage }) {
             </Explain>
           }
         />
-        <Stat
+        <SummaryStat
+          label="На реализации сейчас"
+          value={formatMoney(coverage.consignment_outstanding.pending_kopecks)}
+          note={`отгружено ${formatMoney(
+            coverage.consignment_outstanding.shipped_kopecks
+          )} · продано отчётами ${formatMoney(
+            coverage.consignment_outstanding.reported_kopecks
+          )}`}
+          explain={
+            <Explain>
+              Столько лежит у комиссионеров прямо сейчас: отгружено
+              по договорам комиссии минус подтверждено отчётами. На эту сумму
+              «Прибыльность» отстаёт от отгрузочных страниц <b>в целом</b>,
+              и <b>обе цифры верны</b>: товар отгружен, но продажей
+              становится с приходом отчёта.
+              <br />
+              <br />
+              Число <b>за всё время и по всем каналам</b> — с выручкой слева
+              его вычитать нельзя. Периода у него нет намеренно: отчёт
+              приходит позже отгрузки, часто в следующем месяце, и «отгружено
+              за август» против «отчётов за август» сравнивало бы два разных
+              множества.
+            </Explain>
+          }
+        />
+        <SummaryStat
           label="Канал указан"
           value={`у ${coverage.shipments_count - coverage.unassigned_shipments_count} из ${coverage.shipments_count}`}
           note={unassignedNote(coverage)}
@@ -47,7 +73,7 @@ export function Coverage({ coverage }: { coverage: Coverage }) {
             </Explain>
           }
         />
-        <Stat
+        <SummaryStat
           label="Покупателей"
           value={String(coverage.buyers_count)}
           note="по выборке целиком, без повторов"
@@ -90,29 +116,4 @@ function unassignedNote(coverage: Coverage): string {
     return "канал заполнен у всех отгрузок"
   }
   return `${withPlural(coverage.unassigned_shipments_count, "отгрузка", "отгрузки", "отгрузок")} без канала на ${formatMoney(coverage.unassigned_revenue_kopecks)}`
-}
-
-function Stat({
-  label,
-  value,
-  note,
-  explain,
-}: {
-  label: string
-  value: string
-  note: string
-  explain: React.ReactNode
-}) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        {/* Подпись ужимается, значок объяснения — нет: без него расчётное
-            число остаётся числом без источника. */}
-        <span className="min-w-0 truncate">{label}</span>
-        {explain}
-      </div>
-      <div className="text-lg font-semibold tracking-tight tabular-nums">{value}</div>
-      <div className="text-xs text-muted-foreground">{note}</div>
-    </div>
-  )
 }

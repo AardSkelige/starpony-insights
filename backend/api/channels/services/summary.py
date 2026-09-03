@@ -11,6 +11,7 @@
 """
 
 from core.money import share
+from core.services import consignment
 
 
 def table_totals(rows: list[dict], selection_revenue: int) -> dict:
@@ -26,6 +27,16 @@ def table_totals(rows: list[dict], selection_revenue: int) -> dict:
         "shipments_count": sum(row["shipments_count"] for row in rows),
         "revenue_kopecks": revenue,
         "revenue_share": share(revenue, selection_revenue),
+        # Реализация в итоге считается по показанным строкам, как и выручка
+        # рядом: соседние числа обязаны быть об одном множестве. Оговорка
+        # над таблицей берётся отсюда — при поиске она сужается вместе
+        # со строками, а не остаётся про всю базу (`DESIGN.md` §8).
+        "consignment": consignment.share_of(
+            total_kopecks=revenue,
+            consignment_kopecks=sum(
+                row["consignment"].consignment_kopecks for row in rows
+            ),
+        ),
         # Покупатели и товары — через объединение, а не сложением колонки:
         # один покупатель приходит через несколько каналов, и сложение
         # посчитало бы его дважды. Итог обязан сходиться с числом строк

@@ -44,7 +44,20 @@ class MoySkladClient:
         token: str,
         *,
         base_url: str = BASE_URL,
-        timeout: float = 60.0,
+        # Два срока, а не один. Соединение либо устанавливается за секунды,
+        # либо не установится вовсе: ждать его минуту — значит умножать
+        # чужую аварию на три попытки и на девять сущностей.
+        #
+        # Проверено 03.09: API МойСклада перестал принимать соединения
+        # (порт 443 не отвечал, при живом online.moysklad.ru). С единым
+        # сроком в 60 с прогон «Обновить» растянулся бы на 27 минут вместо
+        # четырёх с половиной — и вылез за срок, после которого кнопка
+        # считает прогон брошенным, то есть соврал бы про своё состояние.
+        #
+        # Чтение остаётся долгим: отчёт прибыльности за квартал считается
+        # на их стороне минуту и это нормально.
+        connect_timeout: float = 10.0,
+        read_timeout: float = 60.0,
         max_attempts: int = 3,
         session: requests.Session | None = None,
         sleep=time.sleep,
@@ -53,7 +66,7 @@ class MoySkladClient:
             raise ValueError("Токен МойСклада обязателен")
 
         self._base_url = base_url.rstrip("/")
-        self._timeout = timeout
+        self._timeout = (connect_timeout, read_timeout)
         self._max_attempts = max_attempts
         self._sleep = sleep
         self._limiter = RateLimiter()

@@ -16,9 +16,26 @@ class User(AbstractUser, DomainModel):
 
     backup_group = BackupGroup.HUMAN
 
+    # Подпись под именем в сайдбаре. Пустая — и там остаётся «Сотрудник»
+    # или «Полный доступ»: подпись, собранная из прав, отвечает на вопрос,
+    # которого человек про себя не задаёт.
+    title = models.CharField("Должность", max_length=64, blank=True)
+
     class Meta:
         verbose_name = "Пользователь"
         verbose_name_plural = "Пользователи"
+
+    @property
+    def sidebar_title(self) -> str:
+        """Что стоит под именем в меню.
+
+        Должность важнее прав: «Хранитель остатков» человек про себя
+        узнаёт, а «Полный доступ» — нет. Права остаются запасным вариантом,
+        пока должность не заполнена.
+        """
+        if self.title:
+            return self.title
+        return "Полный доступ" if self.is_superuser else "Сотрудник"
 
 
 class UserPageAccess(DomainModel):
@@ -47,8 +64,11 @@ class UserPageAccess(DomainModel):
     )
 
     class Meta:
-        verbose_name = "Доступ к странице"
-        verbose_name_plural = "Доступы к страницам"
+        # В админке отдельным пунктом не показывается: выдают галочками
+        # в карточке человека, и там же видно выданное. Второй список
+        # с теми же строками — лишний пункт меню, а не ответ на вопрос.
+        verbose_name = "Выданный доступ"
+        verbose_name_plural = "Выданные доступы"
         constraints = [
             models.UniqueConstraint(fields=["user", "page_key"], name="unique_user_page"),
         ]

@@ -47,7 +47,7 @@ class SyncRun(DomainModel):
 
     class Meta:
         verbose_name = "Прогон синхронизации"
-        verbose_name_plural = "Прогоны синхронизации"
+        verbose_name_plural = "Синхронизация с МойСкладом"
         indexes = [models.Index(fields=["kind", "-started_at"])]
 
     def __str__(self) -> str:

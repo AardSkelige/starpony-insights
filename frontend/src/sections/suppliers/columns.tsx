@@ -114,7 +114,7 @@ export const COLUMNS: Column<SupplierRow>[] = [
   },
   {
     key: "materials",
-    label: "Наимен.",
+    label: "Наименований",
     cardLabel: "Наименований",
     numeric: true,
     sortKey: "materials",

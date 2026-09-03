@@ -23,7 +23,8 @@ from enum import StrEnum
 from django.db.models import F, QuerySet
 
 from core.dates import local_date, today as local_today
-from core.models import ContractType, Document, DocumentKind
+from core.models import Document, DocumentKind
+from core.services import consignment
 
 # За сколько дней до срока считать оплату «скоро истекает». Три дня —
 # как было в прежнем демоне: столько занимает банковский перевод,
@@ -112,19 +113,6 @@ def deferral_for(document: Document) -> tuple[int | None, str]:
     return None, ""
 
 
-def is_commission_shipment(document: Document) -> bool:
-    """Отгрузка по договору комиссии — товар ушёл на реализацию.
-
-    Только отгрузка: сам отчёт комиссионера тоже идёт по договору комиссии,
-    и исключать его нельзя — именно он и есть долг.
-    """
-    return (
-        document.kind == DocumentKind.DEMAND
-        and document.contract is not None
-        and document.contract.contract_type == ContractType.COMMISSION
-    )
-
-
 def classify(days_left: int | None) -> DebtGroup:
     if days_left is None:
         return DebtGroup.UNDATED
@@ -198,7 +186,7 @@ def debts(*, today: date | None = None) -> list[Debt]:
     rows = [
         debt_from(document, today=today)
         for document in unpaid_documents()
-        if not is_commission_shipment(document)
+        if not consignment.is_consignment(document)
     ]
 
     order = list(DebtGroup)
@@ -223,12 +211,20 @@ def consigned(*, today: date | None = None) -> list[Debt]:
     Отдельной функцией, а не флагом у `debts`: вызывающему нужно то или
     другое, и признак в сигнатуре означал бы, что где-то он выставлен
     наугад. На вопрос «где мои 452 696 ₽» отвечает эта функция.
+
+    **Оплата эту сторону не сужает.** `unpaid_documents` здесь не годится:
+    реализация — про товар, который лежит у комиссионера, а не про долг.
+    Появись у комиссионной отгрузки `payedSum` — МойСклад его не заполняет,
+    но и не запрещает, — она выпала бы отсюда целиком, а из вычитания
+    на «Каналах» нет, и одна подпись показала бы два числа. Поэтому
+    множество берётся общим запросом `consignment.shipments`.
     """
     today = today or local_today()
     return [
         debt_from(document, today=today)
-        for document in unpaid_documents()
-        if is_commission_shipment(document)
+        for document in consignment.shipments()
+        .select_related("agent", "contract", "sales_channel")
+        .order_by("moment")
     ]
 
 

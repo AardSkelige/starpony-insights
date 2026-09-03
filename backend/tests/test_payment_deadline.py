@@ -21,6 +21,7 @@ from core.models import (
     SyncKind,
     SyncRun,
 )
+from core.services import consignment
 from core.services.payment_deadline import (
     DebtGroup,
     consigned,
@@ -448,3 +449,22 @@ class TestConsigned:
         )
 
         assert consigned(today=TODAY) == []
+
+    def test_оплаченная_отгрузка_с_реализации_не_пропадает(
+        self, make_agent, make_contract, make_document
+    ):
+        """«Отгружено на реализацию» — про товар, а не про оплату.
+
+        Здесь и на «Каналах» одна подпись и обязано быть одно число.
+        Сузь эту сторону оплатой — и страницы разойдутся молча в тот день,
+        когда у комиссионной отгрузки впервые появится `payedSum`:
+        МойСклад его не заполняет, но запретить это ничто не мешает.
+        """
+        agent = make_agent()
+        contract = make_contract(agent, contract_type=ContractType.COMMISSION)
+        make_document(agent, contract=contract, total=400_000, paid=400_000)
+        make_document(agent, contract=contract, total=52_696, paid=20_000)
+
+        shipped = sum(row.document.total_kopecks for row in consigned(today=TODAY))
+        assert shipped == 452_696
+        assert shipped == consignment.outstanding().shipped_kopecks

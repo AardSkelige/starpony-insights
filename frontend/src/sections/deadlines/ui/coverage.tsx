@@ -1,6 +1,7 @@
 import type { Deadlines } from "@/sections/deadlines/api"
 import { CollapsibleNote } from "@/shared/components/collapsible-note"
 import { Explain } from "@/shared/components/explain"
+import { SummaryStat } from "@/shared/components/summary-stat"
 import { formatMoney } from "@/shared/lib/format"
 import { withPlural } from "@/shared/lib/plural"
 
@@ -22,7 +23,7 @@ export function Coverage({ coverage }: { coverage: Coverage }) {
   return (
     <CollapsibleNote title="Вся картина расчётов" headline={headline(coverage)}>
       <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
-        <Stat
+        <SummaryStat
           label="Нам должны"
           value={formatMoney(coverage.debt_kopecks)}
           note={`${withPlural(coverage.counterparties_count, "контрагент", "контрагента", "контрагентов")} · ${withPlural(coverage.documents_count, "документ", "документа", "документов")}`}
@@ -34,7 +35,7 @@ export function Coverage({ coverage }: { coverage: Coverage }) {
             </Explain>
           }
         />
-        <Stat
+        <SummaryStat
           label="Ждём выплату площадки"
           value={formatMoney(coverage.marketplace_kopecks)}
           note={`${withPlural(coverage.marketplaces_count, "площадка", "площадки", "площадок")} · ${withPlural(coverage.marketplace_documents_count, "документ", "документа", "документов")}`}
@@ -49,7 +50,7 @@ export function Coverage({ coverage }: { coverage: Coverage }) {
             </Explain>
           }
         />
-        <Stat
+        <SummaryStat
           label="Товар на реализации"
           value={formatMoney(coverage.consignment_kopecks)}
           note={`${withPlural(coverage.consignment_count, "отгрузка", "отгрузки", "отгрузок")} · ${withPlural(coverage.consignment_counterparties_count, "комиссионер", "комиссионера", "комиссионеров")}`}
@@ -121,44 +122,5 @@ function deferralNote(coverage: Coverage): string {
   return (
     `Отсрочка задана у ${coverage.with_deferral_count} из ${coverage.counterparties_total} контрагентов. ` +
     "У остальных срок оплаты посчитать не из чего — там показан возраст долга."
-  )
-}
-
-function Stat({
-  label,
-  value,
-  note,
-  explain,
-  quiet = false,
-}: {
-  label: string
-  value: string
-  note: string
-  explain: React.ReactNode
-  /**
-   * Число приглушено: это не долг, а деньги, которые придут сами.
-   * Набери их наравне с дебиторкой — и глаз сложит все три.
-   */
-  quiet?: boolean
-}) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        {/* Подпись ужимается, значок объяснения — нет: без него расчётное
-            число остаётся числом без источника. */}
-        <span className="min-w-0 truncate">{label}</span>
-        {explain}
-      </div>
-      <div
-        className={
-          quiet
-            ? "text-lg font-medium tracking-tight text-muted-foreground tabular-nums"
-            : "text-lg font-semibold tracking-tight tabular-nums"
-        }
-      >
-        {value}
-      </div>
-      <div className="text-xs text-muted-foreground">{note}</div>
-    </div>
   )
 }

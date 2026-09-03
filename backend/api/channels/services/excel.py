@@ -30,6 +30,10 @@ COLUMNS: tuple[tuple[str, int, str], ...] = (
     ("Отгрузок", 10, "shipments"),
     ("В том числе даром", 18, "free"),
     ("Выручка, ₽", 16, "revenue"),
+    # Рядом с выручкой: полосы-оговорки в файле нет, а сложить колонку
+    # «Выручка» сводной таблицей — первое, что с этим файлом делают.
+    # У «Точки продаж» так сложились бы 87 % чужого товара.
+    ("Из них на реализации, ₽", 22, "consignment"),
     ("Доля в выручке", 16, "share"),
     ("Средний чек, ₽", 16, "receipt"),
     ("Разброс чека, ₽", 24, "receipt_span"),
@@ -49,6 +53,7 @@ SHIPMENT_COLUMNS: tuple[tuple[str, int, str], ...] = (
 
 FORMATS = {
     "revenue": MONEY,
+    "consignment": MONEY,
     "receipt": MONEY,
     "share": SHARE,
     "amount": MONEY,
@@ -78,6 +83,7 @@ def build(filters: service.Filters) -> BytesIO:
                 "shipments": row["shipments_count"],
                 "free": row["receipt"].free_shipments,
                 "revenue": rubles(row["revenue_kopecks"]),
+                "consignment": rubles(row["consignment"].consignment_kopecks),
                 "share": float(row["revenue_share"]) if row["revenue_share"] else None,
                 "receipt": rubles(row["receipt"].kopecks),
                 "receipt_span": span(row["receipt"]),
@@ -93,6 +99,9 @@ def build(filters: service.Filters) -> BytesIO:
             "name": "Итого",
             "shipments": whole["totals"]["shipments_count"],
             "revenue": rubles(whole["totals"]["revenue_kopecks"]),
+            "consignment": rubles(
+                whole["totals"]["consignment"].consignment_kopecks
+            ),
             "share": float(whole["totals"]["revenue_share"])
             if whole["totals"]["revenue_share"]
             else None,

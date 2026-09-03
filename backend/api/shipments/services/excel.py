@@ -23,6 +23,11 @@ COLUMNS: tuple[tuple[str, int, str], ...] = (
     ("Продано", 12, "quantity"),
     ("в т.ч. даром", 13, "free_quantity"),
     ("Выручка, ₽", 15, "revenue"),
+    # Рядом с выручкой, а не в конце: в файле оговорка полосой не показывается,
+    # и число, стоящее через шесть колонок, к выручке уже не относят. Столбец
+    # сложится сводной таблицей — ровно там, где иначе всю выручку сложили бы
+    # как заработанную.
+    ("Из них на реализации, ₽", 22, "consignment"),
     ("Средняя цена продажи, ₽", 22, "avg_price"),
     ("Без учёта бесплатных, ₽", 22, "avg_price_paid"),
     ("Доля в выручке", 15, "share"),
@@ -41,6 +46,7 @@ FORMATS = {
     "quantity": QUANTITY,
     "free_quantity": QUANTITY,
     "revenue": MONEY,
+    "consignment": MONEY,
     "avg_price": MONEY,
     "avg_price_paid": MONEY,
     "share": SHARE,
@@ -70,6 +76,7 @@ def _cells(row: dict) -> dict:
         "quantity": float(row["quantity"]),
         "free_quantity": float(row["free_quantity"]),
         "revenue": rubles(row["revenue_kopecks"]),
+        "consignment": rubles(row["consignment"].consignment_kopecks),
         "avg_price": rubles(row["avg_price_kopecks"]),
         "avg_price_paid": rubles(row["avg_price_paid_kopecks"]),
         "share": float(row["revenue_share"]) if row["revenue_share"] is not None else None,
@@ -106,5 +113,6 @@ def _totals_row(totals: dict) -> dict:
         "quantity": float(totals["quantity"]),
         "free_quantity": float(totals["free_quantity"]),
         "revenue": rubles(totals["revenue_kopecks"]),
+        "consignment": rubles(totals["consignment"].consignment_kopecks),
         "documents_count": totals["documents_count"],
     }

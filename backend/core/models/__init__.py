@@ -1,5 +1,6 @@
 from core.models.base import BackupGroup, DomainModel, models_by_backup_group
 from core.models.access import User, UserPageAccess
+from core.models.backup import BackupRun, BackupStatus
 from core.models.catalog import Product, ProductKind, Uom
 from core.models.contract import Contract, ContractType
 from core.models.counterparty import Counterparty, SalesChannel
@@ -43,6 +44,8 @@ __all__ = [
     "SyncKind",
     "SyncRun",
     "SyncStatus",
+    "BackupRun",
+    "BackupStatus",
     "WritebackChange",
     "WritebackKind",
     "WritebackRun",

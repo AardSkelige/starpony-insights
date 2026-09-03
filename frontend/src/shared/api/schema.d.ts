@@ -659,6 +659,7 @@ export interface components {
             revenue_kopecks: number;
             /** Format: decimal */
             revenue_share: string | null;
+            consignment: components["schemas"]["ConsignmentShare"];
             shipments_count: number;
             /** Format: decimal */
             shipments_share: string | null;
@@ -706,6 +707,7 @@ export interface components {
             unassigned_shipments_count: number;
             unassigned_revenue_kopecks: number;
             free_shipments_count: number;
+            consignment_outstanding: components["schemas"]["ConsignmentOutstanding"];
             buyers_count: number;
             products_count: number;
         };
@@ -716,6 +718,7 @@ export interface components {
             revenue_kopecks: number;
             /** Format: decimal */
             revenue_share: string | null;
+            consignment: components["schemas"]["ConsignmentShare"];
             buyers_count: number;
             products_count: number;
         };
@@ -732,6 +735,51 @@ export interface components {
             contracts: string[];
             /** Format: date */
             first_moment: string | null;
+        };
+        /**
+         * @description Вся картина реализации — состояние на сегодня, а не итог периода.
+         *
+         *     Ради одного вычитания: отгружено на реализацию минус подтверждено
+         *     отчётами комиссионера = столько лежит у комиссионеров прямо сейчас.
+         *     Это и есть сумма, на которую «Прибыльность» отстаёт от отгрузочных
+         *     страниц; увидев её, человек перестаёт считать расхождение сбоем расчёта.
+         *
+         *     Один тип на «Каналы продаж» и «Товары в отгрузках»: вычитание у них
+         *     одно и то же, и разойтись оно не имеет права — на «Прибыльности»
+         *     с ним сверяют обе страницы.
+         *
+         *     **Периода здесь нет намеренно** — почему, написано в
+         *     `core/services/consignment.py`.
+         */
+        ConsignmentOutstanding: {
+            shipped_kopecks: number;
+            reported_kopecks: number;
+            pending_kopecks: number;
+        };
+        /**
+         * @description Сколько из показанной выручки — товар на реализации, а не продажа.
+         *
+         *     Один тип на «Каналы продаж» и «Товары в отгрузках»: вопрос у них разный —
+         *     «на чём держится канал» и «сколько продали этого товара», — а оговорка
+         *     одна, и разойтись она не имеет права.
+         *
+         *     **Оговорка не косметическая.** По договору комиссии товар уходит
+         *     комиссионеру на склад и становится продажей только с приходом отчёта;
+         *     до этого он может вернуться. У «Точки продаж» так 87 % выручки,
+         *     у Telegram 97 % — вывод «канал приносит больше всех» держится на складе
+         *     комиссионера.
+         *
+         *     **Это не размер расхождения с «Прибыльностью».** Здесь вся реализация
+         *     показанной выборки (452 696 ₽ на 03.09), а расходятся страницы на её
+         *     непокрытую отчётами часть за всё время (281 126 ₽) — её считает
+         *     `consignment.outstanding`, и живёт она в сводке под таблицей.
+         */
+        ConsignmentShare: {
+            total_kopecks: number;
+            consignment_kopecks: number;
+            /** Format: decimal */
+            fraction: string | null;
+            tone: string;
         };
         Csrf: {
             csrfToken: string;
@@ -1136,6 +1184,7 @@ export interface components {
             id: number;
             username: string;
             full_name: string;
+            title: string;
             is_superuser: boolean;
             pages: components["schemas"]["Page"][];
         };
@@ -1423,8 +1472,27 @@ export interface components {
             synced_at: string | null;
             count: number;
             totals: components["schemas"]["ShipmentProductsTotals"];
+            coverage: components["schemas"]["ShipmentProductsCoverage"];
             results: components["schemas"]["ShipmentProductRow"][];
             channels: components["schemas"]["FilterOption"][];
+        };
+        /**
+         * @description Сводка и охват расчёта: про выборку целиком, а не про найденное.
+         *
+         *     Отдельный тип от итогов, потому что и множества разные. Итог — то, что
+         *     в таблице видно, и он сужается поиском; сводка — период и канал целиком.
+         *     Один тип на двоих означал бы, что где-то их подставят наугад.
+         */
+        ShipmentProductsCoverage: {
+            revenue_kopecks: number;
+            documents_revenue_kopecks: number;
+            positions_count: number;
+            free_positions_count: number;
+            free_value_kopecks: number;
+            free_unpriced_products_count: number;
+            products_count: number;
+            documents_count: number;
+            consignment_outstanding: components["schemas"]["ConsignmentOutstanding"];
         };
         ShipmentProductsTotals: {
             /** Format: decimal */
@@ -1432,6 +1500,7 @@ export interface components {
             /** Format: decimal */
             free_quantity: string;
             revenue_kopecks: number;
+            consignment: components["schemas"]["ConsignmentShare"];
             documents_count: number;
             products_count: number;
             /** Format: decimal */

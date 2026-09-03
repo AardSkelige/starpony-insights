@@ -229,7 +229,10 @@ def _consignment(today) -> dict:
     rows = consigned(today=today)
     return {
         "count": len(rows),
-        "debt_kopecks": sum(debt.debt_kopecks for debt in rows),
+        # Сумма документов, а не остаток к оплате: подпись «Товар
+        # на реализации» — про отгруженное, и это то же число, которое
+        # «Каналы продаж» вычитают в своей сводке.
+        "debt_kopecks": sum(debt.document.total_kopecks for debt in rows),
         "counterparties_count": len({debt.document.agent_id for debt in rows}),
     }
 

@@ -2,7 +2,12 @@
 
 from rest_framework import serializers
 
-from api.common.serializers import FilterOptionSerializer, StockSerializer
+from api.common.serializers import (
+    ConsignmentOutstandingSerializer,
+    ConsignmentShareSerializer,
+    FilterOptionSerializer,
+    StockSerializer,
+)
 from api.shipments.serializers.common import ShipmentQuerySerializer
 from api.shipments.services.products import DEFAULT_ORDERING, ORDERING
 
@@ -42,6 +47,7 @@ class ShipmentProductsTotalsSerializer(serializers.Serializer):
     quantity = serializers.DecimalField(max_digits=18, decimal_places=3)
     free_quantity = serializers.DecimalField(max_digits=18, decimal_places=3)
     revenue_kopecks = serializers.IntegerField()
+    consignment = ConsignmentShareSerializer()
     documents_count = serializers.IntegerField()
     products_count = serializers.IntegerField()
     # Сколько показанное занимает в выручке выборки. Без поиска это ровно
@@ -129,12 +135,41 @@ class ShipmentProductDetailSerializer(serializers.Serializer):
     stock = StockSerializer(allow_null=True)
 
 
+class ShipmentProductsCoverageSerializer(serializers.Serializer):
+    """Сводка и охват расчёта: про выборку целиком, а не про найденное.
+
+    Отдельный тип от итогов, потому что и множества разные. Итог — то, что
+    в таблице видно, и он сужается поиском; сводка — период и канал целиком.
+    Один тип на двоих означал бы, что где-то их подставят наугад.
+    """
+
+    revenue_kopecks = serializers.IntegerField()
+    # Сумма самих отгрузок выборки — независимый свидетель. Сходится
+    # с выручкой по позициям до копейки, пока синхронизация ничего
+    # не потеряла; разойдись они — это и есть та самая тихая потеря,
+    # которую больше негде увидеть (`CLAUDE.md` §9).
+    documents_revenue_kopecks = serializers.IntegerField()
+    positions_count = serializers.IntegerField()
+    free_positions_count = serializers.IntegerField()
+    # Во что обошлась раздача: количество, отданное даром, по средней цене
+    # платных продаж того же товара. «266 позиций» — честное число, которое
+    # ничего не говорит, пока не переведено в деньги (`CLAUDE.md` §8.0).
+    free_value_kopecks = serializers.IntegerField()
+    # Товары, которые только раздавали: цены у них в этой выборке нет,
+    # и в сумму слева они не вошли. Молчание об этом было бы занижением.
+    free_unpriced_products_count = serializers.IntegerField()
+    products_count = serializers.IntegerField()
+    documents_count = serializers.IntegerField()
+    consignment_outstanding = ConsignmentOutstandingSerializer()
+
+
 class ShipmentProductsSerializer(serializers.Serializer):
     # Отметка «данные на 14:32» — часть ответа, а не украшение шапки:
     # без неё человек не отличит свежие числа от вчерашних.
     synced_at = serializers.DateTimeField(allow_null=True)
     count = serializers.IntegerField()
     totals = ShipmentProductsTotalsSerializer()
+    coverage = ShipmentProductsCoverageSerializer()
     results = ShipmentProductRowSerializer(many=True)
     # Наполнение фильтра приходит вместе с данными: своего запроса за девятью
     # значениями фронт не делает, и список не может разойтись с выборкой.

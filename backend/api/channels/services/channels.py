@@ -26,6 +26,7 @@ from api.channels.services import (
 )
 from api.common.selection import page_bounds
 from core.money import share
+from core.services import consignment
 from core.services.documents import positions_in
 
 # Сортировки, разрешённые снаружи. Список закрытый — как у соседних страниц.
@@ -64,6 +65,11 @@ def row_of(
 
         "shipments_count": len(shipments),
         "revenue_kopecks": sum(shipment.total_kopecks for shipment in shipments),
+
+        # Сколько из выручки канала — товар на реализации, а не продажа.
+        # У «Точки продаж» это 87 %, у Telegram 97 %: вывод «канал приносит
+        # больше всех» без этого числа держится на складе комиссионера.
+        "consignment": _consignment_of(shipments),
 
         "first_moment": moments[0],
         "last_moment": moments[-1],
@@ -254,6 +260,11 @@ def _standings(rows: list[dict]) -> list[dict]:
             "slot": row["slot"],
             "revenue_kopecks": row["revenue_kopecks"],
             "revenue_share": share(row["revenue_kopecks"], revenue),
+            # Та же оговорка, что в строке таблицы: полосы отвечают на «кто
+            # приносит больше», и у «Точки продаж» 87 % её денег — товар,
+            # который ещё не продан. Без пометки длина полосы врёт сильнее
+            # всего именно здесь, потому что на неё и смотрят первой.
+            "consignment": row["consignment"],
             "shipments_count": row["shipments_count"],
             "shipments_share": share(row["shipments_count"], shipments),
         }
@@ -272,7 +283,35 @@ def page(filters: Filters) -> dict:
         "count": len(rows),
         "standings": whole["standings"],
         "totals": whole["totals"],
-        "coverage": whole["coverage"],
+        # Сверка с «Прибыльностью» — **состояние на сегодня, а не итог
+        # периода**: отчёт комиссионера приходит позже отгрузки, часто
+        # в следующем месяце, и «отгружено за август» против «отчётов
+        # за август» сравнивало бы два разных множества (`DESIGN.md` §8).
+        #
+        # Считается здесь, а не в `prepared`: это карточка экрана, и двух
+        # полнотабличных запросов ради выгрузки, где её нет, платить незачем.
+        "coverage": {
+            **whole["coverage"],
+            "consignment_outstanding": consignment.outstanding(),
+        },
         "dynamics": whole["dynamics"],
         "results": rows[start:end],
     }
+
+
+def _consignment_of(shipments: list) -> consignment.Share:
+    """Доля реализации в выручке канала.
+
+    Считается в Python, как и вся строка: документы уже загружены,
+    и второй запрос ради того же множества был бы тратой. Условие при этом
+    общее с «Товарами в отгрузках» (`core.services.consignment`), где
+    группировка идёт запросом.
+    """
+    return consignment.share_of(
+        total_kopecks=sum(shipment.total_kopecks for shipment in shipments),
+        consignment_kopecks=sum(
+            shipment.total_kopecks
+            for shipment in shipments
+            if consignment.is_consignment(shipment)
+        ),
+    )

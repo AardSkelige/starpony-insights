@@ -11,8 +11,8 @@
 отображение.
 """
 
-from dataclasses import dataclass, replace
-from decimal import Decimal
+from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.db.models import (
     Count,
@@ -30,6 +30,7 @@ from api.common.selection import matching, page_bounds
 from api.shipments.services import selection
 from core.models import DocumentPosition
 from core.money import share
+from core.services import consignment
 
 # Имена аннотаций намеренно не совпадают с именами полей. `annotate(quantity=…)`
 # перекрывает поле `quantity`, и следующая же агрегация по нему падает
@@ -37,6 +38,10 @@ from core.money import share
 QTY = "qty"
 QTY_FREE = "qty_free"
 REVENUE = "revenue"
+# Из выручки — товар на реализации: отгружен по договору комиссии, но продажей
+# станет с приходом отчёта комиссионера. Без этого числа «Прибыльность»
+# и эта страница расходятся на 281 126 ₽ (03.09), и обе цифры верны.
+CONSIGNMENT = "consignment"
 DOCS = "docs"
 AVG = "avg_price"
 
@@ -102,6 +107,12 @@ def _sums() -> dict:
             output_field=_QUANTITY,
         ),
         REVENUE: Coalesce(Sum("total_kopecks"), Value(0)),
+        # Тем же агрегатом, что и выручка: разойдись они, доля реализации
+        # считалась бы от одного множества, а сама выручка от другого.
+        CONSIGNMENT: Coalesce(
+            Sum("total_kopecks", filter=consignment.where("document__")),
+            Value(0),
+        ),
         DOCS: Count("document", distinct=True),
     }
 
@@ -147,6 +158,9 @@ def summary(filters: Filters) -> dict:
         "quantity": totals[QTY],
         "free_quantity": totals[QTY_FREE],
         "revenue_kopecks": totals[REVENUE],
+        # Итог по выборке: оговорка над таблицей считается отсюда, а не
+        # складыванием строк — при разбиении на страницы строк видно десять.
+        "consignment": consignment.share_of(totals[REVENUE], totals[CONSIGNMENT]),
         "documents_count": totals[DOCS],
         "products_count": totals["products_count"],
     }
@@ -193,13 +207,12 @@ def page(filters: Filters) -> dict:
     # импортирует, — и локальное имя перекрыло бы его внутри функции.
     chosen = grouped(filters)
     totals = summary(filters)
-    # Знаменатель доли — выручка без поиска. Отдельный проход стоит одного
-    # агрегата и только когда поиск задан.
-    denominator = (
-        summary(replace(filters, search=""))["revenue_kopecks"]
-        if filters.search
-        else totals["revenue_kopecks"]
-    )
+    whole = coverage(filters)
+    # Знаменатель доли — выручка выборки без поиска, и это ровно то, что
+    # уже посчитала сводка: тот же отбор, тот же агрегат. Отдельный проход
+    # `summary(replace(filters, search=""))` был вторым обходом всех позиций
+    # за тем же числом.
+    denominator = whole["revenue_kopecks"] if filters.search else totals["revenue_kopecks"]
 
     start, end = page_bounds(filters.page, filters.page_size)
     visible = list(chosen[start:end])
@@ -207,8 +220,103 @@ def page(filters: Filters) -> dict:
     return {
         "count": chosen.count(),
         "totals": {**totals, "revenue_share": share(totals["revenue_kopecks"], denominator)},
+        "coverage": whole,
         "results": [row_of(item, denominator) for item in visible],
     }
+
+
+def coverage(filters: Filters) -> dict:
+    """Сводка и охват расчёта — про выборку целиком, **без поиска**.
+
+    Соседняя с итогом величина, и путать их нельзя. Итог под таблицей считает
+    показанное и обязан сходиться со сложением колонки; сводка описывает
+    период и канал целиком. Смешай их — получится дробь, где числитель
+    от найденного, а знаменатель от всего: она выглядит обычным числом
+    и врёт молча (`DESIGN.md` §8).
+
+    Три вопроса, и все три страница иначе оставляет без ответа:
+
+    - **сколько всего продано** — выручка выборки, а не найденного;
+    - **всё ли доехало** — сумма позиций против суммы самих документов:
+      расходятся они ровно тогда, когда синхронизация потеряла строку,
+      и это единственное место, где потеря видна (`CLAUDE.md` §9);
+    - **сколько из этого ещё не продано** — вычитание по товару
+      на реализации, то же самое, что на «Каналах продаж».
+    """
+    chosen = selection.shipment_positions(
+        date_from=filters.date_from,
+        date_to=filters.date_to,
+        channel_id=filters.channel_id,
+    )
+    totals = chosen.aggregate(
+        revenue_kopecks=Coalesce(Sum("total_kopecks"), Value(0)),
+        positions_count=Count("id"),
+        # Позиции с нулевой суммой: подарки, образцы, призы. Товар со склада
+        # ушёл, в выручку не попал — без этого числа выручка выглядит
+        # заниженной, и объяснить это нечем.
+        free_positions_count=Count("id", filter=Q(total_kopecks=0)),
+        products_count=Count("product", distinct=True),
+        documents_count=Count("document", distinct=True),
+    )
+    free_value_kopecks, unpriced = _free_value(chosen)
+    documents_revenue = selection.demands(
+        date_from=filters.date_from,
+        date_to=filters.date_to,
+        channel_id=filters.channel_id,
+    ).aggregate(total=Coalesce(Sum("total_kopecks"), Value(0)))["total"]
+
+    return {
+        **totals,
+        "free_value_kopecks": free_value_kopecks,
+        "free_unpriced_products_count": unpriced,
+        "documents_revenue_kopecks": documents_revenue,
+        # Состояние на сегодня, а не итог периода: отчёт комиссионера приходит
+        # позже отгрузки, часто в следующем месяце, и «отгружено за август»
+        # против «отчётов за август» сравнивало бы два разных множества.
+        # Считается здесь, а не в `summary`: выгрузке этот блок не нужен,
+        # и платить за два полнотабличных запроса ради файла незачем.
+        "consignment_outstanding": consignment.outstanding(),
+    }
+
+
+def _free_value(positions: QuerySet[DocumentPosition]) -> tuple[int, int]:
+    """Во сколько обошлась раздача — и сколько товаров оценить не удалось.
+
+    «266 позиций даром» — честное число, которое ничего не говорит: раздача
+    на сорок тысяч и на четыреста — разные разговоры (`CLAUDE.md` §8.0).
+    Здесь она переводится в деньги.
+
+    **Цена — своя у каждого товара, средняя по платным продажам этой же
+    выборки.** Не общая средняя по чеку: раздают дешёвое и дорогое в разной
+    пропорции, и одна цена на всех дала бы число, которое ни на что
+    не опирается.
+
+    **Товар, который только раздавали, оценить нечем**, и придумывать ему
+    цену нельзя. Такие считаются отдельно, и их число идёт рядом с суммой:
+    «оценить нечем ещё три» — это ответ, а молчание — занижение.
+
+    Считается в `Decimal` и округляется **один раз, в конце**: цена штуки
+    бывает долями копейки, и округление на каждом товаре накопило бы ошибку
+    (`CLAUDE.md` §3).
+    """
+    value = Decimal(0)
+    unpriced = 0
+
+    for item in positions.values("product_id").annotate(**_sums()):
+        free: Decimal = item[QTY_FREE]
+        if free <= 0:
+            continue
+
+        paid_quantity: Decimal = item[QTY] - free
+        if paid_quantity <= 0:
+            # Товар уходил только даром: платной продажи, из которой взялась
+            # бы цена, в этой выборке нет вовсе.
+            unpriced += 1
+            continue
+
+        value += free * Decimal(item[REVENUE]) / paid_quantity
+
+    return int(value.quantize(Decimal(1), rounding=ROUND_HALF_UP)), unpriced
 
 
 def rows(filters: Filters) -> tuple[list[dict], int, int]:
@@ -232,6 +340,9 @@ def row_of(item: dict, total_revenue: int) -> dict:
         "quantity": quantity,
         "free_quantity": free,
         "revenue_kopecks": revenue,
+        # Сколько из выручки товара — реализация. По комиссии уходили 45
+        # товаров из 66: у части это почти вся их выручка.
+        "consignment": consignment.share_of(revenue, item[CONSIGNMENT]),
         "documents_count": item[DOCS],
         # Расчётные. None вместо нуля там, где делить не на что: ноль читался бы
         # как «товар отдавали бесплатно», а на деле цены просто нет.

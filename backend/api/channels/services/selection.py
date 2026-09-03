@@ -52,5 +52,11 @@ def demands(
     быть посчитаны: иначе итог страницы разойдётся с учётом на эту одну,
     и объяснить расхождение будет нечем.
     """
-    queryset = alive(DocumentKind.DEMAND).select_related("sales_channel", "agent")
+    queryset = alive(DocumentKind.DEMAND).select_related(
+        "sales_channel", "agent",
+        # Договор — ради различия «продано» и «отгружено на реализацию».
+        # Без него `is_consignment` делал бы запрос на каждую из 328
+        # отгрузок: не падение, а тихая трата, видимая только в счётчике.
+        "contract",
+    )
     return selection.within(queryset, date_from, date_to, field="moment")

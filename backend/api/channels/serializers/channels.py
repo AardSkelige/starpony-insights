@@ -14,7 +14,11 @@
 from rest_framework import serializers
 
 from api.channels.services.channels import DEFAULT_ORDERING, ORDERING
-from api.common.serializers import SelectionQuerySerializer
+from api.common.serializers import (
+    ConsignmentOutstandingSerializer,
+    ConsignmentShareSerializer,
+    SelectionQuerySerializer,
+)
 
 
 class ChannelsQuerySerializer(SelectionQuerySerializer):
@@ -152,6 +156,7 @@ class ChannelStandingSerializer(serializers.Serializer):
     revenue_share = serializers.DecimalField(
         max_digits=9, decimal_places=8, allow_null=True
     )
+    consignment = ConsignmentShareSerializer()
     shipments_count = serializers.IntegerField()
     # Доля в отгрузках. Расхождение с долей в деньгах — вопрос, ради которого
     # страницу открывают: канал берёт чеком или числом.
@@ -169,6 +174,7 @@ class ChannelsTotalsSerializer(serializers.Serializer):
     revenue_share = serializers.DecimalField(
         max_digits=9, decimal_places=8, allow_null=True
     )
+    consignment = ConsignmentShareSerializer()
     # Через объединение, а не сложением колонки: один покупатель приходит
     # через несколько каналов и был бы посчитан дважды.
     buyers_count = serializers.IntegerField()
@@ -188,6 +194,7 @@ class ChannelsCoverageSerializer(serializers.Serializer):
     # Отгрузки, ушедшие даром: 46 из 306. Без них нулевая медиана чека
     # у двух каналов выглядит сбоем расчёта.
     free_shipments_count = serializers.IntegerField()
+    consignment_outstanding = ConsignmentOutstandingSerializer()
     buyers_count = serializers.IntegerField()
     products_count = serializers.IntegerField()
 

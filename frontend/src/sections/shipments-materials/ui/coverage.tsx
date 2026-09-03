@@ -4,6 +4,7 @@ import type {
 } from "@/sections/shipments-materials/api"
 import { CollapsibleNote } from "@/shared/components/collapsible-note"
 import { Explain } from "@/shared/components/explain"
+import { SummaryStat } from "@/shared/components/summary-stat"
 import { formatMoney, formatQuantity, formatShare } from "@/shared/lib/format"
 import { withPlural } from "@/shared/lib/plural"
 
@@ -35,7 +36,7 @@ export function Coverage({
   return (
     <CollapsibleNote title="Сводка и охват расчёта" headline={headline(coverage)}>
       <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
-        <Stat
+        <SummaryStat
           label="Стоимость сырья"
           value={formatMoney(coverage.cost_kopecks)}
           note={`из ${withPlural(coverage.materials_count, "материала", "материалов", "материалов")}, ${coverage.priced_count} с известной ценой`}
@@ -48,7 +49,7 @@ export function Coverage({
             </Explain>
           }
         />
-        <Stat
+        <SummaryStat
           label="Доля в выручке"
           value={formatShare(coverage.cost_share_of_revenue)}
           note={`${formatMoney(coverage.cost_kopecks)} из ${formatMoney(coverage.revenue_kopecks)}`}
@@ -61,7 +62,7 @@ export function Coverage({
             </Explain>
           }
         />
-        <Stat
+        <SummaryStat
           label="Развёрнуто по техкартам"
           value={`${coverage.exploded_products_count} из ${coverage.sold_products_count}`}
           note={coverageNote(coverage)}
@@ -98,31 +99,6 @@ function coverageNote(coverage: Coverage): string {
     parts.push(`у ${coverage.unpriced_count} нет цены`)
   }
   return parts.join(" · ")
-}
-
-function Stat({
-  label,
-  value,
-  note,
-  explain,
-}: {
-  label: string
-  value: string
-  note: string
-  explain: React.ReactNode
-}) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        {/* Подпись ужимается, значок объяснения — нет: без него расчётное
-            число остаётся числом без источника. */}
-        <span className="min-w-0 truncate">{label}</span>
-        {explain}
-      </div>
-      <div className="text-lg font-semibold tracking-tight tabular-nums">{value}</div>
-      <div className="text-xs text-muted-foreground">{note}</div>
-    </div>
-  )
 }
 
 /**

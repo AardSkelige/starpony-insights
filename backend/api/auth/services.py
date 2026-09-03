@@ -28,6 +28,9 @@ def profile(user) -> dict:
         "id": user.id,
         "username": user.username,
         "full_name": user.get_full_name() or user.username,
+        # Подпись под именем. Собирается на сервере, а не на фронтенде:
+        # правило «должность важнее прав» одно, и двух мест ему не нужно.
+        "title": user.sidebar_title,
         "is_superuser": user.is_superuser,
         "pages": [
             {"key": p.key, "label": p.label, "group": p.group, "route": p.route}

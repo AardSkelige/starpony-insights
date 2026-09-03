@@ -9,6 +9,7 @@ import { refreshNote, useRefresh, useSyncStatus } from "@/shared/api/sync"
 import { DataTable } from "@/shared/components/data-table"
 import { DetailDrawer } from "@/shared/components/detail-drawer"
 import { FiltersBar } from "@/shared/components/filters/bar"
+import { ConsignmentNote } from "@/shared/components/consignment"
 import { Page } from "@/shared/components/page"
 import { PageHeader } from "@/shared/components/page-header"
 import { TableFooter } from "@/shared/components/table-footer"
@@ -90,6 +91,12 @@ export function ChannelsPage() {
         searchPlaceholder={SEARCH_PLACEHOLDER}
         searchLabel={SEARCH_LABEL}
       />
+
+      {/* Единственное предупреждение страницы, которое не свёрнуто: без него
+          выручка читается как заработанная, а треть её — товар, отгруженный
+          на реализацию. Считается по показанному и сужается фильтрами
+          вместе со строками. */}
+      {data ? <ConsignmentNote share={data.totals.consignment} /> : null}
 
       <DataTable
         columns={COLUMNS}

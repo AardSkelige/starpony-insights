@@ -3,10 +3,12 @@ import { Radio } from "lucide-react"
 
 import { exportUrl, useShipmentProducts } from "@/sections/shipments-products/api"
 import { COLUMNS, SORT_KEYS, totalsFor } from "@/sections/shipments-products/columns"
+import { Coverage } from "@/sections/shipments-products/ui/coverage"
 import { RowDetail } from "@/sections/shipments-products/ui/row-detail"
 import { DataTable } from "@/shared/components/data-table"
 import { DetailDrawer } from "@/shared/components/detail-drawer"
 import { FiltersBar } from "@/shared/components/filters/bar"
+import { ConsignmentNote } from "@/shared/components/consignment"
 import { Page } from "@/shared/components/page"
 import { PageHeader } from "@/shared/components/page-header"
 import { refreshNote, useRefresh, useSyncStatus } from "@/shared/api/sync"
@@ -74,6 +76,12 @@ export function ShipmentProductsPage() {
         searchLabel="Поиск по товарам"
       />
 
+      {/* Единственное предупреждение страницы, которое не свёрнуто: без него
+          выручка читается как заработанная, а треть её — товар, отгруженный
+          на реализацию. Считается по показанному и сужается фильтрами
+          вместе со строками. */}
+      {data ? <ConsignmentNote share={data.totals.consignment} /> : null}
+
       <DataTable
         columns={COLUMNS}
         rows={rows}
@@ -121,6 +129,11 @@ export function ShipmentProductsPage() {
           onPageSize={table.setPageSize}
         />
       ) : null}
+
+      {/* Сводка — под таблицей и свёрнута, как на пяти соседних страницах:
+          они обязаны открываться одинаково. Числа здесь про выборку целиком,
+          а подвал считает показанное — поэтому блоки и разные. */}
+      {data ? <Coverage coverage={data.coverage} /> : null}
 
       {/* Панель деталей — для узкого экрана и телефона. На широком те же
           детали раскрываются прямо в строке.

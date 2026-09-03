@@ -26,6 +26,8 @@ class ProfileSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     username = serializers.CharField()
     full_name = serializers.CharField()
+    # Должность, а если её не заполнили — «Полный доступ» / «Сотрудник».
+    title = serializers.CharField()
     is_superuser = serializers.BooleanField()
     pages = PageSerializer(many=True)
 

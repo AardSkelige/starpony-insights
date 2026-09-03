@@ -17,6 +17,8 @@ import pytest
 from django.utils import timezone
 
 from core.models import (
+    Contract,
+    ContractType,
     Counterparty,
     Document,
     DocumentKind,
@@ -87,6 +89,24 @@ def buyer(make_buyer):
 
 
 @pytest.fixture
+def make_contract(run, buyer):
+    """Договор с контрагентом. По умолчанию комиссия — ради неё он и заведён."""
+    counter = {"n": 0}
+
+    def _make(agent=None, contract_type=ContractType.COMMISSION):
+        counter["n"] += 1
+        return Contract.objects.create(
+            ms_id=f"61000000-0000-0000-0000-{counter['n']:012d}",
+            name=f"{counter['n']:05d}",
+            contract_type=contract_type,
+            agent=agent or buyer,
+            last_seen_run=run,
+        )
+
+    return _make
+
+
+@pytest.fixture
 def make_product(run, piece):
     counter = {"n": 0}
 
@@ -115,6 +135,7 @@ def make_demand(run, channel, buyer):
         sales_channel=-1,
         agent=None,
         total_kopecks=100_000,
+        contract=None,
         deleted=False,
         applicable=True,
     ):
@@ -126,6 +147,7 @@ def make_demand(run, channel, buyer):
             moment=moment or moscow(2026, 5, 1),
             agent=agent or buyer,
             sales_channel=channel if sales_channel == -1 else sales_channel,
+            contract=contract,
             total_kopecks=total_kopecks,
             applicable=applicable,
             deleted_at=timezone.now() if deleted else None,

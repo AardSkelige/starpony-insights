@@ -1,6 +1,7 @@
 import type { Suppliers } from "@/sections/suppliers/api"
 import { CollapsibleNote } from "@/shared/components/collapsible-note"
 import { Explain } from "@/shared/components/explain"
+import { SummaryStat } from "@/shared/components/summary-stat"
 import { formatMoney } from "@/shared/lib/format"
 import { withPlural } from "@/shared/lib/plural"
 
@@ -22,7 +23,7 @@ export function Coverage({ coverage }: { coverage: Coverage }) {
   return (
     <CollapsibleNote title="Сводка и охват расчёта" headline={headline(coverage)}>
       <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
-        <Stat
+        <SummaryStat
           label="Сумма закупок"
           value={formatMoney(coverage.amount_kopecks)}
           note={`${withPlural(coverage.supplies_count, "приёмка", "приёмки", "приёмок")} · ${withPlural(coverage.materials_count, "наименование", "наименования", "наименований")}`}
@@ -35,7 +36,7 @@ export function Coverage({ coverage }: { coverage: Coverage }) {
             </Explain>
           }
         />
-        <Stat
+        <SummaryStat
           label="Ритм посчитан"
           value={`у ${coverage.with_regularity_count} из ${coverage.suppliers_count}`}
           note="у остальных поставка была одна"
@@ -47,7 +48,7 @@ export function Coverage({ coverage }: { coverage: Coverage }) {
             </Explain>
           }
         />
-        <Stat
+        <SummaryStat
           label="Срок посчитан"
           value={`у ${coverage.with_lead_time_count} из ${coverage.suppliers_count}`}
           note={leadNote(coverage)}
@@ -88,29 +89,4 @@ function leadNote(coverage: Coverage): string {
     return `${withPlural(coverage.unlinked_supplies_count, "приёмка", "приёмки", "приёмок")} без заказа`
   }
   return "связь «заказ → приёмка» у всех приёмок"
-}
-
-function Stat({
-  label,
-  value,
-  note,
-  explain,
-}: {
-  label: string
-  value: string
-  note: string
-  explain: React.ReactNode
-}) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        {/* Подпись ужимается, значок объяснения — нет: без него расчётное
-            число остаётся числом без источника. */}
-        <span className="min-w-0 truncate">{label}</span>
-        {explain}
-      </div>
-      <div className="text-lg font-semibold tracking-tight tabular-nums">{value}</div>
-      <div className="text-xs text-muted-foreground">{note}</div>
-    </div>
-  )
 }

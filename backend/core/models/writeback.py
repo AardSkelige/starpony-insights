@@ -24,7 +24,7 @@ from core.models.base import BackupGroup, DomainModel
 
 
 class WritebackKind(models.TextChoices):
-    COST_PRICES = "cost_prices", "Себестоимость → тип цены в карточке товара"
+    COST_PRICES = "cost_prices", "Проставление себестоимости в карточки МойСклада"
 
 
 class WritebackStatus(models.TextChoices):
@@ -56,8 +56,15 @@ class WritebackSwitch(DomainModel):
     updated_at = models.DateTimeField("Изменено", auto_now=True)
 
     class Meta:
-        verbose_name = "Выключатель обратной записи"
-        verbose_name_plural = "Выключатели обратной записи"
+        # Названия — те, что понятны без чтения кода. «Выключатель обратной
+        # записи» описывал механику, а не смысл: человек, зашедший в админку
+        # выключить сломавшуюся запись, такого пункта не находил.
+        # Пункт меню — список скриптов, строка — один скрипт со своим
+        # включателем. Названия по единственному сегодня виду записи
+        # («Скрипт проставления себестоимости») хватило бы ровно до второго,
+        # и тогда чужой выключатель оказался бы под чужой вывеской.
+        verbose_name = "Скрипт"
+        verbose_name_plural = "Скрипты"
 
     def __str__(self) -> str:
         return f"{self.get_kind_display()}: {'включена' if self.enabled else 'выключена'}"
@@ -120,8 +127,12 @@ class WritebackRun(DomainModel):
     error = models.TextField("Ошибка", blank=True)
 
     class Meta:
-        verbose_name = "Прогон обратной записи"
-        verbose_name_plural = "Прогоны обратной записи"
+        # «Журнал: записи в МойСклад» читалось как лог синхронизации,
+        # то есть чтения. Здесь ровно обратное направление — что мы
+        # записали в чужой учёт, и путать эти две вещи нельзя: одна
+        # безобидна, вторая меняет данные компании.
+        verbose_name = "Запуск проставления себестоимости"
+        verbose_name_plural = "Проставление себестоимости"
         indexes = [models.Index(fields=["kind", "-started_at"])]
 
     def __str__(self) -> str:
@@ -167,8 +178,8 @@ class WritebackChange(models.Model):
     error = models.TextField("Ошибка записи", blank=True)
 
     class Meta:
-        verbose_name = "Запись в учёт"
-        verbose_name_plural = "Записи в учёт"
+        verbose_name = "Изменение в карточке товара"
+        verbose_name_plural = "Изменения в карточках товаров"
         indexes = [
             models.Index(fields=["run"]),
             models.Index(fields=["target_ms_id"]),

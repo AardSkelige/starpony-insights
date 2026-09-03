@@ -12,6 +12,8 @@ import pytest
 from django.utils import timezone
 
 from core.models import (
+    Contract,
+    ContractType,
     Counterparty,
     Document,
     DocumentKind,
@@ -57,6 +59,18 @@ def uom(run):
 def agent(run):
     return Counterparty.objects.create(
         ms_id="00000000-0000-0000-0000-0000000000aa", name="Покупатель", last_seen_run=run
+    )
+
+
+@pytest.fixture
+def commission(run, agent):
+    """Договор комиссии: по нему товар уходит на реализацию, а не в продажу."""
+    return Contract.objects.create(
+        ms_id="00000000-0000-0000-0000-0000000000c1",
+        name="00001",
+        contract_type=ContractType.COMMISSION,
+        agent=agent,
+        last_seen_run=run,
     )
 
 
@@ -121,7 +135,7 @@ def make_demand(run, agent):
     counter = {"n": 0}
 
     def _make(moment=None, channel=None, deleted=False, kind=DocumentKind.DEMAND,
-              applicable=True, buyer=None):
+              applicable=True, buyer=None, contract=None, total_kopecks=0):
         counter["n"] += 1
         return Document.objects.create(
             ms_id=f"10000000-0000-0000-0000-{counter['n']:012d}",
@@ -130,6 +144,10 @@ def make_demand(run, agent):
             moment=moment or moscow(2026, 6, 15),
             agent=buyer or agent,
             sales_channel=channel,
+            contract=contract,
+            # Итог самого документа. По умолчанию ноль: почти всем тестам
+            # он не нужен, а сводке нужен — она сверяет им сумму позиций.
+            total_kopecks=total_kopecks,
             applicable=applicable,
             deleted_at=timezone.now() if deleted else None,
             last_seen_run=run,

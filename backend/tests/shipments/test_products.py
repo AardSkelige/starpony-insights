@@ -208,8 +208,18 @@ class TestShareIgnoresSearch:
         self, two_products, django_assert_num_queries
     ):
         """Знаменатель без поиска — второй проход, и он платится только там,
-        где поиск задан."""
-        with django_assert_num_queries(3):
+        где поиск задан.
+
+        Числа абсолютные, а не разница: она одна поймала бы лишний проход,
+        но не поймала бы запрос на строку. Восемь — это строки, их счёт,
+        итог, два агрегата сводки, свёртка по товарам для стоимости раздачи
+        и два вычитания по реализации.
+
+        **С поиском их столько же.** Знаменатель доли — это выручка выборки
+        без поиска, и её уже посчитала сводка: отдельный проход за тем же
+        числом был вторым обходом всех позиций.
+        """
+        with django_assert_num_queries(8):
             products.page(products.Filters())
-        with django_assert_num_queries(4):
+        with django_assert_num_queries(8):
             products.page(products.Filters(search="шампунь"))

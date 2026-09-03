@@ -2021,6 +2021,8 @@ components:
           format: decimal
           pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
           nullable: true
+        consignment:
+          $ref: '#/components/schemas/ConsignmentShare'
         shipments_count:
           type: integer
         shipments_share:
@@ -2030,6 +2032,7 @@ components:
           nullable: true
       required:
       - channel_id
+      - consignment
       - name
       - revenue_kopecks
       - revenue_share
@@ -2129,6 +2132,8 @@ components:
           type: integer
         free_shipments_count:
           type: integer
+        consignment_outstanding:
+          $ref: '#/components/schemas/ConsignmentOutstanding'
         buyers_count:
           type: integer
         products_count:
@@ -2136,6 +2141,7 @@ components:
       required:
       - buyers_count
       - channels_count
+      - consignment_outstanding
       - free_shipments_count
       - products_count
       - revenue_kopecks
@@ -2157,6 +2163,8 @@ components:
           format: decimal
           pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
           nullable: true
+        consignment:
+          $ref: '#/components/schemas/ConsignmentShare'
         buyers_count:
           type: integer
         products_count:
@@ -2164,6 +2172,7 @@ components:
       required:
       - buyers_count
       - channels_count
+      - consignment
       - products_count
       - revenue_kopecks
       - revenue_share
@@ -2194,6 +2203,69 @@ components:
       - count
       - first_moment
       - kopecks
+    ConsignmentOutstanding:
+      type: object
+      description: |-
+        Вся картина реализации — состояние на сегодня, а не итог периода.
+
+        Ради одного вычитания: отгружено на реализацию минус подтверждено
+        отчётами комиссионера = столько лежит у комиссионеров прямо сейчас.
+        Это и есть сумма, на которую «Прибыльность» отстаёт от отгрузочных
+        страниц; увидев её, человек перестаёт считать расхождение сбоем расчёта.
+
+        Один тип на «Каналы продаж» и «Товары в отгрузках»: вычитание у них
+        одно и то же, и разойтись оно не имеет права — на «Прибыльности»
+        с ним сверяют обе страницы.
+
+        **Периода здесь нет намеренно** — почему, написано в
+        `core/services/consignment.py`.
+      properties:
+        shipped_kopecks:
+          type: integer
+        reported_kopecks:
+          type: integer
+        pending_kopecks:
+          type: integer
+      required:
+      - pending_kopecks
+      - reported_kopecks
+      - shipped_kopecks
+    ConsignmentShare:
+      type: object
+      description: |-
+        Сколько из показанной выручки — товар на реализации, а не продажа.
+
+        Один тип на «Каналы продаж» и «Товары в отгрузках»: вопрос у них разный —
+        «на чём держится канал» и «сколько продали этого товара», — а оговорка
+        одна, и разойтись она не имеет права.
+
+        **Оговорка не косметическая.** По договору комиссии товар уходит
+        комиссионеру на склад и становится продажей только с приходом отчёта;
+        до этого он может вернуться. У «Точки продаж» так 87 % выручки,
+        у Telegram 97 % — вывод «канал приносит больше всех» держится на складе
+        комиссионера.
+
+        **Это не размер расхождения с «Прибыльностью».** Здесь вся реализация
+        показанной выборки (452 696 ₽ на 03.09), а расходятся страницы на её
+        непокрытую отчётами часть за всё время (281 126 ₽) — её считает
+        `consignment.outstanding`, и живёт она в сводке под таблицей.
+      properties:
+        total_kopecks:
+          type: integer
+        consignment_kopecks:
+          type: integer
+        fraction:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+        tone:
+          type: string
+      required:
+      - consignment_kopecks
+      - fraction
+      - tone
+      - total_kopecks
     Csrf:
       type: object
       properties:
@@ -3102,6 +3174,8 @@ components:
           type: string
         full_name:
           type: string
+        title:
+          type: string
         is_superuser:
           type: boolean
         pages:
@@ -3113,6 +3187,7 @@ components:
       - id
       - is_superuser
       - pages
+      - title
       - username
     Profitability:
       type: object
@@ -3847,6 +3922,8 @@ components:
           type: integer
         totals:
           $ref: '#/components/schemas/ShipmentProductsTotals'
+        coverage:
+          $ref: '#/components/schemas/ShipmentProductsCoverage'
         results:
           type: array
           items:
@@ -3858,9 +3935,47 @@ components:
       required:
       - channels
       - count
+      - coverage
       - results
       - synced_at
       - totals
+    ShipmentProductsCoverage:
+      type: object
+      description: |-
+        Сводка и охват расчёта: про выборку целиком, а не про найденное.
+
+        Отдельный тип от итогов, потому что и множества разные. Итог — то, что
+        в таблице видно, и он сужается поиском; сводка — период и канал целиком.
+        Один тип на двоих означал бы, что где-то их подставят наугад.
+      properties:
+        revenue_kopecks:
+          type: integer
+        documents_revenue_kopecks:
+          type: integer
+        positions_count:
+          type: integer
+        free_positions_count:
+          type: integer
+        free_value_kopecks:
+          type: integer
+        free_unpriced_products_count:
+          type: integer
+        products_count:
+          type: integer
+        documents_count:
+          type: integer
+        consignment_outstanding:
+          $ref: '#/components/schemas/ConsignmentOutstanding'
+      required:
+      - consignment_outstanding
+      - documents_count
+      - documents_revenue_kopecks
+      - free_positions_count
+      - free_unpriced_products_count
+      - free_value_kopecks
+      - positions_count
+      - products_count
+      - revenue_kopecks
     ShipmentProductsTotals:
       type: object
       properties:
@@ -3874,6 +3989,8 @@ components:
           pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
         revenue_kopecks:
           type: integer
+        consignment:
+          $ref: '#/components/schemas/ConsignmentShare'
         documents_count:
           type: integer
         products_count:
@@ -3884,6 +4001,7 @@ components:
           pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
           nullable: true
       required:
+      - consignment
       - documents_count
       - free_quantity
       - products_count

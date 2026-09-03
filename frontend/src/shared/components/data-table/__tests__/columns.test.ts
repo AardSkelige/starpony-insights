@@ -48,6 +48,14 @@ const TABLES = [
       documents_count: 294,
       products_count: 66,
       revenue_share: "1.00000000",
+      // Товар на реализации: отгружен по договору комиссии, но продажей
+      // станет с приходом отчёта комиссионера. На боевых 34 % выручки.
+      consignment: {
+        total_kopecks: 122265995,
+        consignment_kopecks: 45269600,
+        fraction: "0.37026000",
+        tone: "default",
+      },
     }),
     /** Расчётные колонки — те, что посчитаны, а не взяты из учёта как есть. */
     computed: ["avg", "share"],
@@ -104,6 +112,12 @@ const TABLES = [
       shipments_count: 305,
       revenue_kopecks: 125337245,
       revenue_share: "1.00000000",
+      consignment: {
+        total_kopecks: 133013045,
+        consignment_kopecks: 45269600,
+        fraction: "0.34034000",
+        tone: "default",
+      },
       buyers_count: 70,
       products_count: 66,
     }),
@@ -206,6 +220,12 @@ describe("подвал склоняет существительное при ч
       documents_count: 1,
       products_count: 1,
       revenue_share: "1.00000000",
+      consignment: {
+        total_kopecks: 10000,
+        consignment_kopecks: 0,
+        fraction: "0.00000000",
+        tone: "default",
+      },
     })
 
     expect(String(totals.label)).toMatch(/· 1 наименование$/)

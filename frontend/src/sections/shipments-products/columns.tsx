@@ -72,8 +72,12 @@ export const COLUMNS: Column<ShipmentProductRow>[] = [
     // которого открывают страницу.
     hideOn: ["narrow"],
     changeValue: (row) => row.free_quantity,
+    // Единица обязательна: колонка самостоятельная, и «105» рядом
+    // с «431 шт» читалось как другая величина, хотя это те же штуки.
     render: (row) =>
-      Number(row.free_quantity) > 0 ? formatQuantity(row.free_quantity) : "—",
+      Number(row.free_quantity) > 0
+        ? formatQuantity(row.free_quantity, row.uom)
+        : "—",
     explain: (
       <Explain>
         Сколько штук ушло по позициям с суммой 0 ₽ — образцы, замены, подарки.

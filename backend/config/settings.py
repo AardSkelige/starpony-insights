@@ -49,7 +49,10 @@ INSTALLED_APPS = [
     # Статика Swagger UI. Стоит выше staticfiles: приложение отдаёт свои файлы,
     # и порядок здесь определяет, чьи найдутся первыми.
     "drf_spectacular_sidecar",
-    "django.contrib.admin",
+    # Не "django.contrib.admin": своя главная админки с разделами
+    # по смыслу («Люди и доступы», «Автоматизация») вместо одной кучи
+    # моделей приложения. Подмена через AdminConfig — штатный способ.
+    "config.admin_app.InsightsAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",

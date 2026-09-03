@@ -8,6 +8,7 @@ import {
   SIDEBAR_MIN_WIDTH,
 } from "@/app/layout/sidebar-controls"
 import type { Profile } from "@/shared/api/client"
+import { EmptyState } from "@/shared/components/states"
 import { SidebarInset, SidebarProvider } from "@/shared/ui/sidebar"
 
 const WIDTH_KEY = "sidebar-width"
@@ -58,9 +59,32 @@ export function AppShell({ profile }: { profile: Profile }) {
         {/* `min-w-0` — по той же причине, что и в `Page`: без него широкое
             содержимое распирает оболочку, а не прокручивается внутри себя. */}
         <div className="flex min-w-0 flex-1 flex-col gap-4 p-3 sm:p-4">
-          <Outlet />
+          {profile.pages.length === 0 ? <NoAccess /> : <Outlet />}
         </div>
       </SidebarInset>
     </SidebarProvider>
+  )
+}
+
+/**
+ * Вошёл, а страниц нет ни одной.
+ *
+ * **Умолчание в правах — запрет** (`backend/api/access.py`), и это верно:
+ * ошибка забывчивости обязана закрывать доступ. Но человек в этот момент
+ * видел пустую оболочку без единого пункта меню — экран, неотличимый
+ * от поломки, и шёл спрашивать вместо того, чтобы получить ответ здесь.
+ *
+ * Оболочка остаётся вокруг намеренно: без неё некуда нажать «Выйти»,
+ * и человек, вошедший не тем логином, оказывается заперт.
+ */
+function NoAccess() {
+  return (
+    <EmptyState
+      title="Доступ пока не выдан"
+      hint={
+        "Учётная запись есть, но ни один раздел ей не открыт. " +
+        "Разделы выдаёт администратор — пока их нет, показывать нечего."
+      }
+    />
   )
 }
