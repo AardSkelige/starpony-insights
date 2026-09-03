@@ -1,0 +1,266 @@
+"""Первое звено цепочки: что кончается и сколько этого произвести.
+
+Отвечает на вопрос, которого нет в учёте. Остатки МойСклад показывает сам,
+и открыть их — не работа; чего он не говорит, так это **много это или мало**.
+Двенадцать репеллентов выглядят запасом, пока не выяснится, что их берут
+по четыре в день. Отсюда единственная величина, ради которой страница
+существует: на сколько дней хватит того, что лежит.
+
+**Товар — это то, у чего есть артикул** (решение 02.09). Материалы артикула
+не имеют, и здесь их быть не должно: это список того, что производят,
+а не того, из чего производят.
+
+**Запас считается тем же `coverage.of`, что у материалов.** Вопрос другой —
+там «пора ли закупать», здесь «пора ли варить», — а число одно, и второй
+копии у него быть не должно: разойдись они, две страницы за один период
+показали бы разный запас одного и того же товара.
+"""
+
+import math
+from dataclasses import dataclass
+from decimal import Decimal
+
+from django.db.models import DecimalField, QuerySet, Sum, Value
+from django.db.models.functions import Coalesce
+
+from api.common.selection import matching, within
+from api.production.services.selection import Filters
+from core.models import DocumentKind, DocumentPosition, Product, ProductKind, Stock
+from core.services import coverage
+from core.services.documents import alive, positions_in
+from core.services.materials import plans_by_product
+
+_QUANTITY = DecimalField(max_digits=18, decimal_places=3)
+
+
+@dataclass(frozen=True)
+class ProductRow:
+    """Товар вместе с ответом «надолго ли хватит» и «сколько варить»."""
+
+    product: Product
+    # Свободный остаток. `None` — строки остатка нет в отчёте вовсе;
+    # ноль здесь означал бы «кончился», а это другое утверждение об учёте.
+    available: Decimal | None
+    left: coverage.Coverage
+    # Сколько произвести, чтобы хватило на горизонт. `None` там, где считать
+    # не из чего: товар не продавался за период (восполнять нечего) либо
+    # остаток неизвестен (неясно, от чего отталкиваться). Ноль сюда
+    # не годится — он значит «производить не надо», а мы просто не знаем.
+    suggested: int | None
+    # Без техкарты развернуть товар до сырья нечем. Один такой на 57 —
+    # «Таблетка-мыло для лап». Не ошибка расчёта, а пробел в учёте,
+    # и страница обязана назвать его словами, а не молча пропустить строку.
+    has_plan: bool
+
+
+def shipment_positions(filters: Filters) -> QuerySet[DocumentPosition]:
+    """Позиции отгрузок за период — расход, от которого считается запас.
+
+    **Отгрузки, а не оплаченные продажи.** Товар, ушедший по договору комиссии,
+    ещё не продан, но со склада его уже нет, и восполнять его надо наравне
+    с остальным. Тот же довод у подарков: отданное даром произведено так же,
+    как проданное, и вычесть его значило бы недосчитаться варки.
+    """
+    return within(
+        positions_in(alive(DocumentKind.DEMAND)), filters.date_from, filters.date_to
+    )
+
+
+def rows(
+    filters: Filters, *, articles: list[str] | None = None
+) -> list[ProductRow]:
+    """Все товары с артикулом, сверху — те, что кончаются раньше.
+
+    `articles` сужает выборку до перечисленных — этим пользуется разрешение
+    количеств партии (`payload.resolve`): ему нужны предложения по десятку
+    отмеченных позиций, а не по всем пятидесяти семи. Без сужения полное
+    верхнее звено — каталог, продажи за период и техкарты — считалось бы
+    на каждое нажатие «плюс».
+    """
+    catalogue = _catalogue(filters.search, articles=articles)
+    positions = shipment_positions(filters)
+    span = coverage.span_of(positions, filters.date_from, filters.date_to)
+
+    sold = _sold_by_product(positions, catalogue)
+    available = _available_by_product(catalogue)
+    plans = plans_by_product()
+
+    result = [
+        _row_of(
+            product,
+            sold.get(product.pk, Decimal(0)),
+            available.get(product.pk),
+            span,
+            filters.horizon,
+            product.pk in plans,
+        )
+        for product in catalogue
+    ]
+
+    # Сначала то, что кончается раньше — это и есть срочность производства.
+    #
+    # **При равном запасе выше идёт то, что уходит быстрее.** Восемнадцать
+    # позиций разом показывают «хватит на 0 дней», и алфавит внутри нуля
+    # ставил «Bubblegum» (0,129 шт/день) выше «Зелёного чая» (0,535 шт/день),
+    # хотя второго не хватает вчетверо сильнее. Ноль дней у обоих —
+    # но дыра разная, и первым варят большую.
+    #
+    # Неизвестный запас — в конец: он не «очень большой», про него просто
+    # нечего сказать, и держать такие строки среди спокойных значило бы
+    # выдать незнание за благополучие.
+    result.sort(
+        key=lambda row: (
+            row.left.days_left is None,
+            row.left.days_left if row.left.days_left is not None else 0,
+            -row.left.per_day,
+            row.product.name,
+        )
+    )
+    return result
+
+
+def _catalogue(search: str, *, articles: list[str] | None = None) -> list[Product]:
+    """Товары, которые производят: с артикулом, не в архиве, не услуги.
+
+    Архивные исключены, хотя артикул у них есть — их шестнадцать. Убранный
+    в архив товар больше не выпускают, и предложить сварить его партию
+    значило бы предложить работу, отменённую решением человека.
+    """
+    queryset = Product.objects.alive().filter(
+        kind=ProductKind.PRODUCT, archived=False
+    ).exclude(article="").select_related("uom")
+
+    if articles is not None:
+        queryset = queryset.filter(article__in=articles)
+
+    if search:
+        # Условие общее с остальными разделами, только путь до товара пустой:
+        # здесь строка таблицы и есть товар, а не позиция документа.
+        queryset = queryset.filter(matching(search, prefix=""))
+
+    return list(queryset)
+
+
+def _sold_by_product(
+    positions: QuerySet[DocumentPosition], catalogue: list[Product]
+) -> dict[int, Decimal]:
+    """Сколько каждого товара ушло за период. Один запрос на всех."""
+    return {
+        row["product_id"]: row["quantity"]
+        for row in positions.filter(product__in=catalogue)
+        .values("product_id")
+        .annotate(
+            quantity=Coalesce(Sum("quantity"), Value(Decimal(0)), output_field=_QUANTITY)
+        )
+    }
+
+
+def _available_by_product(catalogue: list[Product]) -> dict[int, Decimal]:
+    """Свободный остаток по товарам. Отсутствие ключа — строки в отчёте нет.
+
+    Свободный, а не общий: зарезервированное под заказы уже обещано, и считать
+    его своим значит обнаружить нехватку в день отгрузки.
+    """
+    return {
+        row.product_id: row.available
+        for row in Stock.objects.filter(product__in=catalogue)
+    }
+
+
+def _row_of(
+    product: Product,
+    sold: Decimal,
+    available: Decimal | None,
+    span: int,
+    horizon: int,
+    has_plan: bool,
+) -> ProductRow:
+    left = coverage.of(sold, span, available)
+    return ProductRow(
+        product=product,
+        available=available,
+        left=left,
+        suggested=suggested_for(left.per_day, available, horizon),
+        has_plan=has_plan,
+    )
+
+
+def suggested_for(
+    per_day: Decimal, available: Decimal | None, horizon: int
+) -> int | None:
+    """Сколько произвести, чтобы хватило на горизонт.
+
+        произвести = темп продаж × горизонт − свободный остаток
+
+    **Вверх, а не вниз.** Половину флакона не варят, и «94,3 штуки» —
+    это 95: недоварить значит вернуться к той же строке через неделю.
+    Обратное правило у `coverage.days_left`, и это не разнобой: там округление
+    вниз, потому что обещать день, которого нет, дороже, чем недообещать.
+
+    `None` там, где считать не из чего. Товар не продавался за период —
+    восполнять нечего, и предложить партию значило бы предложить склад.
+    Остаток неизвестен — неясно, что вычитать, и подставить ноль означало бы
+    выдать незнание за пустой склад.
+    """
+    if available is None or per_day <= 0:
+        return None
+    return max(0, math.ceil(per_day * horizon - available))
+
+
+def page(filters: Filters) -> dict:
+    """Верхнее звено целиком — то, что уходит на экран."""
+    result = rows(filters)
+    return {
+        "rows": [_cells(row, filters.horizon) for row in result],
+        "summary": _summary(result),
+        "horizon": filters.horizon,
+    }
+
+
+def _cells(row: ProductRow, horizon: int) -> dict:
+    return {
+        "product_id": row.product.pk,
+        "article": row.product.article,
+        "name": row.product.name,
+        "folder": row.product.folder,
+        "uom": row.product.uom.name if row.product.uom else "",
+        "available": row.available,
+        "coverage": {
+            "quantity": row.left.quantity,
+            "per_day": row.left.per_day,
+            "days_of_period": row.left.days_of_period,
+            "days_left": row.left.days_left,
+            # Считается на сервере: пороги и текст предупреждения обязаны
+            # меняться вместе.
+            "level": coverage.level(row.left.days_left),
+        },
+        "suggested": row.suggested,
+        # Горизонт едет в каждой строке, а не только в шапке: без него
+        # «произвести 61» не собирается в формулу, а формула обязана
+        # складываться из полученного (`CLAUDE.md` §4).
+        "horizon": horizon,
+        "has_plan": row.has_plan,
+    }
+
+
+def _summary(result: list[ProductRow]) -> dict:
+    """Итог по **показанному**, а не по всей базе.
+
+    Знаменатель сужается поиском вместе со строками: иначе, найдя один товар,
+    человек увидел бы «33 из 57 кончаются» — число про множество, которого
+    на экране нет (`DESIGN.md` §8).
+    """
+    return {
+        "products_count": len(result),
+        "critical_count": sum(
+            1
+            for row in result
+            if row.left.days_left is not None
+            and row.left.days_left <= coverage.CRITICAL_DAYS
+        ),
+        # Рядом с предыдущим обязательно: «кончается 33 из 57» без него
+        # читается как «остальные 24 в порядке», а про часть из них мы
+        # просто ничего не знаем.
+        "unknown_count": sum(1 for row in result if row.left.days_left is None),
+        "without_plan_count": sum(1 for row in result if not row.has_plan),
+    }

@@ -13,14 +13,18 @@
 """
 
 from dataclasses import dataclass
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 
 from api.common.selection import page_bounds
 from api.shipments.services import selection
 from core.services import consumption
 from core.services.consumption import Consumed
 from core.money import share
-from core.services.purchase_prices import PurchasePrice, last_purchase_prices
+from core.services.purchase_prices import (
+    PurchasePrice,
+    cost_of,
+    last_purchase_prices,
+)
 
 # Сортировки, разрешённые снаружи. Список закрытый — как у соседней страницы.
 # Минус означает убывание, как принято от DRF до SQL.
@@ -32,8 +36,6 @@ ORDERING = (
     "products", "-products",
 )
 DEFAULT_ORDERING = "-cost"
-
-_KOPECK = Decimal("1")
 
 
 @dataclass(frozen=True)
@@ -77,21 +79,6 @@ def _price_of(price: PurchasePrice | None) -> Decimal | None:
 def _moment_of(price: PurchasePrice | None):
     return price.moment if price else None
 
-
-def cost_of(quantity: Decimal, price: PurchasePrice | None) -> int | None:
-    """Стоимость израсходованного, целыми копейками. None — цены нет вовсе.
-
-    Округляется здесь, а не в подвале: итог собирается сложением того, что
-    показано в колонке, и без этого расходился бы с ней на копейки — ровно
-    там, где человек проверяет сложением на калькуляторе.
-
-    Ноль вместо None не годится: он читался бы как «материал достался даром»,
-    а на деле его просто ни разу не покупали. Таких три из ста шестидесяти
-    одного, и все — доли грамма.
-    """
-    if price is None:
-        return None
-    return int((quantity * price.price_kopecks).quantize(_KOPECK, rounding=ROUND_HALF_UP))
 
 
 def _matches(row: dict, term: str) -> bool:

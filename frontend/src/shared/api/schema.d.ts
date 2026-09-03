@@ -174,6 +174,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/production/batch/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Что закупить под партию
+         * @description Состав партии передаётся повторяющимся `item` в виде «артикул:количество». Товары разворачиваются по техкартам до сырья рекурсивно — производство идёт в два шага, и прямой состав показал бы полуфабрикат, которого не закупают. Нехватка считается от свободного остатка; неснижаемый остаток идёт вторым сигналом. Строка, не попавшая в расчёт, возвращается названной, а не выбрасывается молча.
+         */
+        get: operations["production_batch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/production/products/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Что кончается и сколько этого произвести
+         * @description Товары с артикулом: свободный остаток против темпа продаж за период. Отвечает на вопрос, которого в учёте нет, — «много это или мало»: двенадцать репеллентов выглядят запасом, пока не выяснится, что их берут по четыре в день. Рядом с каждым — сколько произвести, чтобы хватило на выбранный горизонт.
+         */
+        get: operations["production_products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profitability/": {
         parameters: {
             query?: never;
@@ -526,6 +566,58 @@ export interface components {
             documents_count: number;
             notes?: string[];
         };
+        /** @description Ответ нижнего звена целиком. */
+        Batch: {
+            lines: components["schemas"]["BatchLine"][];
+            materials: components["schemas"]["Need"][];
+            summary: components["schemas"]["BatchSummary"];
+            /** Format: date-time */
+            synced_at: string | null;
+        };
+        /**
+         * @description Строка партии — включая ту, что в расчёт не пошла.
+         *
+         *     Непринятая строка не выбрасывается: сломанная ссылка и опечатка
+         *     в артикуле выглядят одинаково, а «посчитали по трём товарам из четырёх»
+         *     ничем не отличается на вид от «посчитали по всем».
+         */
+        BatchLine: {
+            article: string;
+            quantity: number | null;
+            product_id: number | null;
+            name: string;
+            problem: string | null;
+        };
+        /**
+         * @description Из какого товара партии сколько этого материала пришло.
+         *
+         *     Не `MaterialSource` «Материалов в отгрузках»: там источник — проданное
+         *     изделие, и рядом едут проданное количество, его единица и пути. Одно имя
+         *     на два разных тела схема встречает предупреждением, а фронтенд —
+         *     неверными типами, ничего об этом не узнав.
+         */
+        BatchSource: {
+            product_id: number;
+            name: string;
+            /** Format: decimal */
+            quantity: string;
+        };
+        /** @description Итог по партии — то, ради чего страницу открывали. */
+        BatchSummary: {
+            products_count: number;
+            units_count: number;
+            materials_count: number;
+            shortages_count: number;
+            purchase_kopecks: number;
+            priced_shortages_count: number;
+            /** Format: decimal */
+            max_lead_time_days: string | null;
+            timed_shortages_count: number;
+            unknown_stock_count: number;
+            archived_count: number;
+            below_min_now_count: number;
+            below_min_after_count: number;
+        };
         ChannelRow: {
             channel_id: number;
             name: string;
@@ -810,14 +902,12 @@ export interface components {
             database: string;
         };
         /**
-         * @description Медиана в днях вместе с тем, из чего она получена.
+         * @description Срок от заказа до прихода товара.
          *
-         *     Один тип на регулярность и на срок поставки: поля у них совпадают
-         *     до буквы, и два близнеца в схеме дали бы фронтенду два типа, под которые
-         *     пишутся два компонента. Так уже расходился блок «Склад».
-         *
-         *     Названия полей нейтральны к смыслу (`days`, а не `interval_days`)
-         *     именно поэтому: подпись даёт колонка, а не контракт.
+         *     Переехал сюда из «Поставщиков», когда понадобился «Расчёту
+         *     производства»: там спрашивают «кого торопить», здесь — «успеет ли сырьё
+         *     к партии». Вопрос разный, число одно, и два типа в схеме дали бы
+         *     фронтенду два компонента под одно и то же.
          */
         LeadTime: {
             /** Format: decimal */
@@ -836,13 +926,14 @@ export interface components {
         /**
          * @description На сколько хватит остатка при нынешнем расходе.
          *
-         *     Один тип на два раздела: «Материалы в отгрузках» отвечают им на «надолго
-         *     ли хватит», «Материалы в приёмках» — на «пора ли закупать». Вопрос разный,
-         *     число одно, и разойтись оно не имеет права.
+         *     Один тип на три раздела: «Материалы в отгрузках» отвечают им на «надолго
+         *     ли хватит», «Материалы в приёмках» — на «пора ли закупать», «Расчёт
+         *     производства» — на «пора ли варить». Вопрос разный, число одно,
+         *     и разойтись оно не имеет права.
          *
-         *     Первая половина порога закупки (`PRD.md` §5.9): `minimumBalance` пуст
-         *     у всех 314 позиций, а расход за период против свободного остатка
-         *     берётся из фактов учёта.
+         *     Первая половина порога закупки (`PRD.md` §5.9): `minimumBalance` задан
+         *     у десяти позиций сырья из трёхсот с лишним, а расход за период против
+         *     свободного остатка берётся из фактов учёта по всем.
          *
          *     **Это не прогноз**, и подсказка на экране обязана это сказать: средний
          *     расход выбранного периода, а не тренд. Меняешь период — меняется число.
@@ -876,11 +967,11 @@ export interface components {
             uom: string;
         };
         /**
-         * @description Один путь по техкартам и то, сколько материала пришло именно им.
+         * @description Один путь до материала и сколько пришло именно им.
          *
          *     Количество обязательно: без него путь говорит «через замес и через
-         *     розлив», но не отвечает, чего сколько, — а объяснение, которое не
-         *     складывается обратно в объясняемое число, объяснением не является.
+         *     розлив», но не отвечает, чего сколько, — а объяснение, которое
+         *     не складывается обратно в объясняемое число, объяснением не является.
          */
         MaterialPath: {
             chain: string[];
@@ -959,6 +1050,33 @@ export interface components {
             quantity: string;
             paths: components["schemas"]["MaterialPath"][];
         };
+        /** @description Материал под партию: сколько нужно, что есть, чего не хватает. */
+        Need: {
+            product_id: number;
+            name: string;
+            article: string;
+            code: string;
+            uom: string;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            available: string | null;
+            /** Format: decimal */
+            shortage: string | null;
+            /** Format: decimal */
+            after: string | null;
+            /** Format: decimal */
+            min_balance: string | null;
+            archived: boolean;
+            below_min_now: boolean;
+            below_min_after: boolean;
+            price: components["schemas"]["MaterialPrice"] | null;
+            cost_kopecks: number | null;
+            lead_time: components["schemas"]["LeadTime"];
+            supplier: string;
+            via: components["schemas"]["MaterialPath"][];
+            sources: components["schemas"]["BatchSource"][];
+        };
         /** @description Страница в меню. Префиксы API наружу не отдаются — это деталь защиты. */
         Page: {
             key: string;
@@ -978,6 +1096,41 @@ export interface components {
             moment: string;
             /** Format: decimal */
             price_kopecks: string;
+        };
+        /** @description Товар: надолго ли хватит и сколько варить. */
+        ProductRow: {
+            product_id: number;
+            article: string;
+            name: string;
+            folder: string;
+            uom: string;
+            /** Format: decimal */
+            available: string | null;
+            coverage: components["schemas"]["MaterialCoverage"];
+            suggested: number | null;
+            horizon: number;
+            has_plan: boolean;
+        };
+        /** @description Ответ верхнего звена целиком. */
+        Products: {
+            rows: components["schemas"]["ProductRow"][];
+            summary: components["schemas"]["ProductsSummary"];
+            horizon: number;
+            /** Format: date-time */
+            synced_at: string | null;
+        };
+        /**
+         * @description Итог верхнего списка. Считается по показанному, а не по всей базе.
+         *
+         *     Знаменатель обязан сужаться поиском вместе со строками: иначе, найдя
+         *     один товар, человек увидит «33 из 57 кончаются» — число про множество,
+         *     которого на экране нет (`DESIGN.md` §8).
+         */
+        ProductsSummary: {
+            products_count: number;
+            critical_count: number;
+            unknown_count: number;
+            without_plan_count: number;
         };
         Profile: {
             id: number;
@@ -1826,6 +1979,56 @@ export interface operations {
                 };
                 content: {
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+        };
+    };
+    production_batch: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                horizon?: number;
+                /** @description Позиция партии: «артикул:количество» либо «артикул» — тогда количество считается по горизонту. */
+                item?: string[];
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Batch"];
+                };
+            };
+        };
+    };
+    production_products: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                horizon?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Products"];
                 };
             };
         };

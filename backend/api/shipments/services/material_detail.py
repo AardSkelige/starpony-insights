@@ -98,14 +98,14 @@ def detail(filters: Filters, material_id: int) -> dict:
     hidden = sources[SOURCE_LIMIT:]
 
     stock = stock_of(material_id)
-    # `_days_of_data` считается только при открытом периоде: при заданных
-    # границах `days_in` возвращает их разницу, а лишний обход всех позиций
-    # выборки ради отброшенного числа стоит запроса на каждое раскрытие
-    # строки.
-    span = (
-        coverage.days_in(filters.date_from, filters.date_to, 0)
-        if filters.date_from and filters.date_to
-        else coverage.days_in(None, None, _days_of_data(filters))
+    span = coverage.span_of(
+        selection.shipment_positions(
+            date_from=filters.date_from,
+            date_to=filters.date_to,
+            channel_id=filters.channel_id,
+        ),
+        filters.date_from,
+        filters.date_to,
     )
     left = coverage.of(
         total,
@@ -175,14 +175,3 @@ def detail(filters: Filters, material_id: int) -> dict:
             else None
         ),
     }
-
-
-def _days_of_data(filters: Filters) -> int:
-    """Длина выборки в днях, когда период не задан руками."""
-    return coverage.days_of(
-        selection.shipment_positions(
-            date_from=filters.date_from,
-            date_to=filters.date_to,
-            channel_id=filters.channel_id,
-        )
-    )

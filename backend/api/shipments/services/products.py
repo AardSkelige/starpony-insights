@@ -132,7 +132,7 @@ def positions(filters: Filters) -> QuerySet[DocumentPosition]:
     )
 
     if filters.search:
-        queryset = queryset.filter(matching(filters.search.strip()))
+        queryset = queryset.filter(matching(filters.search))
 
     return queryset
 

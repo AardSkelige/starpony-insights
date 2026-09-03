@@ -403,6 +403,105 @@ paths:
                 type: string
                 format: binary
           description: ''
+  /api/production/batch/:
+    get:
+      operationId: production_batch
+      description: Состав партии передаётся повторяющимся `item` в виде «артикул:количество».
+        Товары разворачиваются по техкартам до сырья рекурсивно — производство идёт
+        в два шага, и прямой состав показал бы полуфабрикат, которого не закупают.
+        Нехватка считается от свободного остатка; неснижаемый остаток идёт вторым
+        сигналом. Строка, не попавшая в расчёт, возвращается названной, а не выбрасывается
+        молча.
+      summary: Что закупить под партию
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: horizon
+        schema:
+          type: integer
+          maximum: 365
+          minimum: 1
+          default: 60
+      - in: query
+        name: item
+        schema:
+          type: array
+          items:
+            type: string
+            maxLength: 120
+        description: 'Позиция партии: «артикул:количество» либо «артикул» — тогда
+          количество считается по горизонту.'
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Batch'
+          description: ''
+  /api/production/products/:
+    get:
+      operationId: production_products
+      description: 'Товары с артикулом: свободный остаток против темпа продаж за период.
+        Отвечает на вопрос, которого в учёте нет, — «много это или мало»: двенадцать
+        репеллентов выглядят запасом, пока не выяснится, что их берут по четыре в
+        день. Рядом с каждым — сколько произвести, чтобы хватило на выбранный горизонт.'
+      summary: Что кончается и сколько этого произвести
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: horizon
+        schema:
+          type: integer
+          maximum: 365
+          minimum: 1
+          default: 60
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Products'
+          description: ''
   /api/profitability/:
     get:
       operationId: profitability_list
@@ -1708,6 +1807,123 @@ components:
       - name
       - quantity
       - revenue_kopecks
+    Batch:
+      type: object
+      description: Ответ нижнего звена целиком.
+      properties:
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchLine'
+        materials:
+          type: array
+          items:
+            $ref: '#/components/schemas/Need'
+        summary:
+          $ref: '#/components/schemas/BatchSummary'
+        synced_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - lines
+      - materials
+      - summary
+      - synced_at
+    BatchLine:
+      type: object
+      description: |-
+        Строка партии — включая ту, что в расчёт не пошла.
+
+        Непринятая строка не выбрасывается: сломанная ссылка и опечатка
+        в артикуле выглядят одинаково, а «посчитали по трём товарам из четырёх»
+        ничем не отличается на вид от «посчитали по всем».
+      properties:
+        article:
+          type: string
+        quantity:
+          type: integer
+          nullable: true
+        product_id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+        problem:
+          type: string
+          nullable: true
+      required:
+      - article
+      - name
+      - problem
+      - product_id
+      - quantity
+    BatchSource:
+      type: object
+      description: |-
+        Из какого товара партии сколько этого материала пришло.
+
+        Не `MaterialSource` «Материалов в отгрузках»: там источник — проданное
+        изделие, и рядом едут проданное количество, его единица и пути. Одно имя
+        на два разных тела схема встречает предупреждением, а фронтенд —
+        неверными типами, ничего об этом не узнав.
+      properties:
+        product_id:
+          type: integer
+        name:
+          type: string
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+      required:
+      - name
+      - product_id
+      - quantity
+    BatchSummary:
+      type: object
+      description: Итог по партии — то, ради чего страницу открывали.
+      properties:
+        products_count:
+          type: integer
+        units_count:
+          type: integer
+        materials_count:
+          type: integer
+        shortages_count:
+          type: integer
+        purchase_kopecks:
+          type: integer
+        priced_shortages_count:
+          type: integer
+        max_lead_time_days:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,1})?$
+          nullable: true
+        timed_shortages_count:
+          type: integer
+        unknown_stock_count:
+          type: integer
+        archived_count:
+          type: integer
+        below_min_now_count:
+          type: integer
+        below_min_after_count:
+          type: integer
+      required:
+      - archived_count
+      - below_min_after_count
+      - below_min_now_count
+      - materials_count
+      - max_lead_time_days
+      - priced_shortages_count
+      - products_count
+      - purchase_kopecks
+      - shortages_count
+      - timed_shortages_count
+      - units_count
+      - unknown_stock_count
     ChannelRow:
       type: object
       properties:
@@ -2395,14 +2611,12 @@ components:
     LeadTime:
       type: object
       description: |-
-        Медиана в днях вместе с тем, из чего она получена.
+        Срок от заказа до прихода товара.
 
-        Один тип на регулярность и на срок поставки: поля у них совпадают
-        до буквы, и два близнеца в схеме дали бы фронтенду два типа, под которые
-        пишутся два компонента. Так уже расходился блок «Склад».
-
-        Названия полей нейтральны к смыслу (`days`, а не `interval_days`)
-        именно поэтому: подпись даёт колонка, а не контракт.
+        Переехал сюда из «Поставщиков», когда понадобился «Расчёту
+        производства»: там спрашивают «кого торопить», здесь — «успеет ли сырьё
+        к партии». Вопрос разный, число одно, и два типа в схеме дали бы
+        фронтенду два компонента под одно и то же.
       properties:
         days:
           type: string
@@ -2446,13 +2660,14 @@ components:
       description: |-
         На сколько хватит остатка при нынешнем расходе.
 
-        Один тип на два раздела: «Материалы в отгрузках» отвечают им на «надолго
-        ли хватит», «Материалы в приёмках» — на «пора ли закупать». Вопрос разный,
-        число одно, и разойтись оно не имеет права.
+        Один тип на три раздела: «Материалы в отгрузках» отвечают им на «надолго
+        ли хватит», «Материалы в приёмках» — на «пора ли закупать», «Расчёт
+        производства» — на «пора ли варить». Вопрос разный, число одно,
+        и разойтись оно не имеет права.
 
-        Первая половина порога закупки (`PRD.md` §5.9): `minimumBalance` пуст
-        у всех 314 позиций, а расход за период против свободного остатка
-        берётся из фактов учёта.
+        Первая половина порога закупки (`PRD.md` §5.9): `minimumBalance` задан
+        у десяти позиций сырья из трёхсот с лишним, а расход за период против
+        свободного остатка берётся из фактов учёта по всем.
 
         **Это не прогноз**, и подсказка на экране обязана это сказать: средний
         расход выбранного периода, а не тренд. Меняешь период — меняется число.
@@ -2521,11 +2736,11 @@ components:
     MaterialPath:
       type: object
       description: |-
-        Один путь по техкартам и то, сколько материала пришло именно им.
+        Один путь до материала и сколько пришло именно им.
 
         Количество обязательно: без него путь говорит «через замес и через
-        розлив», но не отвечает, чего сколько, — а объяснение, которое не
-        складывается обратно в объясняемое число, объяснением не является.
+        розлив», но не отвечает, чего сколько, — а объяснение, которое
+        не складывается обратно в объясняемое число, объяснением не является.
       properties:
         chain:
           type: array
@@ -2677,6 +2892,89 @@ components:
       - quantity
       - sold_quantity
       - sold_uom
+    Need:
+      type: object
+      description: 'Материал под партию: сколько нужно, что есть, чего не хватает.'
+      properties:
+        product_id:
+          type: integer
+        name:
+          type: string
+        article:
+          type: string
+        code:
+          type: string
+        uom:
+          type: string
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+        available:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+          nullable: true
+        shortage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+          nullable: true
+        after:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+          nullable: true
+        min_balance:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+          nullable: true
+        archived:
+          type: boolean
+        below_min_now:
+          type: boolean
+        below_min_after:
+          type: boolean
+        price:
+          allOf:
+          - $ref: '#/components/schemas/MaterialPrice'
+          nullable: true
+        cost_kopecks:
+          type: integer
+          nullable: true
+        lead_time:
+          $ref: '#/components/schemas/LeadTime'
+        supplier:
+          type: string
+        via:
+          type: array
+          items:
+            $ref: '#/components/schemas/MaterialPath'
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchSource'
+      required:
+      - after
+      - archived
+      - article
+      - available
+      - below_min_after
+      - below_min_now
+      - code
+      - cost_kopecks
+      - lead_time
+      - min_balance
+      - name
+      - price
+      - product_id
+      - quantity
+      - shortage
+      - sources
+      - supplier
+      - uom
+      - via
     Page:
       type: object
       description: Страница в меню. Префиксы API наружу не отдаются — это деталь защиты.
@@ -2713,6 +3011,88 @@ components:
       required:
       - moment
       - price_kopecks
+    ProductRow:
+      type: object
+      description: 'Товар: надолго ли хватит и сколько варить.'
+      properties:
+        product_id:
+          type: integer
+        article:
+          type: string
+        name:
+          type: string
+        folder:
+          type: string
+        uom:
+          type: string
+        available:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+          nullable: true
+        coverage:
+          $ref: '#/components/schemas/MaterialCoverage'
+        suggested:
+          type: integer
+          nullable: true
+        horizon:
+          type: integer
+        has_plan:
+          type: boolean
+      required:
+      - article
+      - available
+      - coverage
+      - folder
+      - has_plan
+      - horizon
+      - name
+      - product_id
+      - suggested
+      - uom
+    Products:
+      type: object
+      description: Ответ верхнего звена целиком.
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductRow'
+        summary:
+          $ref: '#/components/schemas/ProductsSummary'
+        horizon:
+          type: integer
+        synced_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - horizon
+      - rows
+      - summary
+      - synced_at
+    ProductsSummary:
+      type: object
+      description: |-
+        Итог верхнего списка. Считается по показанному, а не по всей базе.
+
+        Знаменатель обязан сужаться поиском вместе со строками: иначе, найдя
+        один товар, человек увидит «33 из 57 кончаются» — число про множество,
+        которого на экране нет (`DESIGN.md` §8).
+      properties:
+        products_count:
+          type: integer
+        critical_count:
+          type: integer
+        unknown_count:
+          type: integer
+        without_plan_count:
+          type: integer
+      required:
+      - critical_count
+      - products_count
+      - unknown_count
+      - without_plan_count
     Profile:
       type: object
       properties:

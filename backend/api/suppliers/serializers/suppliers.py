@@ -16,7 +16,11 @@
 
 from rest_framework import serializers
 
-from api.common.serializers import SelectionQuerySerializer
+from api.common.serializers import (
+    LeadTimeSerializer,
+    SelectionQuerySerializer,
+    SpanSerializer,
+)
 from api.suppliers.services.suppliers import DEFAULT_ORDERING, ORDERING
 
 
@@ -33,44 +37,8 @@ class SuppliersQuerySerializer(SelectionQuerySerializer):
     )
 
 
-class SpanSerializer(serializers.Serializer):
-    """Медиана в днях вместе с тем, из чего она получена.
-
-    Один тип на регулярность и на срок поставки: поля у них совпадают
-    до буквы, и два близнеца в схеме дали бы фронтенду два типа, под которые
-    пишутся два компонента. Так уже расходился блок «Склад».
-
-    Названия полей нейтральны к смыслу (`days`, а не `interval_days`)
-    именно поэтому: подпись даёт колонка, а не контракт.
-    """
-
-    # Медиана, а не среднее. На боевых данных среднее по срокам 4,77 дня
-    # против медианы 1,00 — впятеро: половина закупок оформляется одним днём,
-    # вторая идёт до сорока, и среднее описывает несуществующую середину.
-    days = serializers.DecimalField(
-        max_digits=8, decimal_places=1, allow_null=True
-    )
-    # Знаменатель медианы: сколько промежутков или пар удалось измерить.
-    # Приходит рядом с ответом, чтобы формула собиралась из полученного.
-    measurements = serializers.IntegerField()
-    min_days = serializers.IntegerField(allow_null=True)
-    max_days = serializers.IntegerField(allow_null=True)
-    # Среднее — только в объяснении, рядом с медианой. Расхождение между ними
-    # само говорит, насколько поставки рваные: у «Полицвета» 22,5 против 6,5.
-    average_days = serializers.DecimalField(
-        max_digits=8, decimal_places=1, allow_null=True
-    )
-
-
 class RegularitySerializer(SpanSerializer):
     measurements = serializers.IntegerField(source="gaps")
-
-
-class LeadTimeSerializer(SpanSerializer):
-    measurements = serializers.IntegerField(source="pairs")
-    # Приёмки, у которых заказа в зеркале нет. Показывается словами:
-    # «срок по 12 приёмкам из 14» честнее, чем молчаливая медиана по части.
-    unlinked = serializers.IntegerField()
 
 
 class SupplierMaterialSerializer(serializers.Serializer):

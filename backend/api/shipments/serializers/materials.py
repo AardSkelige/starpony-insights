@@ -9,9 +9,11 @@
 from rest_framework import serializers
 
 from api.common.serializers import (
-    MaterialCoverageSerializer,
     FilterOptionSerializer,
+    MaterialCoverageSerializer,
     MaterialHeadSerializer,
+    MaterialPathSerializer,
+    MaterialPriceSerializer,
     StockSerializer,
 )
 from api.shipments.serializers.common import ShipmentQuerySerializer
@@ -124,18 +126,6 @@ class ShipmentMaterialsSerializer(serializers.Serializer):
     channels = FilterOptionSerializer(many=True)
 
 
-class MaterialPathSerializer(serializers.Serializer):
-    """Один путь по техкартам и то, сколько материала пришло именно им.
-
-    Количество обязательно: без него путь говорит «через замес и через
-    розлив», но не отвечает, чего сколько, — а объяснение, которое не
-    складывается обратно в объясняемое число, объяснением не является.
-    """
-
-    chain = serializers.ListField(child=serializers.CharField())
-    quantity = serializers.DecimalField(max_digits=18, decimal_places=6)
-
-
 class MaterialSourceSerializer(serializers.Serializer):
     """Изделие, из-за продажи которого материал израсходован."""
 
@@ -145,19 +135,6 @@ class MaterialSourceSerializer(serializers.Serializer):
     sold_uom = serializers.CharField(allow_blank=True)
     quantity = serializers.DecimalField(max_digits=18, decimal_places=6)
     paths = MaterialPathSerializer(many=True)
-
-
-class MaterialPriceSerializer(serializers.Serializer):
-    """Откуда взялась цена: документ, дата, поставщик.
-
-    Число, посчитанное по цене, обязано назвать её источник. Иначе колонка
-    «Стоимость» остаётся суммой, за которую никто не отвечает.
-    """
-
-    price_kopecks = serializers.DecimalField(max_digits=18, decimal_places=6)
-    moment = serializers.DateTimeField()
-    document_number = serializers.CharField()
-    supplier = serializers.CharField()
 
 
 class MaterialRestSerializer(serializers.Serializer):

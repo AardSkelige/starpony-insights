@@ -87,6 +87,15 @@ type Props = {
    * «Сбросить» появлялась бы из-за дат, которых на экране нет.
    */
   period?: boolean
+  /**
+   * Как называется период **на этой странице**.
+   *
+   * По умолчанию «Период»: у восьми разделов он сужает выборку, и слово
+   * говорит само за себя. У «Расчёта производства» он делает другое —
+   * задаёт окно, из которого берётся темп продаж, — и безымянное «Период»
+   * там не объясняло ничего: первый же вопрос к странице был «зачем он тут».
+   */
+  periodLabel?: string
   /** Что ищут на этой странице — подсказка в поле и подпись для чтения с экрана. */
   searchPlaceholder: string
   searchLabel: string
@@ -119,6 +128,7 @@ export function Filters({
   onReset,
   picker,
   period = true,
+  periodLabel,
   searchPlaceholder,
   searchLabel,
   extra,
@@ -143,7 +153,9 @@ export function Filters({
         />
       </div>
 
-      {period ? <PeriodField value={value} onChange={onChange} /> : null}
+      {period ? (
+        <PeriodField value={value} onChange={onChange} title={periodLabel} />
+      ) : null}
 
       {picker ? <PickerField value={value} onChange={onChange} picker={picker} /> : null}
 
@@ -233,9 +245,11 @@ function PickerField({
 function PeriodField({
   value,
   onChange,
+  title = "Период",
 }: {
   value: FilterValue
   onChange: (patch: Partial<FilterValue>) => void
+  title?: string
 }) {
   // Календарь на телефоне помещается только в один месяц — это про
   // содержимое, а не про оформление, и классами не задаётся.
@@ -251,11 +265,13 @@ function PeriodField({
         render={
           <Button
             variant="outline"
-            aria-label="Период"
+            aria-label={title}
             className={cn("w-full justify-start gap-2 font-normal sm:w-44", PHONE_HEIGHT)}
           >
             <CalendarDays data-icon="inline-start" className="text-muted-foreground" />
-            <span className="flex-1 truncate text-left">{label(value, screen)}</span>
+            <span className="flex-1 truncate text-left">
+              {label(value, screen, title)}
+            </span>
             <ChevronDown className="text-muted-foreground" />
           </Button>
         }
@@ -286,8 +302,8 @@ function PeriodField({
  * и снимает вопрос «апрель какого года». В ряду фильтров на большом экране
  * поле узкое, а год виден в календаре по нажатию.
  */
-function label(value: FilterValue, screen: Screen): string {
-  if (!value.dateFrom && !value.dateTo) return "Период"
+function label(value: FilterValue, screen: Screen, title = "Период"): string {
+  if (!value.dateFrom && !value.dateTo) return title
 
   const format = screen === "phone" ? formatDate : formatDayMonth
   const from = value.dateFrom ? format(value.dateFrom) : "…"

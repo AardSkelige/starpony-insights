@@ -196,11 +196,7 @@ def _coverage_of(
         ),
         Decimal(0),
     )
-    span = (
-        coverage.days_in(filters.date_from, filters.date_to, 0)
-        if filters.date_from and filters.date_to
-        else coverage.days_in(None, None, coverage.days_of(shipments))
-    )
+    span = coverage.span_of(shipments, filters.date_from, filters.date_to)
     # Расход считается всегда, даже когда остатка в отчёте нет (36 материалов
     # из 161). Прочерк там только у «хватит на N дней» — делить не на что;
     # а «израсходовано за период» и «расход в день» известны, и подставить

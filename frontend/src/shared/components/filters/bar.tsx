@@ -31,6 +31,8 @@ export function FiltersBar(props: {
    * на сегодня, и период прятал бы часть его, а не сужал выборку.
    */
   period?: boolean
+  /** Как называется период на этой странице. По умолчанию «Период». */
+  periodLabel?: string
   /** Что ищут на этой странице — подсказка в поле и подпись для чтения с экрана. */
   searchPlaceholder: string
   searchLabel: string
