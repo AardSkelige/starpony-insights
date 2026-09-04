@@ -17,8 +17,8 @@ import { useScreen } from "@/shared/hooks/use-screen"
 import { useTableParams } from "@/shared/hooks/use-table-params"
 import { withPlural } from "@/shared/lib/plural"
 
-const SEARCH_PLACEHOLDER = "Название канала"
-const SEARCH_LABEL = "Поиск по каналам"
+const SEARCH_PLACEHOLDER = "Канал или покупатель"
+const SEARCH_LABEL = "Поиск по каналам и покупателям"
 
 /**
  * «Каналы продаж»: где продаём и сколько это приносит.
@@ -76,7 +76,7 @@ export function ChannelsPage() {
         syncedAt={data?.synced_at ?? null}
         onRefresh={() => refresh.mutate()}
         refreshing={refresh.isPending || sync.running}
-        refreshNote={refreshNote(refresh, sync.running)}
+        refreshNote={refreshNote(refresh, sync.running, sync)}
         onExport={() => {
           window.location.assign(
             exportUrl({ ...table.applied, ordering: table.ordering })

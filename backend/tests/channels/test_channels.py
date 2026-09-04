@@ -8,6 +8,7 @@
 """
 
 from datetime import date
+from decimal import Decimal
 
 import pytest
 
@@ -243,3 +244,129 @@ def test_standings_compare_two_shares_of_one_set(three_channels):
     # «Маркет» — наоборот: половина отгрузок и шестая часть денег.
     assert round(float(by_name["Маркет"]["shipments_share"]), 3) == 0.5
     assert round(float(by_name["Маркет"]["revenue_share"]), 3) == 0.167
+
+
+@pytest.mark.django_db
+class TestSearchFindsByBuyer:
+    """Строка — канал, но вопрос к странице часто про покупателя.
+
+    «Через что покупает Каприоль» — тот же ответ, просто найденный с другой
+    стороны. Заставлять сначала вспомнить название канала незачем.
+    """
+
+    def test_имя_покупателя_находит_его_канал(
+        self, make_demand, make_product, make_channel, make_buyer
+    ):
+        ozon = make_channel("Озон")
+        point = make_channel("Точка продаж")
+        capriole = make_buyer("КРМОО «Каприоль»")
+        position(
+            make_demand(sales_channel=ozon, total_kopecks=100_00),
+            make_product(code="2-001"),
+            "1",
+            100_00,
+        )
+        position(
+            make_demand(sales_channel=point, agent=capriole, total_kopecks=200_00),
+            make_product(code="3-001"),
+            "1",
+            200_00,
+        )
+
+        rows = service.page(service.Filters(search="каприоль"))["results"]
+
+        assert [row["name"] for row in rows] == ["Точка продаж"]
+
+    def test_название_канала_ищется_по_прежнему(
+        self, make_demand, make_product, make_channel
+    ):
+        make_channel("Точка продаж")
+        position(
+            make_demand(total_kopecks=100_00), make_product(code="2-001"), "1", 100_00
+        )
+
+        rows = service.page(service.Filters(search="озон"))["results"]
+
+        assert [row["name"] for row in rows] == ["Озон"]
+
+    def test_ищутся_все_покупатели_а_не_первая_пятёрка(
+        self, make_demand, make_product, make_channel, make_buyer
+    ):
+        """Найти нельзя было бы шестого по величине — и поиску перестают верить."""
+        channel = make_channel("Озон")
+        product = make_product(code="2-001")
+        for index in range(6):
+            buyer = make_buyer(f"Покупатель {index}")
+            position(
+                make_demand(
+                    sales_channel=channel, agent=buyer, total_kopecks=(10 - index) * 100
+                ),
+                product,
+                "1",
+                (10 - index) * 100,
+            )
+
+        rows = service.page(service.Filters(search="Покупатель 5"))["results"]
+
+        assert [row["name"] for row in rows] == ["Озон"]
+
+    def test_доли_не_сужаются_поиском(
+        self, make_demand, make_product, make_channel, make_buyer
+    ):
+        """Найденное — про строки, а не про знаменатель (`DESIGN.md` §8)."""
+        ozon = make_channel("Озон")
+        point = make_channel("Точка продаж")
+        capriole = make_buyer("Каприоль")
+        product = make_product(code="2-001")
+        position(make_demand(sales_channel=ozon, total_kopecks=300_00), product, "1", 300_00)
+        position(
+            make_demand(sales_channel=point, agent=capriole, total_kopecks=100_00),
+            product,
+            "1",
+            100_00,
+        )
+
+        rows = service.page(service.Filters(search="каприоль"))["results"]
+
+        assert rows[0]["revenue_share"] == Decimal("0.25")
+
+
+@pytest.mark.django_db
+class TestMarketplaceBuyer:
+    """У площадки покупатель один по устройству, а не по стечению обстоятельств.
+
+    «1 покупатель · полоса на 100 % · уйдёт он — уйдёт и канал» здесь
+    не сообщает ничего: канал и есть площадка. Признак ведёт владелец
+    группой «маркетплейсы» в учёте — тот же, что у «Сроков оплаты».
+    """
+
+    def test_покупатель_помечен_площадкой(
+        self, make_demand, make_product, make_channel, make_buyer
+    ):
+        ozon = make_channel("Озон")
+        buyer = make_buyer('ООО "ИНТЕРНЕТ РЕШЕНИЯ"')
+        # Группа набирается человеком в учёте, поэтому с заглавной —
+        # это та же группа, а не другая.
+        buyer.tags = ["Маркетплейсы"]
+        buyer.save(update_fields=["tags"])
+        position(
+            make_demand(sales_channel=ozon, agent=buyer, total_kopecks=100_00),
+            make_product(code="2-001"),
+            "1",
+            100_00,
+        )
+
+        row = service.page(service.Filters())["results"][0]
+
+        assert row["buyers"]["items"][0]["is_marketplace"] is True
+
+    def test_обычный_покупатель_не_площадка(
+        self, make_demand, make_product, make_channel
+    ):
+        position(
+            make_demand(total_kopecks=100_00), make_product(code="2-001"), "1", 100_00
+        )
+
+        row = service.page(service.Filters())["results"][0]
+
+        assert row["buyers"]["items"][0]["is_marketplace"] is False

@@ -46,9 +46,20 @@ export function RowDetail({
 }) {
   const leader = row.buyers.items[0]
   const leaderShare = Number(leader?.share ?? 0)
+
+  /**
+   * Канал — площадка, и покупатель у него один по устройству, а не по стечению
+   * обстоятельств: у Озона, Яндекса, ХорсСмарта и ПМТ контрагент всегда сам
+   * маркетплейс. Полоса на 100 %, подпись «1 покупатель» и вывод «уйдёт он —
+   * уйдёт и канал» здесь не сообщают ничего: уйдёт площадка — да, канал
+   * и есть площадка. Замечание владельца 04.09.
+   */
+  const soleMarketplace = row.buyers_count === 1 && Boolean(leader?.is_marketplace)
+
   // Именованное условие, а не сравнение прямо в разметке: половина выручки
   // на одном покупателе — это утверждение, и у него должно быть имя.
-  const concentrated = leaderShare >= 0.5
+  // У площадки утверждения нет — есть устройство канала.
+  const concentrated = leaderShare >= 0.5 && !soleMarketplace
 
   return (
     <div
@@ -66,7 +77,11 @@ export function RowDetail({
         // Цвет — только когда есть о чём предупредить: половина выручки
         // на одном покупателе это зависимость, а не статистика.
         tone={concentrated ? "warning" : "default"}
-        note={`${withPlural(row.buyers_count, "покупатель", "покупателя", "покупателей")} за период`}
+        note={
+          soleMarketplace
+            ? undefined
+            : `${withPlural(row.buyers_count, "покупатель", "покупателя", "покупателей")} за период`
+        }
         explain={
           <Explain>
             Отгрузки канала, сгруппированные по контрагенту. <b>Единица —
@@ -76,13 +91,27 @@ export function RowDetail({
           </Explain>
         }
       >
-        <TopList top={row.buyers} total={row.revenue_kopecks} tail={["покупатель", "покупателя", "покупателей"]} />
-        {concentrated && leader ? (
-          <p className="mt-2 text-xs text-muted-foreground">
-            На одном покупателе {formatShare(leader.share)} выручки канала.
-            Уйдёт он — уйдёт и канал.
+        {soleMarketplace && leader ? (
+          // Ни полосы, ни перечисления: полоса сравнивает, а сравнивать
+          // не с чем. Остаётся то, что владелец назвал интересным, —
+          // сколько отгрузок за период.
+          <p className="text-sm">
+            Покупатель — сама площадка, {leader.name}.{" "}
+            <span className="text-muted-foreground">
+              {leader.note} за период.
+            </span>
           </p>
-        ) : null}
+        ) : (
+          <>
+            <TopList top={row.buyers} total={row.revenue_kopecks} tail={["покупатель", "покупателя", "покупателей"]} />
+            {concentrated && leader ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                На одном покупателе {formatShare(leader.share)} выручки канала.
+                Уйдёт он — уйдёт и канал.
+              </p>
+            ) : null}
+          </>
+        )}
       </Section>
 
       <Section

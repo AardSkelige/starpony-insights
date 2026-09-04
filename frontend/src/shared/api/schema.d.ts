@@ -688,6 +688,8 @@ export interface components {
             /** Format: decimal */
             share: string | null;
             note: string;
+            /** @default false */
+            is_marketplace: boolean;
         };
         Channels: {
             count: number;
@@ -1721,10 +1723,20 @@ export interface components {
             request_count: number;
             error: string;
         };
+        /**
+         * @description Идёт ли прогон и насколько продвинулся.
+         *
+         *     Счётчик настоящий — по числу закрытых сущностей, а не по доле
+         *     прошедшего времени. Вопрос человека у крутящейся стрелки один:
+         *     «идёт или зависло», и отвечает на него только число, которое меняется.
+         */
         SyncStatus: {
             running: boolean;
             /** Format: date-time */
             started_at: string | null;
+            done: number;
+            total: number;
+            stage: string;
         };
         /**
          * @description Продажи во времени. Заменило журнал последних отгрузок.

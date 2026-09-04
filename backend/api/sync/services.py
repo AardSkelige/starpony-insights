@@ -14,8 +14,8 @@ from datetime import timedelta
 
 from django.utils import timezone
 
-from core.models import SyncKind, SyncRun, SyncStatus
-from moysklad.sync.full import AlreadyRunning, TokenMissing, run_documents_sync
+from core.models import SyncEntityResult, SyncKind, SyncRun, SyncStatus
+from moysklad.sync.full import ENTITIES, AlreadyRunning, TokenMissing, run_documents_sync
 
 # Сколько ждать между запусками руками. Три минуты — не про нагрузку на нас,
 # а про общий с ботом лимит: ночной проход тратит около двухсот запросов,
@@ -28,6 +28,25 @@ COOLDOWN = timedelta(minutes=3)
 # запись выключает кнопку навсегда — до следующего ночного прогона.
 # Живой проход занимает секунды; четверть часа — заведомо больше любого.
 STALE_AFTER = timedelta(minutes=15)
+
+
+# Как называется сущность на экране. Ключи — из `ENTITIES`, и второго списка
+# здесь нет: порядок и состав задаёт синхронизация, тут только подписи.
+# Забыть подпись у новой сущности не даёт `test_every_entity_has_a_label`.
+STAGE_LABELS = {
+    "uom": "единицы измерения",
+    "product": "товары",
+    "processingplan": "техкарты",
+    "counterparty": "контрагенты",
+    "contract": "договоры",
+    "saleschannel": "каналы продаж",
+    "customerorder": "заказы покупателей",
+    "demand": "отгрузки",
+    "purchaseorder": "заказы поставщикам",
+    "supply": "приёмки",
+    "commissionreportin": "отчёты комиссионеров",
+    "profit": "прибыльность",
+}
 
 
 class Refused(Exception):
@@ -81,9 +100,23 @@ def status() -> dict:
         and previous.status == SyncStatus.RUNNING
         and timezone.now() - previous.started_at < STALE_AFTER
     )
+    if not running:
+        return {"running": False, "started_at": None, "done": 0, "total": 0, "stage": ""}
+
+    # Сколько сущностей уже закрыто. Строка итога пишется по завершении
+    # каждой, поэтому счётчик настоящий, а не выдуманная доля времени:
+    # человеку нужен ответ на «идёт или зависло», и его даёт только число,
+    # которое меняется.
+    done = SyncEntityResult.objects.filter(run=previous).count()
+    order = [name for name, _ in ENTITIES]
+    stage = STAGE_LABELS.get(order[done], "") if done < len(order) else "заканчиваем"
+
     return {
-        "running": running,
-        "started_at": previous.started_at if running else None,
+        "running": True,
+        "started_at": previous.started_at,
+        "done": done,
+        "total": len(order),
+        "stage": stage,
     }
 
 

@@ -86,21 +86,23 @@ export function Section({
         !bare && TONES[tone]
       )}
     >
-      {bare ? (
-        // За вкладкой заголовок лишний — его роль играет сама вкладка,
-        // но значок объяснения обязан остаться: на телефоне подсказки
-        // у колонок таблицы недостижимы вовсе (таблица там карточками),
-        // и это единственное место, где формулу можно посмотреть.
-        explain ? <div className="mb-2 flex justify-end">{explain}</div> : null
-      ) : (
-        <div className="mb-2 flex items-center gap-2">
-          <span className="text-xs tracking-wide text-muted-foreground uppercase">
-            {title}
-          </span>
-          {explain}
-          <span className="h-px flex-1 bg-border" />
-        </div>
-      )}
+      {/* Шапка одна на оба вида. `bare` снимает карточку, но не подпись:
+          прежде за вкладкой заголовок выбрасывался, а значок объяснения
+          оставался — и висел один, прижатый к правому краю, посреди пустой
+          строки. Ровно то, что запрещает правило четырьмя абзацами выше:
+          «висящий сам по себе вопросительный знак не говорит, к чему
+          относится, и его просто не нажимают».
+
+          Опасение, из-за которого подпись убирали, — что она повторит
+          вкладку — не подтвердилось: за вкладкой «Цена» стоят блоки
+          «Склад» и «Запас», и названия у них свои. */}
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-xs tracking-wide text-muted-foreground uppercase">
+          {title}
+        </span>
+        {explain}
+        <span className="h-px flex-1 bg-border" />
+      </div>
       {note ? <p className="mb-1.5 text-xs text-muted-foreground">{note}</p> : null}
       {/* `contents` не добавляет уровень раскладки, но даёт общий паттерн:
           новый корень данных мягко проявляется на месте скелетона. */}

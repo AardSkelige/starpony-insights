@@ -71,6 +71,10 @@ class ChannelTopItemSerializer(serializers.Serializer):
     # Склоняется на сервере — склонятель один на проект (`core/text.py`),
     # и вторая копия правила на фронте разошлась бы с первой.
     note = serializers.CharField(allow_blank=True)
+    # Площадка ли это. Есть только у покупателей — у списка товаров понятия
+    # площадки нет вовсе, поэтому необязательное: тип один на оба списка,
+    # и обязательное поле сломало бы второй.
+    is_marketplace = serializers.BooleanField(required=False, default=False)
 
 
 class ChannelTopSerializer(serializers.Serializer):

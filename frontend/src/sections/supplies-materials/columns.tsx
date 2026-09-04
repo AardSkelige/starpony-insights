@@ -2,11 +2,11 @@ import type {
   SupplyMaterialRow,
   SupplyMaterials,
 } from "@/sections/supplies-materials/api"
-import { PriceSpark } from "@/sections/supplies-materials/ui/price-line"
+import { Price, PriceSpark } from "@/sections/supplies-materials/ui/price-line"
 import { PriceChange } from "@/sections/supplies-materials/ui/price-change"
 import type { Column, Totals } from "@/shared/components/data-table"
 import { Explain } from "@/shared/components/explain"
-import { formatMoney, formatQuantity, formatUnitPrice } from "@/shared/lib/format"
+import { formatMoney, formatQuantity } from "@/shared/lib/format"
 import { withPlural } from "@/shared/lib/plural"
 
 /**
@@ -119,15 +119,13 @@ export const COLUMNS: Column<SupplyMaterialRow>[] = [
     render: (row) => (
       <span className="flex items-center justify-end gap-2">
         <PriceSpark prices={row.prices} />
-        {row.last_price_kopecks === null ? (
-          <span className="text-muted-foreground">—</span>
-        ) : (
-          <span>
-            {formatUnitPrice(row.last_price_kopecks)}/{row.uom || "ед."}
-          </span>
-        )}
+        <Price kopecks={row.last_price_kopecks} uom={row.uom} />
       </span>
     ),
+    // В карточке линии нет: она держит место в колонке, а колонки там нет.
+    // Её заглушка-точка висела посреди строки, а сама линия наезжала
+    // на подпись — обе подпорки на телефоне превращались в мусор.
+    renderCard: (row) => <Price kopecks={row.last_price_kopecks} uom={row.uom} />,
     explain: (
       <Explain>
         <b>Цена последней закупки</b> и весь ряд цен за период линией.
@@ -232,3 +230,4 @@ export function totalsFor(totals: SupplyMaterials["totals"]): Totals {
     },
   }
 }
+

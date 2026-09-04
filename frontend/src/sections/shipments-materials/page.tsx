@@ -58,7 +58,7 @@ export function ShipmentMaterialsPage() {
         syncedAt={data?.synced_at ?? null}
         onRefresh={() => refresh.mutate()}
         refreshing={refresh.isPending || sync.running}
-        refreshNote={refreshNote(refresh, sync.running)}
+        refreshNote={refreshNote(refresh, sync.running, sync)}
         onExport={() => {
           window.location.assign(
             exportUrl({ ...table.applied, ordering: table.ordering })

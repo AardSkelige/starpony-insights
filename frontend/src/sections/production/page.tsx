@@ -92,7 +92,7 @@ export function ProductionPage() {
         syncedAt={products.data?.synced_at ?? null}
         onRefresh={() => refresh.mutate()}
         refreshing={refresh.isPending || sync.running}
-        refreshNote={refreshNote(refresh, sync.running)}
+        refreshNote={refreshNote(refresh, sync.running, sync)}
       />
 
       {/* «Период» здесь подписан иначе: он не сужает выборку, а задаёт окно,

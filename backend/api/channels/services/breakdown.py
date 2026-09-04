@@ -48,7 +48,14 @@ def buyers(shipments: list) -> dict:
     for shipment in shipments:
         entry = by_agent.setdefault(
             shipment.agent_id,
-            {"name": shipment.agent.name, "revenue_kopecks": 0, "count": 0},
+            {
+                "name": shipment.agent.name,
+                "revenue_kopecks": 0,
+                "count": 0,
+                # Площадка ли это. Признак ведёт владелец группой
+                # «маркетплейсы» в учёте — тот же, что у «Сроков оплаты».
+                "is_marketplace": shipment.agent.is_marketplace,
+            },
         )
         entry["revenue_kopecks"] += shipment.total_kopecks
         entry["count"] += 1

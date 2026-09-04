@@ -8,6 +8,7 @@ import {
   formatShare,
   formatUnitPrice,
 } from "@/shared/lib/format"
+import { cn } from "@/shared/lib/utils"
 
 /**
  * Разбор строки: из чего сложилась маржа этого товара.
@@ -36,7 +37,18 @@ export function RowDetail({
   const unsold = Number(row.unsold_quantity) > 0
 
   return (
-    <div className="flex flex-col gap-3">
+    <div
+      className={cn(
+        "flex flex-col gap-3",
+        // Отступ свой только у встроенного вида: `TableCell` разбора
+        // объявляет `p-0`, и без него блоки прилипали к верхней границе
+        // и к обоим краям — а с рамкой у блока `tone="warning"` это видно
+        // особенно. В панели отступ свой сверху: иначе подпись первого
+        // блока встаёт вплотную к подзаголовку шапки и читается
+        // как её продолжение.
+        inDrawer ? "pt-2" : "p-4"
+      )}
+    >
       <Section
         title="Из чего сложилась маржа"
         lead

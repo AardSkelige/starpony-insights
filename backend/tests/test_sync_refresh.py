@@ -341,3 +341,41 @@ def test_refusal_text_shows_minutes(client, make_user):
     detail = client.post(URL).json()["detail"]
 
     assert "мин" in detail
+
+
+class TestProgress:
+    """Прогресс настоящий: по закрытым сущностям, а не по доле времени.
+
+    Вопрос у крутящейся стрелки один — «идёт или зависло». Доля времени
+    на него не отвечает: она растёт и у намертво зависшего прогона.
+    """
+
+    def test_подписи_есть_у_каждой_сущности(self):
+        """Второй список сущностей разъедется с первым, и молча."""
+        from api.sync.services import STAGE_LABELS
+        from moysklad.sync.full import ENTITIES
+
+        assert {name for name, _ in ENTITIES} == set(STAGE_LABELS)
+
+    def test_счётчик_растёт_по_мере_закрытия(self, db):
+        from core.models import SyncEntityResult, SyncKind, SyncRun, SyncStatus
+        from api.sync.services import status
+
+        run = SyncRun.objects.create(kind=SyncKind.DOCUMENTS)
+        assert status()["done"] == 0
+        assert status()["stage"] == "единицы измерения"
+
+        SyncEntityResult.objects.create(run=run, entity="uom", status=SyncStatus.SUCCESS)
+
+        assert status()["done"] == 1
+        assert status()["stage"] == "товары"
+
+    def test_закрытый_прогон_прогресса_не_показывает(self, db):
+        from core.models import SyncKind, SyncRun, SyncStatus
+        from api.sync.services import status
+
+        SyncRun.objects.create(kind=SyncKind.DOCUMENTS, status=SyncStatus.SUCCESS)
+
+        state = status()
+        assert state["running"] is False
+        assert state["done"] == 0 and state["total"] == 0

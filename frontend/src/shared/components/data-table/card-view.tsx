@@ -76,7 +76,7 @@ export function CardView<Row>({
                   {/* Число не переносится и не ужимается: подпись слева
                     уступит место первой, ей есть куда. */}
                   <dd className="shrink-0 tabular-nums">
-                    {column.render(row)}
+                    {(column.renderCard ?? column.render)(row)}
                   </dd>
                 </div>
               ))}

@@ -39,7 +39,14 @@ export function useSyncStatus() {
     wasRunning.current = running
   }, [running, queryClient])
 
-  return { running, startedAt: query.data?.started_at ?? null }
+  return {
+    running,
+    startedAt: query.data?.started_at ?? null,
+    // Настоящий прогресс: сколько сущностей уже закрыто и что идёт сейчас.
+    done: query.data?.done ?? 0,
+    total: query.data?.total ?? 0,
+    stage: query.data?.stage ?? "",
+  }
 }
 
 /**
@@ -86,13 +93,51 @@ function refusalText(error: unknown): string | null {
  * на всех десяти разделах, а разойдись он — человек по формулировке решал бы,
  * что разделы обновляются по-разному.
  */
+/**
+ * Чем занять человека, пока крутится стрелка.
+ *
+ * Меняются по кругу, раз в несколько секунд, — и это часть ответа
+ * на вопрос «зависло или нет»: неподвижная надпись выглядит одинаково
+ * у живого прогона и у мёртвого. Правду при этом несёт счётчик рядом,
+ * а не фраза: она только показывает, что жизнь есть.
+ *
+ * **Ни одна не склоняет «МойСклад»** — это название, а не слово.
+ */
+const WAITING_PHRASES = [
+  "тормошим МойСклад",
+  "считаем баночки",
+  "пересчитываем гривы и хвосты",
+  "сверяем с учётом",
+  "раскладываем по полочкам",
+  "уговариваем МойСклад отдать данные",
+  "проверяем, всё ли доехало",
+]
+
+/** Одна фраза на каждые четыре секунды ожидания. */
+function waitingPhrase(startedAt: string | null): string {
+  if (!startedAt) return WAITING_PHRASES[0]
+  const seconds = (Date.now() - new Date(startedAt).getTime()) / 1000
+  const index = Math.floor(Math.max(0, seconds) / 4) % WAITING_PHRASES.length
+  return WAITING_PHRASES[index]
+}
+
 export function refreshNote(
   refresh: ReturnType<typeof useRefresh>,
-  running: boolean
+  running: boolean,
+  progress?: { done: number; total: number; stage: string; startedAt: string | null }
 ): string | null {
   // `running` покрывает и чужой прогон, и свой после перезагрузки страницы,
   // когда состояние мутации уже потеряно.
-  if (refresh.isPending || running) return "идёт обновление из МойСклада…"
+  if (refresh.isPending || running) {
+    const phrase = waitingPhrase(progress?.startedAt ?? null)
+    // Счётчик — единственное, что отличает идущий прогон от зависшего.
+    // Пока сервер не отдал первую сущность, показывать нечего, и лучше
+    // честное многоточие, чем «0 из 13», которое выглядит поломкой.
+    if (progress && progress.total > 0 && progress.done > 0) {
+      return `${phrase}… ${progress.done} из ${progress.total}${progress.stage ? ` · ${progress.stage}` : ""}`
+    }
+    return `${phrase}…`
+  }
 
   const refusal = refusalText(refresh.error)
   if (refusal) return refusal

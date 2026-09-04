@@ -16,8 +16,19 @@ class SyncRunSerializer(serializers.Serializer):
 
 
 class SyncStatusSerializer(serializers.Serializer):
+    """Идёт ли прогон и насколько продвинулся.
+
+    Счётчик настоящий — по числу закрытых сущностей, а не по доле
+    прошедшего времени. Вопрос человека у крутящейся стрелки один:
+    «идёт или зависло», и отвечает на него только число, которое меняется.
+    """
+
     running = serializers.BooleanField()
     started_at = serializers.DateTimeField(allow_null=True)
+    done = serializers.IntegerField()
+    total = serializers.IntegerField()
+    # Что обрабатывается прямо сейчас: «отгрузки», «прибыльность».
+    stage = serializers.CharField(allow_blank=True)
 
 
 class RefusedSerializer(serializers.Serializer):

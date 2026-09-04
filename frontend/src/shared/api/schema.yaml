@@ -2080,6 +2080,9 @@ components:
           nullable: true
         note:
           type: string
+        is_marketplace:
+          type: boolean
+          default: false
       required:
       - name
       - note
@@ -4547,6 +4550,12 @@ components:
       - status_label
     SyncStatus:
       type: object
+      description: |-
+        Идёт ли прогон и насколько продвинулся.
+
+        Счётчик настоящий — по числу закрытых сущностей, а не по доле
+        прошедшего времени. Вопрос человека у крутящейся стрелки один:
+        «идёт или зависло», и отвечает на него только число, которое меняется.
       properties:
         running:
           type: boolean
@@ -4554,9 +4563,18 @@ components:
           type: string
           format: date-time
           nullable: true
+        done:
+          type: integer
+        total:
+          type: integer
+        stage:
+          type: string
       required:
+      - done
       - running
+      - stage
       - started_at
+      - total
     Timeline:
       type: object
       description: |-

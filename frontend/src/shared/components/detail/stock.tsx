@@ -85,10 +85,21 @@ export function StockSection({
         <Fact label="Остаток" value={formatQuantity(stock.quantity, uom)} />
         <Fact label="В резерве" value={formatQuantity(stock.reserved)} />
         <Fact label="Свободно" value={formatQuantity(stock.available)} />
+        {/* **«Лежит на складе», а не «без движения».** МойСклад называет это
+            поле «количество дней на складе» — это возраст **сегодняшнего
+            остатка**, а не время без операций. Разница видна сразу:
+            у всех 57 товаров с нулевым остатком здесь ноль, и раньше это
+            читалось как «движение было сегодня», хотя товара просто нет.
+            Поэтому при пустом остатке — прочерк: лежать нечему, и число
+            ответа не даёт. */}
         {stock.stock_days !== null ? (
           <Fact
-            label="Без движения"
-            value={withPlural(stock.stock_days, "день", "дня", "дней")}
+            label="Лежит на складе"
+            value={
+              Number(stock.quantity) > 0
+                ? withPlural(stock.stock_days, "день", "дня", "дней")
+                : "—"
+            }
           />
         ) : null}
       </Facts>

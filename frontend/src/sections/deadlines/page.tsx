@@ -78,7 +78,7 @@ export function DeadlinesPage() {
         syncedAt={data?.synced_at ?? null}
         onRefresh={() => refresh.mutate()}
         refreshing={refresh.isPending || sync.running}
-        refreshNote={refreshNote(refresh, sync.running)}
+        refreshNote={refreshNote(refresh, sync.running, sync)}
         onExport={() => {
           window.location.assign(
             exportUrl({ search: table.applied.search, ordering: table.ordering })

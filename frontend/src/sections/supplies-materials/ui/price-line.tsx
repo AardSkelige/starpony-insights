@@ -231,3 +231,25 @@ export function PriceChart({
     </figure>
   )
 }
+
+
+/**
+ * Цена последней закупки с единицей.
+ *
+ * Одна на ячейку таблицы и на карточку телефона: в ячейке рядом с ней
+ * стоит линия, в карточке — нет, а само число обязано быть одинаковым.
+ */
+export function Price({
+  kopecks,
+  uom,
+}: {
+  kopecks: string | null
+  uom: string
+}) {
+  if (kopecks === null) return <span className="text-muted-foreground">—</span>
+  return (
+    <span>
+      {formatUnitPrice(kopecks)}/{uom || "ед."}
+    </span>
+  )
+}

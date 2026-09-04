@@ -29,7 +29,39 @@ import { useDebounced } from "@/shared/hooks/use-debounced"
  * пользуются, а не всё, что API готов принять.
  */
 export const HORIZONS = [15, 30, 60, 90] as const
-export const DEFAULT_HORIZON = 60
+// Пятнадцать, а не шестьдесят: короткая варка под то, что кончается прямо
+// сейчас, — обычный случай, а два месяца вперёд планируют изредка. Решение
+// владельца 04.09; до него страница открывалась на шестидесяти.
+export const DEFAULT_HORIZON = 15
+
+// Где помнить подобранную партию между заходами. Адресная строка остаётся
+// главной — ссылку с партией шлют коллеге, — но по ссылке из меню параметров
+// в адресе нет, и получасовой подбор из сорока позиций терялся от одного
+// перехода на соседнюю страницу и обратно.
+const MEMORY_KEY = "production-batch"
+
+type Remembered = { horizon: number; batch: string | null }
+
+function readRemembered(): Remembered | null {
+  try {
+    const raw = localStorage.getItem(MEMORY_KEY)
+    if (!raw) return null
+    const value = JSON.parse(raw) as Remembered
+    return typeof value?.horizon === "number" ? value : null
+  } catch {
+    // Приватное окно, запрет на хранилище, испорченный JSON — забыть
+    // прошлый подбор неприятно, но уронить страницу из-за этого нельзя.
+    return null
+  }
+}
+
+function remember(value: Remembered): void {
+  try {
+    localStorage.setItem(MEMORY_KEY, JSON.stringify(value))
+  } catch {
+    /* пусто */
+  }
+}
 
 /**
  * Потолок количества в одной позиции. Общий с сервером
@@ -112,13 +144,37 @@ export function useBatchParams() {
     from: parseAsString,
     to: parseAsString,
     q: parseAsString.withDefault(""),
-    horizon: parseAsInteger.withDefault(DEFAULT_HORIZON),
+    // Без умолчания: `null` означает «в адресе не задан», и только это
+    // позволяет отличить переход по ссылке из меню от осознанного выбора.
+    horizon: parseAsInteger,
     batch: parseAsString,
   })
 
   // Поиск набирают по букве, а запрос за пятьюдесятью семью товарами
   // на каждую букву — пустая трата. Задержка та же, что у соседних страниц.
   const search = useDebounced(params.q)
+
+  // Адрес главнее памяти: пришли по ссылке — открываем то, что в ней.
+  // Память подхватывает только пустой адрес, то есть переход из меню.
+  const restored = React.useRef(false)
+  React.useEffect(() => {
+    if (restored.current) return
+    restored.current = true
+    if (params.horizon !== null || params.batch !== null) return
+
+    const saved = readRemembered()
+    if (saved) setParams({ horizon: saved.horizon, batch: saved.batch })
+  }, [params.horizon, params.batch, setParams])
+
+  const horizon = params.horizon ?? DEFAULT_HORIZON
+
+  // Запоминаем только то, что человек действительно выбрал: пустой адрес
+  // сразу после восстановления затёр бы память тем же, что из неё взяли,
+  // а чистый заход на страницу — стёр бы подбор.
+  React.useEffect(() => {
+    if (params.horizon === null && params.batch === null) return
+    remember({ horizon, batch: params.batch })
+  }, [horizon, params.horizon, params.batch])
 
   const picked = React.useMemo(() => parseBatch(params.batch), [params.batch])
 
@@ -192,8 +248,8 @@ export function useBatchParams() {
     raw: { dateFrom: params.from, dateTo: params.to, search: params.q },
     // То, что уходит в запрос.
     applied: { dateFrom: params.from, dateTo: params.to, search },
-    horizon: params.horizon,
-    setHorizon: (horizon: number) => setParams({ horizon }),
+    horizon,
+    setHorizon: (next: number) => setParams({ horizon: next }),
     setFilters: (patch: { dateFrom?: string | null; dateTo?: string | null; search?: string }) =>
       setParams({
         ...(patch.dateFrom !== undefined ? { from: patch.dateFrom } : {}),
