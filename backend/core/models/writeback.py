@@ -25,6 +25,7 @@ from core.models.base import BackupGroup, DomainModel
 
 class WritebackKind(models.TextChoices):
     COST_PRICES = "cost_prices", "Проставление себестоимости в карточки МойСклада"
+    MIN_BALANCE = "min_balance", "Проставление неснижаемого остатка в карточки МойСклада"
 
 
 class WritebackStatus(models.TextChoices):

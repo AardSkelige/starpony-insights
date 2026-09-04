@@ -8,10 +8,10 @@
 #   2. Сообщает внешнему наблюдателю, что прогон был и чем кончился;
 #   3. Пишет вывод в журнал с отметкой времени.
 #
-# Использование: starpony-sync.sh documents|state|cost_prices
+# Использование: starpony-sync.sh documents|state|cost_prices|min_balance
 set -uo pipefail
 
-COMMAND="${1:?Укажите задачу: documents, state или cost_prices}"
+COMMAND="${1:?Укажите задачу: documents, state, cost_prices или min_balance}"
 PROJECT_DIR=/root/starpony
 LOG=/var/log/starpony_sync.log
 
@@ -36,6 +36,10 @@ case "$COMMAND" in
     MANAGE=writeback_cost_prices; TIMEOUT=900
     LOCK=/var/lock/starpony-writeback-cost-prices.lock
     # Прогон по расписанию не должен числиться в журнале запущенным человеком.
+    MANAGE_ARGS=(--cron) ;;
+  min_balance)
+    MANAGE=writeback_min_balance; TIMEOUT=900
+    LOCK=/var/lock/starpony-writeback-min-balance.lock
     MANAGE_ARGS=(--cron) ;;
   *) echo "Неизвестная задача: $COMMAND" >&2; exit 2 ;;
 esac
