@@ -83,9 +83,15 @@ verify() {
     "${COMPOSE[@]}" exec -T db createdb -U "$USER" "$VERIFY_DB" >>"$LOG" 2>&1 || return 1
     "${COMPOSE[@]}" exec -T db pg_restore -U "$USER" -d "$VERIFY_DB" --no-owner \
         >>"$LOG" 2>&1 < "$FILE" || return 1
+    # Считаем **пользователей**, а не товары. Товары — группа `MIRROR`,
+    # она возвращается синхронизацией за полминуты, и её наличие в архиве
+    # ничего не доказывает про то, ради чего бэкап существует. `core_user` —
+    # группа `HUMAN`: не восстановится ничем, и строка там есть всегда,
+    # хотя бы суперпользователь. Найдено 04.09 ручной приёмкой: прежняя
+    # проверка прошла бы и на архиве, где нет ни одного человека.
     local rows
     rows=$("${COMPOSE[@]}" exec -T db psql -U "$USER" -d "$VERIFY_DB" -tAc \
-        "select count(*) from core_product" 2>>"$LOG" | tr -d '[:space:]')
+        "select count(*) from core_user" 2>>"$LOG" | tr -d '[:space:]')
     [ -n "$rows" ] && [ "$rows" -gt 0 ]
 }
 

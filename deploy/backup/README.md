@@ -23,6 +23,31 @@ ls -lh /root/backup/starpony/
 и галочкой **«Проверен восстановлением»**. Без галочки бэкапа нет —
 пустой архив создаётся так же успешно, как настоящий.
 
+**Проверка считает пользователей, а не товары.** Товары вернутся синком
+за полминуты; смысл бэкапа — в группах `HUMAN` (люди и доступы)
+и `SNAPSHOT` (история синков и записей в учёт), которые не вернутся ничем.
+
+Хотя бы раз стоит посмотреть глазами, что именно доехало:
+
+```bash
+cd /root/starpony
+F=/root/backup/starpony/$(ls -1 /root/backup/starpony | tail -1)
+docker compose -f docker-compose.prod.yml exec -T db createdb -U starpony starpony_check
+docker compose -f docker-compose.prod.yml exec -T db \
+    pg_restore -U starpony -d starpony_check --no-owner < "$F"
+for t in core_user core_userpageaccess core_syncrun core_writebackrun; do
+  echo -n "$t: "
+  docker compose -f docker-compose.prod.yml exec -T db \
+      psql -U starpony -d starpony_check -tAc "select count(*) from $t"
+done
+docker compose -f docker-compose.prod.yml exec -T db dropdb -U starpony starpony_check
+```
+
+Проверено 04.09: 2 пользователя, 10 выданных доступов, 183 прогона синка,
+101 запись в учёт. `core_backuprun` в архиве на единицу отстаёт — строка
+журнала пишется после дампа, и это нормально: восстановившись, вы видите
+историю на момент снимка.
+
 ## Восстановление
 
 ```bash
