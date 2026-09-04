@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 
 import * as React from "react"
 
@@ -10,6 +15,38 @@ type SyncStatus = components["schemas"]["SyncStatus"]
 
 /** Как часто спрашивать, не закончился ли прогон. */
 const POLL_MS = 3000
+
+/** Как часто меняется фраза ожидания. */
+const PHRASE_MS = 4000
+
+/**
+ * Ключ мутации «Обновить».
+ *
+ * Нужен не ради удобства: пока идёт **свой** прогон, опрос статуса обязан
+ * работать, а узнать о нём иначе неоткуда — `useSyncStatus` и `useRefresh`
+ * живут в разных местах страницы.
+ */
+const REFRESH_KEY = ["sync", "refresh"] as const
+
+/**
+ * Чем занять человека, пока крутится стрелка.
+ *
+ * Меняются по кругу, раз в несколько секунд, — и это часть ответа
+ * на вопрос «зависло или нет»: неподвижная надпись выглядит одинаково
+ * у живого прогона и у мёртвого. Правду при этом несёт счётчик рядом,
+ * а не фраза: она только показывает, что жизнь есть.
+ *
+ * **Ни одна не склоняет «МойСклад»** — это название, а не слово.
+ */
+const WAITING_PHRASES = [
+  "тормошим МойСклад",
+  "считаем баночки",
+  "пересчитываем гривы и хвосты",
+  "сверяем с учётом",
+  "раскладываем по полочкам",
+  "уговариваем МойСклад отдать данные",
+  "проверяем, всё ли доехало",
+]
 
 /**
  * Идёт ли синхронизация — по данным сервера, а не по памяти вкладки.
@@ -24,10 +61,18 @@ export function useSyncStatus() {
   const queryClient = useQueryClient()
   const wasRunning = React.useRef(false)
 
+  // Идёт ли **наш** запрос «Обновить». Без этого опрос не включался вовсе:
+  // статус приходил один раз при загрузке страницы со словом «не идёт»,
+  // интервал оставался выключенным, и всё время прогона счётчик показывал
+  // ноль из нуля. Чужой прогон при этом опрашивался нормально — оттого
+  // ошибка и не бросалась в глаза.
+  const refreshing = useIsMutating({ mutationKey: REFRESH_KEY }) > 0
+
   const query = useQuery({
     queryKey: ["sync", "status"],
     queryFn: () => api.get<SyncStatus>("/api/sync/status/"),
-    refetchInterval: (query) => (query.state.data?.running ? POLL_MS : false),
+    refetchInterval: (query) =>
+      query.state.data?.running || refreshing ? POLL_MS : false,
   })
 
   const running = query.data?.running ?? false
@@ -46,7 +91,36 @@ export function useSyncStatus() {
     done: query.data?.done ?? 0,
     total: query.data?.total ?? 0,
     stage: query.data?.stage ?? "",
+    // Фраза крутится своим ходом, а не считается из времени начала.
+    // Считанная — менялась бы только вместе с ответом сервера, то есть
+    // рывками раз в три секунды и вовсе никогда, пока опрос выключен.
+    phrase: useWaitingPhrase(running || refreshing),
   }
+}
+
+/**
+ * Фраза ожидания, меняющаяся сама по себе.
+ *
+ * **Это не украшение, а половина ответа на «зависло или нет».** Вторая
+ * половина — счётчик сущностей, но он появляется только когда сервер
+ * закроет первую из тринадцати, а до тех пор на экране обязано двигаться
+ * хоть что-то.
+ */
+function useWaitingPhrase(active: boolean): string {
+  const [tick, setTick] = React.useState(0)
+
+  React.useEffect(() => {
+    if (!active) return
+    const timer = setInterval(() => setTick((value) => value + 1), PHRASE_MS)
+    return () => clearInterval(timer)
+  }, [active])
+
+  // Счётчик не сбрасывается между прогонами намеренно: сброс — это
+  // присваивание состояния прямо в эффекте, которое запрещено правилом
+  // React Compiler, а пользы от него нет. Следующее ожидание просто
+  // начнётся с другой фразы, и это скорее приятно.
+
+  return WAITING_PHRASES[tick % WAITING_PHRASES.length]
 }
 
 /**
@@ -61,6 +135,9 @@ export function useRefresh() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    // Ключ объявлен, чтобы `useSyncStatus` увидел идущий прогон и включил
+    // опрос: иначе прогресс молчит всё время, пока человек ждёт.
+    mutationKey: REFRESH_KEY,
     mutationFn: () => api.post<SyncRun>("/api/sync/refresh/"),
     onSuccess: () => {
       // Обновились все разделы сразу, а не только открытый: перечитываем
@@ -93,46 +170,19 @@ function refusalText(error: unknown): string | null {
  * на всех десяти разделах, а разойдись он — человек по формулировке решал бы,
  * что разделы обновляются по-разному.
  */
-/**
- * Чем занять человека, пока крутится стрелка.
- *
- * Меняются по кругу, раз в несколько секунд, — и это часть ответа
- * на вопрос «зависло или нет»: неподвижная надпись выглядит одинаково
- * у живого прогона и у мёртвого. Правду при этом несёт счётчик рядом,
- * а не фраза: она только показывает, что жизнь есть.
- *
- * **Ни одна не склоняет «МойСклад»** — это название, а не слово.
- */
-const WAITING_PHRASES = [
-  "тормошим МойСклад",
-  "считаем баночки",
-  "пересчитываем гривы и хвосты",
-  "сверяем с учётом",
-  "раскладываем по полочкам",
-  "уговариваем МойСклад отдать данные",
-  "проверяем, всё ли доехало",
-]
-
-/** Одна фраза на каждые четыре секунды ожидания. */
-function waitingPhrase(startedAt: string | null): string {
-  if (!startedAt) return WAITING_PHRASES[0]
-  const seconds = (Date.now() - new Date(startedAt).getTime()) / 1000
-  const index = Math.floor(Math.max(0, seconds) / 4) % WAITING_PHRASES.length
-  return WAITING_PHRASES[index]
-}
 
 export function refreshNote(
   refresh: ReturnType<typeof useRefresh>,
   running: boolean,
-  progress?: { done: number; total: number; stage: string; startedAt: string | null }
+  progress?: { done: number; total: number; stage: string; phrase: string }
 ): string | null {
   // `running` покрывает и чужой прогон, и свой после перезагрузки страницы,
   // когда состояние мутации уже потеряно.
   if (refresh.isPending || running) {
-    const phrase = waitingPhrase(progress?.startedAt ?? null)
-    // Счётчик — единственное, что отличает идущий прогон от зависшего.
-    // Пока сервер не отдал первую сущность, показывать нечего, и лучше
-    // честное многоточие, чем «0 из 13», которое выглядит поломкой.
+    const phrase = progress?.phrase ?? WAITING_PHRASES[0]
+    // Счётчик — то, что отличает идущий прогон от зависшего. Пока сервер
+    // не закрыл первую сущность, показывать нечего, и остаётся фраза:
+    // «0 из 13» выглядело бы поломкой, а не началом.
     if (progress && progress.total > 0 && progress.done > 0) {
       return `${phrase}… ${progress.done} из ${progress.total}${progress.stage ? ` · ${progress.stage}` : ""}`
     }
