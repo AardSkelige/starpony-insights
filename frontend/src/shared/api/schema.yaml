@@ -403,6 +403,25 @@ paths:
                 type: string
                 format: binary
           description: ''
+  /api/home/:
+    get:
+      operationId: home
+      description: 'Состояние дел за последний полный месяц: что требует решения,
+        во что вложены деньги, как идут продажи и на чём мы зарабатываем. Состав ответа
+        зависит от доступов: плитка раздела, закрытого для пользователя, приходит
+        пустой.'
+      summary: Главная
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Home'
+          description: ''
   /api/production/batch/:
     get:
       operationId: production_batch
@@ -989,12 +1008,14 @@ paths:
         schema:
           enum:
           - -avg_price
+          - -card_price
           - -free
           - -name
           - -quantity
           - -revenue
           - -share
           - avg_price
+          - card_price
           - free
           - name
           - quantity
@@ -1005,12 +1026,14 @@ paths:
           minLength: 1
         description: |-
           * `-avg_price` - -avg_price
+          * `-card_price` - -card_price
           * `-free` - -free
           * `-name` - -name
           * `-quantity` - -quantity
           * `-revenue` - -revenue
           * `-share` - -share
           * `avg_price` - avg_price
+          * `card_price` - card_price
           * `free` - free
           * `name` - name
           * `quantity` - quantity
@@ -1074,12 +1097,14 @@ paths:
         schema:
           enum:
           - -avg_price
+          - -card_price
           - -free
           - -name
           - -quantity
           - -revenue
           - -share
           - avg_price
+          - card_price
           - free
           - name
           - quantity
@@ -1090,12 +1115,14 @@ paths:
           minLength: 1
         description: |-
           * `-avg_price` - -avg_price
+          * `-card_price` - -card_price
           * `-free` - -free
           * `-name` - -name
           * `-quantity` - -quantity
           * `-revenue` - -revenue
           * `-share` - -share
           * `avg_price` - avg_price
+          * `card_price` - card_price
           * `free` - free
           * `name` - name
           * `quantity` - quantity
@@ -1165,12 +1192,14 @@ paths:
         schema:
           enum:
           - -avg_price
+          - -card_price
           - -free
           - -name
           - -quantity
           - -revenue
           - -share
           - avg_price
+          - card_price
           - free
           - name
           - quantity
@@ -1181,12 +1210,14 @@ paths:
           minLength: 1
         description: |-
           * `-avg_price` - -avg_price
+          * `-card_price` - -card_price
           * `-free` - -free
           * `-name` - -name
           * `-quantity` - -quantity
           * `-revenue` - -revenue
           * `-share` - -share
           * `avg_price` - avg_price
+          * `card_price` - card_price
           * `free` - free
           * `name` - name
           * `quantity` - quantity
@@ -1417,6 +1448,7 @@ paths:
           - -amount
           - -avg_price
           - -change
+          - -days_left
           - -last_price
           - -name
           - -quantity
@@ -1425,6 +1457,7 @@ paths:
           - amount
           - avg_price
           - change
+          - days_left
           - last_price
           - name
           - quantity
@@ -1437,6 +1470,7 @@ paths:
           * `-amount` - -amount
           * `-avg_price` - -avg_price
           * `-change` - -change
+          * `-days_left` - -days_left
           * `-last_price` - -last_price
           * `-name` - -name
           * `-quantity` - -quantity
@@ -1445,6 +1479,7 @@ paths:
           * `amount` - amount
           * `avg_price` - avg_price
           * `change` - change
+          * `days_left` - days_left
           * `last_price` - last_price
           * `name` - name
           * `quantity` - quantity
@@ -1515,6 +1550,7 @@ paths:
           - -amount
           - -avg_price
           - -change
+          - -days_left
           - -last_price
           - -name
           - -quantity
@@ -1523,6 +1559,7 @@ paths:
           - amount
           - avg_price
           - change
+          - days_left
           - last_price
           - name
           - quantity
@@ -1535,6 +1572,7 @@ paths:
           * `-amount` - -amount
           * `-avg_price` - -avg_price
           * `-change` - -change
+          * `-days_left` - -days_left
           * `-last_price` - -last_price
           * `-name` - -name
           * `-quantity` - -quantity
@@ -1543,6 +1581,7 @@ paths:
           * `amount` - amount
           * `avg_price` - avg_price
           * `change` - change
+          * `days_left` - days_left
           * `last_price` - last_price
           * `name` - name
           * `quantity` - quantity
@@ -1610,6 +1649,7 @@ paths:
           - -amount
           - -avg_price
           - -change
+          - -days_left
           - -last_price
           - -name
           - -quantity
@@ -1618,6 +1658,7 @@ paths:
           - amount
           - avg_price
           - change
+          - days_left
           - last_price
           - name
           - quantity
@@ -1630,6 +1671,7 @@ paths:
           * `-amount` - -amount
           * `-avg_price` - -avg_price
           * `-change` - -change
+          * `-days_left` - -days_left
           * `-last_price` - -last_price
           * `-name` - -name
           * `-quantity` - -quantity
@@ -1638,6 +1680,7 @@ paths:
           * `amount` - amount
           * `avg_price` - avg_price
           * `change` - change
+          * `days_left` - days_left
           * `last_price` - last_price
           * `name` - name
           * `quantity` - quantity
@@ -2276,6 +2319,18 @@ components:
           type: string
       required:
       - csrfToken
+    DaysLeftLevelEnum:
+      enum:
+      - none
+      - ok
+      - low
+      - critical
+      type: string
+      description: |-
+        * `none` - none
+        * `ok` - ok
+        * `low` - low
+        * `critical` - critical
     DeadlineDetail:
       type: object
       properties:
@@ -2683,6 +2738,339 @@ components:
       required:
       - database
       - status
+    Home:
+      type: object
+      properties:
+        period:
+          $ref: '#/components/schemas/HomePeriod'
+        known:
+          type: boolean
+        signals:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeSignal'
+        sync_trouble:
+          allOf:
+          - $ref: '#/components/schemas/HomeSyncTrouble'
+          nullable: true
+        misplaced:
+          allOf:
+          - $ref: '#/components/schemas/HomeMisplaced'
+          nullable: true
+        pulse:
+          allOf:
+          - $ref: '#/components/schemas/HomePulse'
+          nullable: true
+        margins:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeMargin'
+          nullable: true
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeChange'
+          nullable: true
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeChannel'
+          nullable: true
+        synced_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - changes
+      - channels
+      - known
+      - margins
+      - misplaced
+      - period
+      - pulse
+      - signals
+      - sync_trouble
+      - synced_at
+    HomeChange:
+      type: object
+      properties:
+        name:
+          type: string
+        delta_kopecks:
+          type: integer
+        now_kopecks:
+          type: integer
+        earlier_kopecks:
+          type: integer
+      required:
+      - delta_kopecks
+      - earlier_kopecks
+      - name
+      - now_kopecks
+    HomeChannel:
+      type: object
+      properties:
+        name:
+          type: string
+        revenue_kopecks:
+          type: integer
+        documents:
+          type: integer
+      required:
+      - documents
+      - name
+      - revenue_kopecks
+    HomeFigure:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        value:
+          type: integer
+        earlier:
+          type: integer
+        change:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        unit:
+          $ref: '#/components/schemas/UnitEnum'
+      required:
+      - change
+      - earlier
+      - key
+      - label
+      - unit
+      - value
+    HomeFound:
+      type: object
+      description: 'Одна найденная позиция: что именно и почему попало.'
+      properties:
+        name:
+          type: string
+        note:
+          type: string
+      required:
+      - name
+      - note
+    HomeListRow:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          type: integer
+        note:
+          type: string
+      required:
+      - name
+      - note
+      - value
+    HomeMargin:
+      type: object
+      properties:
+        name:
+          type: string
+        revenue_kopecks:
+          type: integer
+        margin:
+          type: integer
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+      required:
+      - margin
+      - name
+      - quantity
+      - revenue_kopecks
+    HomeMisplaced:
+      type: object
+      properties:
+        lost_kopecks:
+          type: integer
+        lost_positions:
+          type: integer
+        frozen_kopecks:
+          type: integer
+        frozen_positions:
+          type: integer
+        stock_kopecks:
+          type: integer
+        demand_days:
+          type: integer
+        material_days:
+          type: integer
+        to_brew:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeListRow'
+        lying_still:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeListRow'
+        lost_all:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeListRow'
+        frozen_all:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeListRow'
+      required:
+      - demand_days
+      - frozen_all
+      - frozen_kopecks
+      - frozen_positions
+      - lost_all
+      - lost_kopecks
+      - lost_positions
+      - lying_still
+      - material_days
+      - stock_kopecks
+      - to_brew
+    HomeMonth:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+        revenue_kopecks:
+          type: integer
+        partial:
+          type: boolean
+      required:
+      - end
+      - partial
+      - revenue_kopecks
+      - start
+    HomePeriod:
+      type: object
+      description: |-
+        Окно страницы. Приходит с сервера, потому что сервер его и выбрал.
+
+        Считать «последний полный месяц» на фронте значило бы завести вторую
+        арифметику календаря — ту самую, что ошибается на декабре.
+      properties:
+        label:
+          type: string
+        label_of:
+          type: string
+        first:
+          type: string
+          format: date
+        last:
+          type: string
+          format: date
+        earlier_label:
+          type: string
+        earlier_label_to:
+          type: string
+        running_label:
+          type: string
+          nullable: true
+        running_days:
+          type: integer
+        running_of_days:
+          type: integer
+      required:
+      - earlier_label
+      - earlier_label_to
+      - first
+      - label
+      - label_of
+      - last
+      - running_days
+      - running_label
+      - running_of_days
+    HomePulse:
+      type: object
+      description: |-
+        Два множества разведены по группам — сложить их нельзя.
+
+        `shipped` — документы: сколько увезли. `sold` — отчёт прибыльности:
+        сколько из увезённого стало выручкой. Разница между ними — товар,
+        ушедший по договору комиссии, и она названа отдельным числом,
+        а не оставлена читателю на вычитание.
+      properties:
+        shipped:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeFigure'
+        sold:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeFigure'
+        consignment_kopecks:
+          type: integer
+        months:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeMonth'
+      required:
+      - consignment_kopecks
+      - months
+      - shipped
+      - sold
+    HomeSignal:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        label_clean:
+          type: string
+        note:
+          type: string
+        note_clean:
+          type: string
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeFound'
+        route:
+          type: string
+        tone:
+          $ref: '#/components/schemas/ToneEnum'
+      required:
+      - count
+      - items
+      - key
+      - label
+      - label_clean
+      - note
+      - note_clean
+      - route
+      - tone
+    HomeSyncTrouble:
+      type: object
+      description: Синхронизация отстала. `hours = -1` — не отрабатывала ни разу.
+      properties:
+        kind:
+          type: string
+        label:
+          type: string
+        usual:
+          type: string
+        affects:
+          type: string
+        hours:
+          type: integer
+      required:
+      - affects
+      - hours
+      - kind
+      - label
+      - usual
     LeadTime:
       type: object
       description: |-
@@ -3114,6 +3502,10 @@ components:
           type: integer
         has_plan:
           type: boolean
+        reserved:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
       required:
       - article
       - available
@@ -3123,6 +3515,7 @@ components:
       - horizon
       - name
       - product_id
+      - reserved
       - suggested
       - uom
     Products:
@@ -3896,6 +4289,11 @@ components:
           format: decimal
           pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
           nullable: true
+        card_price_kopecks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+          nullable: true
         revenue_share:
           type: string
           format: decimal
@@ -3905,6 +4303,7 @@ components:
       - article
       - avg_price_kopecks
       - avg_price_paid_kopecks
+      - card_price_kopecks
       - code
       - documents_count
       - free_quantity
@@ -4346,6 +4745,11 @@ components:
           format: decimal
           pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
           nullable: true
+        days_left:
+          type: integer
+          nullable: true
+        days_left_level:
+          $ref: '#/components/schemas/DaysLeftLevelEnum'
         avg_price_kopecks:
           type: string
           format: decimal
@@ -4400,6 +4804,8 @@ components:
       - article
       - avg_price_kopecks
       - code
+      - days_left
+      - days_left_level
       - free_quantity
       - last_document_number
       - last_moment
@@ -4617,6 +5023,26 @@ components:
       - quantity
       - revenue_kopecks
       - start
+    ToneEnum:
+      enum:
+      - ok
+      - warn
+      - bad
+      type: string
+      description: |-
+        * `ok` - ok
+        * `warn` - warn
+        * `bad` - bad
+    UnitEnum:
+      enum:
+      - money
+      - count
+      - percent
+      type: string
+      description: |-
+        * `money` - money
+        * `count` - count
+        * `percent` - percent
     WithoutPlanRow:
       type: object
       description: |-

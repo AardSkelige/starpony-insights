@@ -320,3 +320,101 @@ class TestReportRequest:
         # что лежит на складе. Ноль здесь — «неизвестна», и маржа по такому
         # товару берётся из отчёта прибыльности, а не отсюда.
         assert stock.cost_kopecks == 0
+
+
+class TestSalePrice:
+    """Цена продажи приезжает тем же отчётом, что и остаток.
+
+    Отдельных запросов не стоит вовсе: `salePrice` — обязательное поле ответа
+    `/report/stock/all`, который синк остатков и так забирает каждые
+    15 минут. Корзину лимита, общую с ботом, это не трогает.
+    """
+
+    @staticmethod
+    def _sync(product, *, sale_price):
+        from moysklad.sync.stock import sync_stock
+
+        class FakeClient:
+            def iterate(self, path, params=None):
+                yield {
+                    "meta": {
+                        "href": "https://api.moysklad.ru/api/remap/1.2/entity/"
+                        f"product/{product.ms_id}"
+                    },
+                    "stock": 10,
+                    "reserve": 0,
+                    "inTransit": 0,
+                    "price": 12000,
+                    "salePrice": sale_price,
+                    "stockDays": 4,
+                }
+
+        sync_stock(FakeClient(), SyncRun.objects.create(kind=SyncKind.STATE))
+        return Stock.objects.get(product=product)
+
+    def test_price_from_the_report_lands_in_the_mirror(self, product):
+        """Цена приходит в копейках, как и себестоимость рядом."""
+        stock = self._sync(product, sale_price=34900.0)
+
+        assert stock.sale_price_kopecks == Decimal("34900")
+
+    def test_price_removed_from_the_card_becomes_zero(self, product):
+        """Цену убрали из карточки — зеркало обязано это заметить.
+
+        Ноль здесь не «бесплатно», а «цену не задали»: поле в отчёте
+        обязательное, и товар без цены приходит нулём. Останься в зеркале
+        вчерашняя цена — сигнал главной «товары без цены продажи» молчал бы
+        именно про те позиции, ради которых заведён.
+        """
+        self._sync(product, sale_price=34900.0)
+
+        stock = self._sync(product, sale_price=0.0)
+
+        assert stock.sale_price_kopecks == 0
+
+    def test_zeroing_a_vanished_product_keeps_its_price(self, product):
+        """Товар кончился — цена продажи остаётся прежней.
+
+        Она свойство карточки, а не остатка. Обнули мы её вместе
+        с количеством — главная объявила бы «товар без цены продажи» ровно
+        тогда, когда товар просто распродан, и человек пошёл бы чинить
+        карточку, с которой всё в порядке.
+        """
+        from moysklad.sync.stock import sync_stock
+
+        self._sync(product, sale_price=34900.0)
+
+        # Девять соседей нужны, чтобы отчёт без нашего товара считался полным:
+        # иначе сработает защита от неполного отчёта и обнуления не будет.
+        run = SyncRun.objects.create(kind=SyncKind.STATE)
+        neighbours = [
+            Product.objects.create(
+                ms_id=f"2222{i:04d}-2222-2222-2222-222222222222",
+                name=f"Шампунь {i}",
+                last_seen_run=run,
+            )
+            for i in range(9)
+        ]
+
+        class FakeClient:
+            def iterate(self, path, params=None):
+                for neighbour in neighbours:
+                    yield {
+                        "meta": {
+                            "href": "https://api.moysklad.ru/api/remap/1.2/entity/"
+                            f"product/{neighbour.ms_id}"
+                        },
+                        "stock": 5,
+                        "reserve": 0,
+                        "inTransit": 0,
+                        "price": 100,
+                        "salePrice": 20000,
+                        "stockDays": 1,
+                    }
+
+        outcome = sync_stock(FakeClient(), run)
+
+        assert outcome.extra["zeroed"] == 1, "исчезнувший товар должен обнулиться"
+        vanished = Stock.objects.get(product=product)
+        assert vanished.quantity == 0
+        assert vanished.sale_price_kopecks == Decimal("34900")

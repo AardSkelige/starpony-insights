@@ -345,14 +345,32 @@ class TestCoverage:
 
 
 class TestQueries:
-    def test_page_costs_one_query(self, bought, django_assert_num_queries):
-        """Расчёт страницы — один запрос, независимо от числа материалов.
+    def test_page_cost_does_not_grow_with_rows(
+        self, bought, make_supply, make_product, django_assert_num_queries
+    ):
+        """Число запросов постоянно — оно не зависит от числа материалов.
 
-        Тот же дефект уже был в общем сервисе техкарт: единица измерения
-        догружалась по каждому материалу, 162 запроса на 161 строку.
-        Не падало и не логировалось, только тратило.
+        Раньше здесь стояло «ровно один запрос». Условие ужесточилось
+        не в ту сторону: 04.09 к строке добавился запас в днях, и вместе
+        с ним — расход через техкарты и остатки. Запросов стало шесть,
+        и это правильная цена: одна выборка отгрузок, один разворот
+        техкарт, одни остатки на всю страницу.
+
+        А защищать надо было не «один», а **отсутствие роста**: тот же
+        дефект в общем сервисе техкарт давал 162 запроса на 161 строку —
+        не падал, не логировался, только тратил. Проверка сравнением
+        ловит именно его, и её не приходится править при каждом честном
+        добавлении расчёта.
         """
-        with django_assert_num_queries(1):
+        with django_assert_num_queries(6) as few:
+            materials.page(materials.Filters())
+
+        # Втрое больше материалов — столько же запросов.
+        supply = make_supply()
+        for index in range(20):
+            position(supply, make_product(name=f"Материал {index}"), 10, 100)
+
+        with django_assert_num_queries(len(few.captured_queries)):
             materials.page(materials.Filters())
 
 

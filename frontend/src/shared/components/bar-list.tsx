@@ -113,7 +113,7 @@ export function BarList({
   if (max <= 0) return null
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="@container/bars flex flex-col gap-1.5">
       {bars.map((bar) => (
         <div key={bar.key} className="flex min-w-0 flex-col gap-0.5">
         <Tooltip>
@@ -128,13 +128,17 @@ export function BarList({
                 <span
                   className={cn(
                     "shrink-0 text-xs text-muted-foreground",
-                    "max-sm:w-full",
-                    // Ширины разные на телефоне и на большом экране.
+                    // Узко — подпись занимает свою строку, полоса с числами
+                    // переносится на следующую. Мерится **контейнер**, а не
+                    // экран: 390 точек телефона и колонка бенто шириной
+                    // в четверть широкого экрана — один и тот же случай,
+                    // и правило у них одно.
+                    "@max-md/bars:w-full",
                     // 176 точек подписи, 96 числа и 48 доли не помещаются
                     // в 390 вместе с дорожкой: полоса схлопывалась в ноль,
                     // и список превращался в таблицу без картинки.
                     // Найдено снимком телефона, а не чтением кода.
-                    wideLabels ? "w-28 sm:w-44" : "w-20 sm:w-24",
+                    wideLabels ? "w-28 @md/bars:w-44" : "w-20 @md/bars:w-24",
                     multilineLabels
                       ? "line-clamp-2 whitespace-normal"
                       : "truncate"
@@ -163,11 +167,11 @@ export function BarList({
                     по содержимому дала бы рваный столбец. */}
                 {numbersOnHover ? null : (
                   <>
-                    <span className="w-20 shrink-0 text-right text-xs whitespace-nowrap tabular-nums sm:w-24">
+                    <span className="w-auto shrink-0 text-right text-xs whitespace-nowrap tabular-nums @md/bars:w-24">
                       {bar.display}
                     </span>
                     {bar.secondary ? (
-                      <span className="w-11 shrink-0 text-right text-xs text-muted-foreground tabular-nums sm:w-12">
+                      <span className="w-auto shrink-0 text-right text-xs text-muted-foreground tabular-nums @md/bars:w-12">
                         {bar.secondary}
                       </span>
                     ) : null}

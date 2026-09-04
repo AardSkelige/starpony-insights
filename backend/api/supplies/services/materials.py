@@ -18,10 +18,13 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-from api.common.selection import page_bounds
+from api.common.selection import page_bounds, within
 from api.supplies.services import purchases, selection, summary
 from api.supplies.services.purchases import Purchase
+from core.models import DocumentKind, Stock
 from core.money import share
+from core.services import consumption, coverage
+from core.services.documents import alive, positions_in
 
 # Сортировки, разрешённые снаружи. Список закрытый — как у соседних страниц.
 ORDERING = (
@@ -33,6 +36,11 @@ ORDERING = (
     "change", "-change",
     "supplies", "-supplies",
     "suppliers", "-suppliers",
+    # Запас в днях. Заведён 04.09: главная присылает сюда по сигналу
+    # «сырья кончится за 30 дней», а показать это было нечем — страница
+    # открывалась своей сортировкой по сумме закупки, и восемь позиций
+    # приходилось искать глазами среди двухсот.
+    "days_left", "-days_left",
 )
 DEFAULT_ORDERING = "-amount"
 
@@ -186,6 +194,7 @@ _SORT_KEYS = {
     "supplies": lambda row: row["supplies_count"],
     "suppliers": lambda row: row["suppliers_count"],
     "name": lambda row: row["name"].casefold(),
+    "days_left": lambda row: row["days_left"],
 }
 
 
@@ -215,6 +224,45 @@ def _sorted(rows: list[dict], ordering: str) -> list[dict]:
     return known + unknown
 
 
+def _add_days_left(rows: list[dict], filters: Filters) -> None:
+    """Дописать каждой строке, на сколько дней хватит остатка.
+
+    **Расход берётся из отгрузок через техкарты, а не из приёмок.** Приёмка
+    говорит, сколько пришло; вопрос «пора ли закупать» — про то, сколько
+    уходит, а уходит материал вместе с проданной продукцией. Тот же расчёт,
+    что в разборе строки (`material_detail._coverage_of`), и числа обязаны
+    совпасть — иначе таблица и её же раскрытая строка скажут разное.
+
+    Одним проходом на всю выборку: разворот техкарт стоит дорого, и делать
+    его по строке значило бы двести проходов вместо одного.
+
+    **Поставщик в расход не входит.** Он сужает закупки, а не потребление:
+    выбрав «Лемуна», человек смотрит его приёмки — но материал расходуется
+    независимо от того, у кого куплен.
+    """
+    shipments = within(
+        positions_in(alive(DocumentKind.DEMAND)), filters.date_from, filters.date_to
+    )
+    used = {
+        item.product.pk: item.quantity
+        for item in consumption.of_shipments(shipments).materials
+    }
+    span = coverage.span_of(shipments, filters.date_from, filters.date_to)
+    available = {
+        stock.product_id: stock.available
+        for stock in Stock.objects.filter(product_id__in=[row["material_id"] for row in rows])
+    }
+
+    for row in rows:
+        left = coverage.of(
+            used.get(row["material_id"], Decimal(0)), span, available.get(row["material_id"])
+        )
+        # `None` — остатка в отчёте нет вовсе либо расхода за период не было.
+        # Ноль здесь означал бы «кончился», а это другое утверждение.
+        row["days_left"] = left.days_left
+        row["days_left_level"] = coverage.level(left.days_left)
+
+
 def prepared(filters: Filters) -> dict:
     """Все строки выборки и оба набора итогов — без нарезки на страницы.
 
@@ -241,6 +289,8 @@ def prepared(filters: Filters) -> dict:
     selection_amount = sum(row["amount_kopecks"] for row in everything)
     for row in everything:
         row["amount_share"] = share(row["amount_kopecks"], selection_amount)
+
+    _add_days_left(everything, filters)
 
     rows = everything
     if filters.search:

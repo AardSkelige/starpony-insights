@@ -174,6 +174,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/home/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Главная
+         * @description Состояние дел за последний полный месяц: что требует решения, во что вложены деньги, как идут продажи и на чём мы зарабатываем. Состав ответа зависит от доступов: плитка раздела, закрытого для пользователя, приходит пустой.
+         */
+        get: operations["home"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/production/batch/": {
         parameters: {
             query?: never;
@@ -786,6 +806,14 @@ export interface components {
         Csrf: {
             csrfToken: string;
         };
+        /**
+         * @description * `none` - none
+         *     * `ok` - ok
+         *     * `low` - low
+         *     * `critical` - critical
+         * @enum {string}
+         */
+        DaysLeftLevelEnum: "none" | "ok" | "low" | "critical";
         DeadlineDetail: {
             agent_id: number;
             name: string;
@@ -950,6 +978,129 @@ export interface components {
         Health: {
             status: string;
             database: string;
+        };
+        Home: {
+            period: components["schemas"]["HomePeriod"];
+            known: boolean;
+            signals: components["schemas"]["HomeSignal"][];
+            sync_trouble: components["schemas"]["HomeSyncTrouble"] | null;
+            misplaced: components["schemas"]["HomeMisplaced"] | null;
+            pulse: components["schemas"]["HomePulse"] | null;
+            margins: components["schemas"]["HomeMargin"][] | null;
+            changes: components["schemas"]["HomeChange"][] | null;
+            channels: components["schemas"]["HomeChannel"][] | null;
+            /** Format: date-time */
+            synced_at: string | null;
+        };
+        HomeChange: {
+            name: string;
+            delta_kopecks: number;
+            now_kopecks: number;
+            earlier_kopecks: number;
+        };
+        HomeChannel: {
+            name: string;
+            revenue_kopecks: number;
+            documents: number;
+        };
+        HomeFigure: {
+            key: string;
+            label: string;
+            value: number;
+            earlier: number;
+            /** Format: decimal */
+            change: string | null;
+            unit: components["schemas"]["UnitEnum"];
+        };
+        /** @description Одна найденная позиция: что именно и почему попало. */
+        HomeFound: {
+            name: string;
+            note: string;
+        };
+        HomeListRow: {
+            name: string;
+            value: number;
+            note: string;
+        };
+        HomeMargin: {
+            name: string;
+            revenue_kopecks: number;
+            margin: number;
+            /** Format: decimal */
+            quantity: string;
+        };
+        HomeMisplaced: {
+            lost_kopecks: number;
+            lost_positions: number;
+            frozen_kopecks: number;
+            frozen_positions: number;
+            stock_kopecks: number;
+            demand_days: number;
+            material_days: number;
+            to_brew: components["schemas"]["HomeListRow"][];
+            lying_still: components["schemas"]["HomeListRow"][];
+            lost_all: components["schemas"]["HomeListRow"][];
+            frozen_all: components["schemas"]["HomeListRow"][];
+        };
+        HomeMonth: {
+            /** Format: date */
+            start: string;
+            /** Format: date */
+            end: string;
+            revenue_kopecks: number;
+            partial: boolean;
+        };
+        /**
+         * @description Окно страницы. Приходит с сервера, потому что сервер его и выбрал.
+         *
+         *     Считать «последний полный месяц» на фронте значило бы завести вторую
+         *     арифметику календаря — ту самую, что ошибается на декабре.
+         */
+        HomePeriod: {
+            label: string;
+            label_of: string;
+            /** Format: date */
+            first: string;
+            /** Format: date */
+            last: string;
+            earlier_label: string;
+            earlier_label_to: string;
+            running_label: string | null;
+            running_days: number;
+            running_of_days: number;
+        };
+        /**
+         * @description Два множества разведены по группам — сложить их нельзя.
+         *
+         *     `shipped` — документы: сколько увезли. `sold` — отчёт прибыльности:
+         *     сколько из увезённого стало выручкой. Разница между ними — товар,
+         *     ушедший по договору комиссии, и она названа отдельным числом,
+         *     а не оставлена читателю на вычитание.
+         */
+        HomePulse: {
+            shipped: components["schemas"]["HomeFigure"][];
+            sold: components["schemas"]["HomeFigure"][];
+            consignment_kopecks: number;
+            months: components["schemas"]["HomeMonth"][];
+        };
+        HomeSignal: {
+            key: string;
+            label: string;
+            label_clean: string;
+            note: string;
+            note_clean: string;
+            count: number;
+            items: components["schemas"]["HomeFound"][];
+            route: string;
+            tone: components["schemas"]["ToneEnum"];
+        };
+        /** @description Синхронизация отстала. `hours = -1` — не отрабатывала ни разу. */
+        HomeSyncTrouble: {
+            kind: string;
+            label: string;
+            usual: string;
+            affects: string;
+            hours: number;
         };
         /**
          * @description Срок от заказа до прихода товара.
@@ -1160,6 +1311,8 @@ export interface components {
             suggested: number | null;
             horizon: number;
             has_plan: boolean;
+            /** Format: decimal */
+            reserved: string;
         };
         /** @description Ответ верхнего звена целиком. */
         Products: {
@@ -1467,6 +1620,8 @@ export interface components {
             /** Format: decimal */
             avg_price_paid_kopecks: string | null;
             /** Format: decimal */
+            card_price_kopecks: string | null;
+            /** Format: decimal */
             revenue_share: string | null;
         };
         ShipmentProducts: {
@@ -1648,6 +1803,8 @@ export interface components {
             amount_kopecks: number;
             /** Format: decimal */
             amount_share: string | null;
+            days_left: number | null;
+            days_left_level: components["schemas"]["DaysLeftLevelEnum"];
             /** Format: decimal */
             avg_price_kopecks: string | null;
             /** Format: decimal */
@@ -1760,6 +1917,20 @@ export interface components {
             quantity: string;
             revenue_kopecks: number;
         };
+        /**
+         * @description * `ok` - ok
+         *     * `warn` - warn
+         *     * `bad` - bad
+         * @enum {string}
+         */
+        ToneEnum: "ok" | "warn" | "bad";
+        /**
+         * @description * `money` - money
+         *     * `count` - count
+         *     * `percent` - percent
+         * @enum {string}
+         */
+        UnitEnum: "money" | "count" | "percent";
         /**
          * @description Проданное, чего техкарта не описывает: услуги и покупные товары.
          *
@@ -2064,6 +2235,25 @@ export interface operations {
             };
         };
     };
+    home: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Home"];
+                };
+            };
+        };
+    };
     production_batch: {
         parameters: {
             query?: {
@@ -2346,19 +2536,21 @@ export interface operations {
                 date_to?: string | null;
                 /**
                  * @description * `-avg_price` - -avg_price
+                 *     * `-card_price` - -card_price
                  *     * `-free` - -free
                  *     * `-name` - -name
                  *     * `-quantity` - -quantity
                  *     * `-revenue` - -revenue
                  *     * `-share` - -share
                  *     * `avg_price` - avg_price
+                 *     * `card_price` - card_price
                  *     * `free` - free
                  *     * `name` - name
                  *     * `quantity` - quantity
                  *     * `revenue` - revenue
                  *     * `share` - share
                  */
-                ordering?: "-avg_price" | "-free" | "-name" | "-quantity" | "-revenue" | "-share" | "avg_price" | "free" | "name" | "quantity" | "revenue" | "share";
+                ordering?: "-avg_price" | "-card_price" | "-free" | "-name" | "-quantity" | "-revenue" | "-share" | "avg_price" | "card_price" | "free" | "name" | "quantity" | "revenue" | "share";
                 page?: number;
                 page_size?: number;
                 search?: string;
@@ -2387,19 +2579,21 @@ export interface operations {
                 date_to?: string | null;
                 /**
                  * @description * `-avg_price` - -avg_price
+                 *     * `-card_price` - -card_price
                  *     * `-free` - -free
                  *     * `-name` - -name
                  *     * `-quantity` - -quantity
                  *     * `-revenue` - -revenue
                  *     * `-share` - -share
                  *     * `avg_price` - avg_price
+                 *     * `card_price` - card_price
                  *     * `free` - free
                  *     * `name` - name
                  *     * `quantity` - quantity
                  *     * `revenue` - revenue
                  *     * `share` - share
                  */
-                ordering?: "-avg_price" | "-free" | "-name" | "-quantity" | "-revenue" | "-share" | "avg_price" | "free" | "name" | "quantity" | "revenue" | "share";
+                ordering?: "-avg_price" | "-card_price" | "-free" | "-name" | "-quantity" | "-revenue" | "-share" | "avg_price" | "card_price" | "free" | "name" | "quantity" | "revenue" | "share";
                 page?: number;
                 page_size?: number;
                 search?: string;
@@ -2437,19 +2631,21 @@ export interface operations {
                 date_to?: string | null;
                 /**
                  * @description * `-avg_price` - -avg_price
+                 *     * `-card_price` - -card_price
                  *     * `-free` - -free
                  *     * `-name` - -name
                  *     * `-quantity` - -quantity
                  *     * `-revenue` - -revenue
                  *     * `-share` - -share
                  *     * `avg_price` - avg_price
+                 *     * `card_price` - card_price
                  *     * `free` - free
                  *     * `name` - name
                  *     * `quantity` - quantity
                  *     * `revenue` - revenue
                  *     * `share` - share
                  */
-                ordering?: "-avg_price" | "-free" | "-name" | "-quantity" | "-revenue" | "-share" | "avg_price" | "free" | "name" | "quantity" | "revenue" | "share";
+                ordering?: "-avg_price" | "-card_price" | "-free" | "-name" | "-quantity" | "-revenue" | "-share" | "avg_price" | "card_price" | "free" | "name" | "quantity" | "revenue" | "share";
                 page?: number;
                 page_size?: number;
                 search?: string;
@@ -2563,6 +2759,7 @@ export interface operations {
                  * @description * `-amount` - -amount
                  *     * `-avg_price` - -avg_price
                  *     * `-change` - -change
+                 *     * `-days_left` - -days_left
                  *     * `-last_price` - -last_price
                  *     * `-name` - -name
                  *     * `-quantity` - -quantity
@@ -2571,13 +2768,14 @@ export interface operations {
                  *     * `amount` - amount
                  *     * `avg_price` - avg_price
                  *     * `change` - change
+                 *     * `days_left` - days_left
                  *     * `last_price` - last_price
                  *     * `name` - name
                  *     * `quantity` - quantity
                  *     * `suppliers` - suppliers
                  *     * `supplies` - supplies
                  */
-                ordering?: "-amount" | "-avg_price" | "-change" | "-last_price" | "-name" | "-quantity" | "-suppliers" | "-supplies" | "amount" | "avg_price" | "change" | "last_price" | "name" | "quantity" | "suppliers" | "supplies";
+                ordering?: "-amount" | "-avg_price" | "-change" | "-days_left" | "-last_price" | "-name" | "-quantity" | "-suppliers" | "-supplies" | "amount" | "avg_price" | "change" | "days_left" | "last_price" | "name" | "quantity" | "suppliers" | "supplies";
                 page?: number;
                 page_size?: number;
                 search?: string;
@@ -2608,6 +2806,7 @@ export interface operations {
                  * @description * `-amount` - -amount
                  *     * `-avg_price` - -avg_price
                  *     * `-change` - -change
+                 *     * `-days_left` - -days_left
                  *     * `-last_price` - -last_price
                  *     * `-name` - -name
                  *     * `-quantity` - -quantity
@@ -2616,13 +2815,14 @@ export interface operations {
                  *     * `amount` - amount
                  *     * `avg_price` - avg_price
                  *     * `change` - change
+                 *     * `days_left` - days_left
                  *     * `last_price` - last_price
                  *     * `name` - name
                  *     * `quantity` - quantity
                  *     * `suppliers` - suppliers
                  *     * `supplies` - supplies
                  */
-                ordering?: "-amount" | "-avg_price" | "-change" | "-last_price" | "-name" | "-quantity" | "-suppliers" | "-supplies" | "amount" | "avg_price" | "change" | "last_price" | "name" | "quantity" | "suppliers" | "supplies";
+                ordering?: "-amount" | "-avg_price" | "-change" | "-days_left" | "-last_price" | "-name" | "-quantity" | "-suppliers" | "-supplies" | "amount" | "avg_price" | "change" | "days_left" | "last_price" | "name" | "quantity" | "suppliers" | "supplies";
                 page?: number;
                 page_size?: number;
                 search?: string;
@@ -2662,6 +2862,7 @@ export interface operations {
                  * @description * `-amount` - -amount
                  *     * `-avg_price` - -avg_price
                  *     * `-change` - -change
+                 *     * `-days_left` - -days_left
                  *     * `-last_price` - -last_price
                  *     * `-name` - -name
                  *     * `-quantity` - -quantity
@@ -2670,13 +2871,14 @@ export interface operations {
                  *     * `amount` - amount
                  *     * `avg_price` - avg_price
                  *     * `change` - change
+                 *     * `days_left` - days_left
                  *     * `last_price` - last_price
                  *     * `name` - name
                  *     * `quantity` - quantity
                  *     * `suppliers` - suppliers
                  *     * `supplies` - supplies
                  */
-                ordering?: "-amount" | "-avg_price" | "-change" | "-last_price" | "-name" | "-quantity" | "-suppliers" | "-supplies" | "amount" | "avg_price" | "change" | "last_price" | "name" | "quantity" | "suppliers" | "supplies";
+                ordering?: "-amount" | "-avg_price" | "-change" | "-days_left" | "-last_price" | "-name" | "-quantity" | "-suppliers" | "-supplies" | "amount" | "avg_price" | "change" | "days_left" | "last_price" | "name" | "quantity" | "suppliers" | "supplies";
                 page?: number;
                 page_size?: number;
                 search?: string;

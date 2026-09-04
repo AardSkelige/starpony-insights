@@ -125,12 +125,21 @@ def buckets(start: date, end: date, step: str) -> list[tuple[date, date]]:
     return out
 
 
-def of(positions, *, date_from: date | None, date_to: date | None) -> Timeline:
+def of(
+    positions, *, date_from: date | None, date_to: date | None, step: str | None = None
+) -> Timeline:
     """Продажи по столбикам за период выборки.
 
     Границы берутся из фильтров, а при открытом периоде — из самих отгрузок:
     рисовать пустой хвост до сегодняшнего дня значило бы показать спад,
     которого нет, — там просто нет данных.
+
+    `step` задаётся снаружи там, где шаг диктует **вопрос**, а не длина
+    периода. Главная спрашивает «растём ли мы от месяца к месяцу», и ответ
+    обязан быть в месяцах: вся история проекта — 157 дней, автоматический
+    выбор дал бы недели, и рядом с месячным пульсом на той же карточке
+    столбики мерили бы другое. Разрешить переопределение дешевле, чем завести
+    вторую арифметику корзин: она разойдётся с этой на феврале.
     """
     # Границы одним запросом: два `order_by().first()` стоили бы двух.
     bounds = positions.aggregate(first=Min("document__moment"), last=Max("document__moment"))
@@ -148,7 +157,7 @@ def of(positions, *, date_from: date | None, date_to: date | None) -> Timeline:
     if end < start:
         start, end = end, start
 
-    step = step_for((end - start).days + 1)
+    step = step or step_for((end - start).days + 1)
     trunc, label = STEPS[step]
 
     rows = (

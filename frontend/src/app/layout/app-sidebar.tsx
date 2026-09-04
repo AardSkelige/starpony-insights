@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from "react-router"
-import { ChevronsUpDown, LogOut } from "lucide-react"
+import { ChevronsUpDown, LogOut, Settings } from "lucide-react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { splitNavigation } from "@/app/layout/nav-groups"
@@ -213,6 +213,24 @@ export function AppSidebar({
                 className="w-(--anchor-width) min-w-56"
               >
                 <DropdownMenuGroup>
+                  {/* Админка — только суперпользователю, и только здесь:
+                      пунктом меню она стояла бы наравне с разделами, хотя
+                      это не раздел, а служебный вход. Django пускает внутрь
+                      сам, по `is_staff`, — наша проверка лишь прячет ссылку
+                      у тех, кому она всё равно ответит формой входа.
+
+                      Обычная ссылка, а не `Link`: админка живёт вне
+                      React-приложения, и роутер по ней перейти не может. */}
+                  {profile.is_superuser ? (
+                    <DropdownMenuItem
+                      render={
+                        <a href="/admin/" target="_blank" rel="noreferrer">
+                          <Settings />
+                          Админка
+                        </a>
+                      }
+                    />
+                  ) : null}
                   <DropdownMenuItem
                     disabled={logout.isPending}
                     onClick={() => logout.mutate()}

@@ -20,17 +20,15 @@ import math
 from dataclasses import dataclass
 from decimal import Decimal
 
-from django.db.models import DecimalField, QuerySet, Sum, Value
-from django.db.models.functions import Coalesce
+
+from django.db.models import QuerySet
 
 from api.common.selection import matching, within
 from api.production.services.selection import Filters
-from core.models import DocumentKind, DocumentPosition, Product, ProductKind, Stock
-from core.services import coverage
+from core.models import DocumentKind, DocumentPosition, Product, Stock
+from core.services import catalogue, coverage
 from core.services.documents import alive, positions_in
 from core.services.materials import plans_by_product
-
-_QUANTITY = DecimalField(max_digits=18, decimal_places=3)
 
 
 @dataclass(frozen=True)
@@ -51,6 +49,14 @@ class ProductRow:
     # «Таблетка-мыло для лап». Не ошибка расчёта, а пробел в учёте,
     # и страница обязана назвать его словами, а не молча пропустить строку.
     has_plan: bool
+    # Сколько обещано под заказы покупателей. Показывается только когда
+    # больше нуля: строка «в резерве 0» есть у всех и не сообщает ничего.
+    #
+    # Заведено 04.09. Свободный остаток на странице был всегда, а откуда
+    # он получен — нет: «остаток 5» при шести на складе выглядел ошибкой
+    # данных. И это же ответ на сигнал главной «заказов нечем закрыть»:
+    # резерв больше остатка виден здесь, а не только в разборе строки.
+    reserved: Decimal
 
 
 def shipment_positions(filters: Filters) -> QuerySet[DocumentPosition]:
@@ -77,24 +83,30 @@ def rows(
     верхнее звено — каталог, продажи за период и техкарты — считалось бы
     на каждое нажатие «плюс».
     """
-    catalogue = _catalogue(filters.search, articles=articles)
+    # Не `catalogue`: так называется модуль `core/services/catalogue.py`,
+    # который этот файл импортирует, — локальное имя перекрыло бы его внутри
+    # функции, и обращение к `catalogue.goods()` упало бы с `AttributeError`.
+    # Та же причина, что у `chosen` в «Товарах в отгрузках».
+    chosen = _catalogue(filters.search, articles=articles)
     positions = shipment_positions(filters)
     span = coverage.span_of(positions, filters.date_from, filters.date_to)
 
-    sold = _sold_by_product(positions, catalogue)
-    available = _available_by_product(catalogue)
+    left_by_product = coverage.by_product(chosen, positions, span)
     plans = plans_by_product()
+    reserved = {
+        stock.product_id: stock.reserved
+        for stock in Stock.objects.filter(product__in=chosen, reserved__gt=0)
+    }
 
     result = [
         _row_of(
             product,
-            sold.get(product.pk, Decimal(0)),
-            available.get(product.pk),
-            span,
+            left_by_product[product.pk],
             filters.horizon,
             product.pk in plans,
+            reserved.get(product.pk, Decimal(0)),
         )
-        for product in catalogue
+        for product in chosen
     ]
 
     # Сначала то, что кончается раньше — это и есть срочность производства.
@@ -120,15 +132,12 @@ def rows(
 
 
 def _catalogue(search: str, *, articles: list[str] | None = None) -> list[Product]:
-    """Товары, которые производят: с артикулом, не в архиве, не услуги.
+    """Товары, которые производят. Определение — общее, в `core/services/catalogue.py`.
 
-    Архивные исключены, хотя артикул у них есть — их шестнадцать. Убранный
-    в архив товар больше не выпускают, и предложить сварить его партию
-    значило бы предложить работу, отменённую решением человека.
+    Своим здесь остаётся только отбор страницы: поиск и сужение до партии.
+    Что именно считать товаром — знание домена, и оно одно на проект.
     """
-    queryset = Product.objects.alive().filter(
-        kind=ProductKind.PRODUCT, archived=False
-    ).exclude(article="").select_related("uom")
+    queryset = catalogue.goods().select_related("uom")
 
     if articles is not None:
         queryset = queryset.filter(article__in=articles)
@@ -141,47 +150,20 @@ def _catalogue(search: str, *, articles: list[str] | None = None) -> list[Produc
     return list(queryset)
 
 
-def _sold_by_product(
-    positions: QuerySet[DocumentPosition], catalogue: list[Product]
-) -> dict[int, Decimal]:
-    """Сколько каждого товара ушло за период. Один запрос на всех."""
-    return {
-        row["product_id"]: row["quantity"]
-        for row in positions.filter(product__in=catalogue)
-        .values("product_id")
-        .annotate(
-            quantity=Coalesce(Sum("quantity"), Value(Decimal(0)), output_field=_QUANTITY)
-        )
-    }
-
-
-def _available_by_product(catalogue: list[Product]) -> dict[int, Decimal]:
-    """Свободный остаток по товарам. Отсутствие ключа — строки в отчёте нет.
-
-    Свободный, а не общий: зарезервированное под заказы уже обещано, и считать
-    его своим значит обнаружить нехватку в день отгрузки.
-    """
-    return {
-        row.product_id: row.available
-        for row in Stock.objects.filter(product__in=catalogue)
-    }
-
-
 def _row_of(
     product: Product,
-    sold: Decimal,
-    available: Decimal | None,
-    span: int,
+    left: coverage.Coverage,
     horizon: int,
     has_plan: bool,
+    reserved: Decimal,
 ) -> ProductRow:
-    left = coverage.of(sold, span, available)
     return ProductRow(
         product=product,
-        available=available,
+        available=left.available,
         left=left,
-        suggested=suggested_for(left.per_day, available, horizon),
+        suggested=suggested_for(left.per_day, left.available, horizon),
         has_plan=has_plan,
+        reserved=reserved,
     )
 
 
@@ -240,6 +222,7 @@ def _cells(row: ProductRow, horizon: int) -> dict:
         # складываться из полученного (`CLAUDE.md` §4).
         "horizon": horizon,
         "has_plan": row.has_plan,
+        "reserved": row.reserved,
     }
 
 

@@ -20,14 +20,18 @@
 на экране обязана это сказать.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-from django.db.models import Max, Min, QuerySet
+from django.db.models import DecimalField, Max, Min, QuerySet, Sum, Value
+from django.db.models.functions import Coalesce
 
 from core.dates import days_between
-from core.models import DocumentPosition
+from core.models import DocumentPosition, Product, Stock
+
+_QUANTITY = DecimalField(max_digits=18, decimal_places=3)
 
 
 @dataclass(frozen=True)
@@ -153,3 +157,44 @@ def level(days_left: int | None) -> str:
     if days_left <= LOW_DAYS:
         return "low"
     return "ok"
+
+
+def by_product(
+    products: Iterable[Product],
+    positions: QuerySet[DocumentPosition],
+    span: int,
+) -> dict[int, Coverage]:
+    """Запас по каждой позиции: сколько ушло за период против свободного остатка.
+
+    Живёт здесь, а не у страницы, ровно по той же причине, что и `of` выше:
+    вопрос у разделов разный — «что варить» у «Расчёта производства»,
+    «что кончилось и во что вложены деньги» у главной, — а число одно.
+    Держи они по копии, две страницы за один день насчитали бы разное
+    количество кончившихся позиций, и обе выглядели бы правдоподобно.
+
+    Два запроса на весь список, а не по два на позицию: пятьдесят семь
+    товаров превратились бы в сто четырнадцать обращений к базе.
+
+    Отсутствие остатка и остаток, равный нулю, — разные ответы. Первое
+    попадает в `available=None` («строки в отчёте нет вовсе»), второе —
+    в ноль («кончился»), и `of` разводит их дальше сам.
+    """
+    catalogue = list(products)
+
+    sold = {
+        row["product_id"]: row["quantity"]
+        for row in positions.filter(product__in=catalogue)
+        .values("product_id")
+        .annotate(
+            quantity=Coalesce(Sum("quantity"), Value(Decimal(0)), output_field=_QUANTITY)
+        )
+    }
+    available = {
+        stock.product_id: stock.available
+        for stock in Stock.objects.filter(product__in=catalogue)
+    }
+
+    return {
+        product.pk: of(sold.get(product.pk, Decimal(0)), span, available.get(product.pk))
+        for product in catalogue
+    }

@@ -38,6 +38,16 @@ class ShipmentProductRowSerializer(serializers.Serializer):
     avg_price_paid_kopecks = serializers.DecimalField(
         max_digits=18, decimal_places=6, allow_null=True
     )
+
+    # Цена из карточки МойСклада — рядом с фактической, по которой продавали.
+    #
+    # **Ноль и `null` означают разное.** Ноль — цена не задана: товар лежит
+    # на складе, а продать его нельзя. `null` — строки остатка нет вовсе,
+    # товара на складе не было, и вопроса о его цене не стоит. Свернув одно
+    # в другое, список «без цены» наполнился бы позициями не в наличии.
+    card_price_kopecks = serializers.DecimalField(
+        max_digits=18, decimal_places=6, allow_null=True
+    )
     revenue_share = serializers.DecimalField(
         max_digits=9, decimal_places=8, allow_null=True
     )

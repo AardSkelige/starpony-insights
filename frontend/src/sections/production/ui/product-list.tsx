@@ -183,6 +183,28 @@ function Row({
                 row.coverage.per_day
               )} ${row.uom}/день`}
         </span>
+        {/* Резерв — только когда он есть. «В резерве 0» стоит у всех
+            и не сообщает ничего, а при ненулевом объясняет, почему
+            свободный остаток меньше складского: без этой строки «остаток 5»
+            при шести на складе выглядит ошибкой данных.
+
+            Тон предупреждающий, когда обещано больше, чем лежит: это уже
+            не пояснение, а долг, который нечем закрыть. */}
+        {Number(row.reserved) > 0 ? (
+          <span
+            className={cn(
+              "text-xs",
+              row.available !== null && Number(row.available) < 0
+                ? "text-destructive"
+                : "text-muted-foreground"
+            )}
+          >
+            в резерве {formatQuantity(row.reserved, row.uom)}
+            {row.available !== null && Number(row.available) < 0
+              ? " — больше, чем есть"
+              : ""}
+          </span>
+        ) : null}
       </span>
 
       <span className="col-start-3 flex shrink-0 flex-col items-center gap-0.5">

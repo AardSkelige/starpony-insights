@@ -137,6 +137,53 @@ def explode(
     return sorted(collected.values(), key=lambda need: need.product.name)
 
 
+def consumed_at_every_level(
+    product: Product,
+    quantity: Decimal,
+    *,
+    plans: dict[int, ProcessingPlan] | None = None,
+) -> dict[int, Decimal]:
+    """Расход по **всем** узлам дерева, а не только по сырью.
+
+    Отличие от `explode` ровно одно, и оно принципиально. `explode` отвечает
+    на «что закупить»: полуфабрикат там раскрывается до своего состава
+    и в ответе не остаётся — закупают не его. Здесь вопрос другой —
+    «что расходуется со склада», — и полуфабрикат расходуется наравне
+    с сырьём: у него есть остаток, себестоимость и строка в отчёте.
+
+    Разница видна на боевых: «Основа кондиционера 500 мл» входит в состав
+    41 техкарты и уходит каждый день, а через `explode` она не появлялась
+    вовсе — и главная объявляла её «не расходуется вовсе», предлагая
+    списать 13 135 ₽ живого производства. Владелец это и заметил.
+
+    Сам продукт верхнего уровня в ответ не входит: он не расходуется,
+    а производится.
+    """
+    plans = plans_by_product() if plans is None else plans
+    collected: dict[int, Decimal] = {}
+
+    def walk(current: Product, needed: Decimal, depth: int, trail: list[str]) -> None:
+        if depth > MAX_DEPTH:
+            raise CircularBillOfMaterials(
+                f"Техкарты ссылаются по кругу: {' → '.join(trail)}. "
+                f"Проверьте состав в МойСкладе."
+            )
+
+        if depth > 0:
+            collected[current.pk] = collected.get(current.pk, Decimal(0)) + needed
+
+        plan = plans.get(current.pk)
+        if plan is None:
+            return
+
+        for material in plan.materials.all():
+            per_unit = material.quantity / plan.output_quantity
+            walk(material.product, needed * per_unit, depth + 1, trail + [plan.name])
+
+    walk(product, quantity, 0, [])
+    return collected
+
+
 def _add_path(entry: MaterialNeed, chain: tuple[str, ...], quantity: Decimal) -> None:
     """Прибавить слагаемое к пути, а не завести второй такой же.
 

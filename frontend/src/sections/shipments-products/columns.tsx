@@ -116,6 +116,40 @@ export const COLUMNS: Column<ShipmentProductRow>[] = [
     ),
   },
   {
+    key: "card_price",
+    label: "Цена в карточке",
+    cardLabel: "Цена в карточке",
+    numeric: true,
+    sortKey: "card_price",
+    // `hideOn` здесь нет намеренно: главная присылает сюда сигналом
+    // с сортировкой по этой колонке, и спрятать её на узком экране значит
+    // открыть страницу, отсортированную по невидимому столбцу, — без единого
+    // признака почему.
+    
+    changeValue: (row) => row.card_price_kopecks,
+    render: (row) =>
+      row.card_price_kopecks === null ? (
+        // Строки остатка нет — товара на складе не было, и вопроса о его
+        // цене не стоит. Не то же самое, что цена не задана.
+        <span className="text-muted-foreground">—</span>
+      ) : Number(row.card_price_kopecks) === 0 ? (
+        // А вот это уже сигнал: товар лежит, а продать его нельзя.
+        // Цветом и словами сразу — `DESIGN.md` §1.
+        <span className="text-destructive">не задана</span>
+      ) : (
+        formatUnitPrice(row.card_price_kopecks)
+      ),
+    explain: (
+      <Explain>
+        <b>Цена продажи из карточки МойСклада</b> — рядом с фактической,
+        по которой продавали. Расхождение между ними видно только когда обе
+        стоят рядом: продавали дешевле прайса или дороже, замечают именно так.
+        «Не задана» — товар лежит на складе, а продать его нельзя; прочерк —
+        товара на складе нет, и вопроса о цене не возникает.
+      </Explain>
+    ),
+  },
+  {
     key: "share",
     label: "Доля в выручке",
     cardLabel: "Доля",
@@ -163,6 +197,9 @@ export function totalsFor(totals: ShipmentProducts["totals"]): Totals {
       free: formatQuantity(totals.free_quantity),
       revenue: formatMoney(totals.revenue_kopecks),
       avg: <span className="text-muted-foreground">—</span>,
+      // Цена из карточки в итоге не суммируется по той же причине, что
+      // и средняя: складывать цены разных товаров бессмысленно.
+      card_price: <span className="text-muted-foreground">—</span>,
       // Доля приходит с сервера, а не пишется «100 %» жёстко. Без поиска
       // это ровно сто процентов; с поиском — сколько найденное занимает
       // в выручке выборки, и оно сходится со сложением колонки. Жёсткая

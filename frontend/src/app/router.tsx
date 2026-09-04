@@ -8,13 +8,16 @@ import {
   RouterProvider,
   useLocation,
   useNavigate,
+  useRouteError,
+  type RouteObject,
 } from "react-router"
 
-import { CloudOff } from "lucide-react"
+import { CloudOff, TriangleAlert } from "lucide-react"
 
 import { AppShell } from "@/app/layout/app-shell"
 import { ChannelsPage } from "@/sections/channels/page"
 import { DeadlinesPage } from "@/sections/deadlines/page"
+import { HomePage } from "@/sections/home/page"
 import { LoginPage } from "@/sections/login/page"
 import { ProductionPage } from "@/sections/production/page"
 import { ProfitabilityPage } from "@/sections/profitability/page"
@@ -152,6 +155,66 @@ function Placeholder({ title }: { title: string }) {
   )
 }
 
+/**
+ * Экран упавшего раздела.
+ *
+ * **Без него роутер показывает свою страницу для разработчика** — ту самую
+ * «Hey developer 👋 You can provide a way better UX…». Человеку она сообщает
+ * ровно ничего, а выглядит как поломка всей системы: сайдбар пропадает
+ * вместе со страницей, и вернуться некуда, кроме адресной строки.
+ *
+ * Что важно — **ошибка не роняет приложение целиком**. Граница стоит внутри
+ * `RequireAuth`, поэтому оболочка с меню остаётся на месте, и человек уходит
+ * в соседний раздел одним нажатием, вместо того чтобы перезагружать вкладку.
+ *
+ * Подробность ошибки показывается только при `DEV`: в проде она сообщает
+ * человеку не больше, чем сам факт сбоя, зато исправно пугает.
+ */
+function SectionCrashed() {
+  const error = useRouteError()
+  const detail = error instanceof Error ? error.message : String(error ?? "")
+
+  return (
+    <div className="flex flex-1 items-center justify-center p-6">
+      <div className="flex max-w-md flex-col items-center gap-4 text-center">
+        <TriangleAlert className="size-8 text-warning" />
+        <div className="flex flex-col gap-1">
+          <h1 className="font-medium">Раздел не открылся</h1>
+          <p className="text-sm text-muted-foreground">
+            Сбой на стороне приложения. Данные целы, сессия тоже — можно
+            обновить страницу или уйти в другой раздел.
+          </p>
+        </div>
+        {import.meta.env.DEV && detail ? (
+          <pre className="max-w-full overflow-x-auto rounded-md bg-muted p-3 text-left text-xs">
+            {detail}
+          </pre>
+        ) : null}
+        <Button variant="outline" onClick={() => window.location.reload()}>
+          Обновить страницу
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Граница ошибок каждому разделу — по одной, а не одна на всех.
+ *
+ * **Проверено падением, а не рассуждением.** Сначала `errorElement` стоял
+ * на родительском безымянном роуте — и работал не так, как задумано: роутер
+ * заменяет `element` **того роута, на котором объявлена граница**, а на нём
+ * висит `RequireAuth` вместе со всей оболочкой. Сайдбар исчезал вместе
+ * со страницей, и уйти в соседний раздел было некуда, кроме адресной строки.
+ *
+ * На дочернем роуте граница заменяет только его собственный элемент: шапка
+ * и меню остаются, и падение одного раздела перестаёт выглядеть как отказ
+ * системы целиком.
+ */
+function withErrorBoundary(routes: RouteObject[]): RouteObject[] {
+  return routes.map((route) => ({ ...route, errorElement: <SectionCrashed /> }))
+}
+
 /** Общая обёртка: адаптер состояния в адресной строке живёт внутри роутера. */
 function Root() {
   return (
@@ -172,8 +235,8 @@ const router = createBrowserRouter([
       { path: "/login", element: <RedirectIfAuthenticated /> },
       {
         element: <RequireAuth />,
-        children: [
-          { index: true, element: <Placeholder title="Главная" /> },
+        children: withErrorBoundary([
+          { index: true, element: <HomePage /> },
           // Путь совпадает с полем `route` в реестре `api/access.py`:
           // второго списка страниц в проекте нет намеренно.
           { path: "shipments/products", element: <ShipmentProductsPage /> },
@@ -185,7 +248,7 @@ const router = createBrowserRouter([
           { path: "production", element: <ProductionPage /> },
           { path: "channels", element: <ChannelsPage /> },
           { path: "*", element: <Placeholder title="Раздел" /> },
-        ],
+        ]),
       },
     ],
   },

@@ -21,8 +21,9 @@ def sync_stock(client: MoySkladClient, run: SyncRun) -> EntityOutcome:
     """Остатки, резервы, себестоимость и время лежания.
 
     Один запрос на весь склад: `/report/stock/all` отдаёт сразу всё нужное,
-    включая `stockDays`. Он весит 5 единиц лимита вместо одной — но это
-    несравнимо дешевле, чем спрашивать по каждому из 380 товаров.
+    включая `stockDays` и цену продажи. Он весит 5 единиц лимита вместо
+    одной — но это несравнимо дешевле, чем спрашивать по каждому
+    из 380 товаров.
     """
     outcome = EntityOutcome()
     products = {str(p.ms_id): p for p in Product.objects.all()}
@@ -59,6 +60,7 @@ def sync_stock(client: MoySkladClient, run: SyncRun) -> EntityOutcome:
                     "reserved": parse_decimal(row.get("reserve")) or 0,
                     "in_transit": parse_decimal(row.get("inTransit")) or 0,
                     "cost_kopecks": parse_decimal(row.get("price")) or 0,
+                    "sale_price_kopecks": parse_decimal(row.get("salePrice")) or 0,
                     "stock_days": row.get("stockDays"),
                 },
             )
@@ -93,6 +95,10 @@ def sync_stock(client: MoySkladClient, run: SyncRun) -> EntityOutcome:
     )
 
     if complete_enough:
+        # Цена продажи здесь не трогается намеренно: она свойство карточки
+        # товара, а не остатка. Обнулить её вместе с количеством значило бы
+        # объявить товар «без цены продажи» ровно тогда, когда он просто
+        # кончился, — и главная показала бы сигнал на пустом месте.
         zeroed = Stock.objects.exclude(product_id__in=seen).update(
             quantity=0, reserved=0, in_transit=0, stock_days=None
         )
