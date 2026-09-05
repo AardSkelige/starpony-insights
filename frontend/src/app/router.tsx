@@ -18,6 +18,7 @@ import { AppShell } from "@/app/layout/app-shell"
 import { ChannelsPage } from "@/sections/channels/page"
 import { DeadlinesPage } from "@/sections/deadlines/page"
 import { HomePage } from "@/sections/home/page"
+import { InventoryPage } from "@/sections/inventory/page"
 import { LoginPage } from "@/sections/login/page"
 import { ProductionPage } from "@/sections/production/page"
 import { ProfitabilityPage } from "@/sections/profitability/page"
@@ -246,6 +247,7 @@ const router = createBrowserRouter([
           { path: "deadlines", element: <DeadlinesPage /> },
           { path: "profitability", element: <ProfitabilityPage /> },
           { path: "production", element: <ProductionPage /> },
+          { path: "inventory", element: <InventoryPage /> },
           { path: "channels", element: <ChannelsPage /> },
           { path: "*", element: <Placeholder title="Раздел" /> },
         ]),

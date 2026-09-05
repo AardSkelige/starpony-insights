@@ -20,6 +20,7 @@ from moysklad.sync.documents import (
     sync_purchase_orders,
     sync_supplies,
 )
+from moysklad.sync.inventory import sync_inventories
 from moysklad.sync.lock import advisory_lock
 from moysklad.sync.profit import sync_profit
 from moysklad.sync.production import sync_processing_plans
@@ -29,6 +30,7 @@ from moysklad.sync.references import (
     sync_sales_channels,
 )
 from moysklad.sync.runner import SyncSession
+from moysklad.sync.store_stock import sync_store_stock
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,12 @@ LOCK_NAME = "sync:documents"
 ENTITIES = (
     ("uom", sync_uoms),
     ("product", sync_products),
+    # Остатки по складам — сразу за товарами: они на них ссылаются,
+    # а больше ни от чего не зависят. В ночном прогоне, а не в
+    # пятнадцатиминутном: вопрос «что на складе не пересчитали»
+    # за четверть часа не меняется, а запрос берётся из корзины,
+    # общей с ботом.
+    ("storestock", sync_store_stock),
     ("processingplan", sync_processing_plans),
     ("counterparty", sync_counterparties),
     ("contract", sync_contracts),
@@ -57,6 +65,10 @@ ENTITIES = (
     ("demand", sync_demands),
     ("purchaseorder", sync_purchase_orders),
     ("supply", sync_supplies),
+    # Инвентаризация ссылается только на товары, поэтому её место в ряду
+    # свободно; стоит среди складских документов, рядом с приёмками,
+    # чтобы порядок читался по смыслу, а не по истории появления.
+    ("inventory", sync_inventories),
     ("commissionreportin", sync_commission_reports),
     # Прибыльность — последней: она читает даты отгрузок, чтобы понять,
     # с какого дня начинать, и до них зеркало этого не знает.

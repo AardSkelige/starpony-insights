@@ -8,6 +8,7 @@ urlpatterns = [
     path("channels/", include("api.channels.urls")),
     path("deadlines/", include("api.deadlines.urls")),
     path("home/", include("api.home.urls")),
+    path("inventory/", include("api.inventory.urls")),
     path("profitability/", include("api.profitability.urls")),
     path("production/", include("api.production.urls")),
     path("shipments/", include("api.shipments.urls")),

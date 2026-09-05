@@ -194,6 +194,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inventory/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Инвентаризация
+         * @description Когда пересчитывали каждую позицию и на сколько она не сошлась. Расхождение в деньгах считается по себестоимости остатков: в документах учёта цена заполнена у меньшинства позиций.
+         */
+        get: operations["inventory_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/xlsx/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Инвентаризация — выгрузка в Excel
+         * @description Та же выборка, что на экране, целиком. Вторым листом — сами инвентаризации: когда, на каком складе и сколько позиций разошлось.
+         */
+        get: operations["inventory_xlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/production/batch/": {
         parameters: {
             query?: never;
@@ -803,6 +843,26 @@ export interface components {
             fraction: string | null;
             tone: string;
         };
+        /** @description Блок «Что не считали»: доля пересчитанного по папкам. */
+        Coverage: {
+            products_count: number;
+            counted_count: number;
+            never_counted_count: number;
+            oldest_folder: string;
+            oldest_days_ago: number | null;
+            items: components["schemas"]["CoverageFolder"][];
+        };
+        CoverageFolder: {
+            folder: string;
+            products_count: number;
+            counted_count: number;
+            /** Format: decimal */
+            share: string | null;
+            days_ago: number | null;
+            /** Format: date-time */
+            last_moment: string | null;
+            last_days_ago: number | null;
+        };
         Csrf: {
             csrfToken: string;
         };
@@ -1101,6 +1161,66 @@ export interface components {
             usual: string;
             affects: string;
             hours: number;
+        };
+        Inventory: {
+            count: number;
+            /** Format: date-time */
+            synced_at: string | null;
+            totals: components["schemas"]["InventoryTotals"];
+            coverage: components["schemas"]["Coverage"];
+            worst: components["schemas"]["Worst"];
+            repeats: components["schemas"]["Repeats"];
+            documents: components["schemas"]["InventoryDocuments"];
+            stores: components["schemas"]["FilterOption"][];
+            folders: string[];
+            results: components["schemas"]["InventoryRow"][];
+        };
+        InventoryDocument: {
+            inventory_id: number;
+            number: string;
+            /** Format: date-time */
+            moment: string;
+            store_name: string;
+            positions_count: number;
+            diverged_count: number;
+            description: string;
+        };
+        InventoryDocuments: {
+            count: number;
+            stores: components["schemas"]["StoreRecount"][];
+            items: components["schemas"]["InventoryDocument"][];
+        };
+        InventoryRow: {
+            product_id: number;
+            name: string;
+            article: string;
+            folder: string;
+            uom: string;
+            counted_times: number;
+            diverged_times: number;
+            /** Format: date-time */
+            last_moment: string | null;
+            last_store: string;
+            days_ago: number | null;
+            /** Format: decimal */
+            calculated: string | null;
+            /** Format: decimal */
+            counted: string | null;
+            /** Format: decimal */
+            correction: string | null;
+            correction_money_kopecks: number | null;
+            /** Format: decimal */
+            cost_kopecks: string | null;
+            /** Format: decimal */
+            stock_quantity: string | null;
+        };
+        /** @description Итог под таблицей — про то, что в ней видно, с учётом поиска. */
+        InventoryTotals: {
+            products_count: number;
+            never_counted_count: number;
+            diverged_count: number;
+            money_kopecks: number;
+            unpriced_count: number;
         };
         /**
          * @description Срок от заказа до прихода товара.
@@ -1520,6 +1640,18 @@ export interface components {
             /** Format: decimal */
             average_days: string | null;
         };
+        RepeatItem: {
+            product_id: number;
+            name: string;
+            folder: string;
+            counted_times: number;
+            diverged_times: number;
+        };
+        /** @description Блок «Расходится из раза в раз» — единственный про всю историю. */
+        Repeats: {
+            count: number;
+            items: components["schemas"]["RepeatItem"][];
+        };
         ShipmentMaterialDetail: {
             material: components["schemas"]["MaterialHead"];
             /** Format: decimal */
@@ -1679,6 +1811,26 @@ export interface components {
             /** Format: decimal */
             available: string;
             stock_days: number | null;
+        };
+        /**
+         * @description Склад: когда считали и сколько его пересчитано.
+         *
+         *     Пересчёт — операция склада, а не папки: документ всегда про один склад
+         *     целиком. Знаменатель — позиции, которые на складе **лежат** сейчас:
+         *     доля от всей номенклатуры объявила бы «Готовую продукцию» заброшенной
+         *     за то, что на ней нет сырья.
+         */
+        StoreRecount: {
+            store_name: string;
+            number: string;
+            /** Format: date-time */
+            moment: string | null;
+            days_ago: number | null;
+            products_count: number;
+            counted_count: number;
+            /** Format: decimal */
+            share: string | null;
+            unchecked_kopecks: number;
         };
         SupplierMaterial: {
             name: string;
@@ -1948,6 +2100,27 @@ export interface components {
             /** Format: decimal */
             quantity: string;
             revenue_kopecks: number;
+        };
+        /**
+         * @description Блок «Где не сходится»: по последнему пересчёту каждой позиции.
+         *
+         *     По последнему, а не по всей истории, — как и таблица. Иначе два числа
+         *     на одном экране означали бы разное, оставаясь оба верными.
+         */
+        Worst: {
+            money_kopecks: number;
+            diverged_count: number;
+            counted_count: number;
+            unpriced_count: number;
+            items: components["schemas"]["WorstItem"][];
+        };
+        WorstItem: {
+            product_id: number;
+            name: string;
+            /** Format: decimal */
+            correction: string;
+            uom: string;
+            money_kopecks: number;
         };
     };
     responses: never;
@@ -2250,6 +2423,86 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Home"];
+                };
+            };
+        };
+    };
+    inventory_list: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                folder?: string;
+                /**
+                 * @description * `-correction` - -correction
+                 *     * `-last` - -last
+                 *     * `-money` - -money
+                 *     * `-name` - -name
+                 *     * `-times` - -times
+                 *     * `correction` - correction
+                 *     * `last` - last
+                 *     * `money` - money
+                 *     * `name` - name
+                 *     * `times` - times
+                 */
+                ordering?: "-correction" | "-last" | "-money" | "-name" | "-times" | "correction" | "last" | "money" | "name" | "times";
+                page?: number;
+                page_size?: number;
+                search?: string;
+                store?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Inventory"];
+                };
+            };
+        };
+    };
+    inventory_xlsx: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                folder?: string;
+                /**
+                 * @description * `-correction` - -correction
+                 *     * `-last` - -last
+                 *     * `-money` - -money
+                 *     * `-name` - -name
+                 *     * `-times` - -times
+                 *     * `correction` - correction
+                 *     * `last` - last
+                 *     * `money` - money
+                 *     * `name` - name
+                 *     * `times` - times
+                 */
+                ordering?: "-correction" | "-last" | "-money" | "-name" | "-times" | "correction" | "last" | "money" | "name" | "times";
+                page?: number;
+                page_size?: number;
+                search?: string;
+                store?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
                 };
             };
         };

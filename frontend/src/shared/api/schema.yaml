@@ -422,6 +422,180 @@ paths:
               schema:
                 $ref: '#/components/schemas/Home'
           description: ''
+  /api/inventory/:
+    get:
+      operationId: inventory_list
+      description: 'Когда пересчитывали каждую позицию и на сколько она не сошлась.
+        Расхождение в деньгах считается по себестоимости остатков: в документах учёта
+        цена заполнена у меньшинства позиций.'
+      summary: Инвентаризация
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: folder
+        schema:
+          type: string
+          default: ''
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -correction
+          - -last
+          - -money
+          - -name
+          - -times
+          - correction
+          - last
+          - money
+          - name
+          - times
+          type: string
+          default: -money
+          minLength: 1
+        description: |-
+          * `-correction` - -correction
+          * `-last` - -last
+          * `-money` - -money
+          * `-name` - -name
+          * `-times` - -times
+          * `correction` - correction
+          * `last` - last
+          * `money` - money
+          * `name` - name
+          * `times` - times
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 10
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      - in: query
+        name: store
+        schema:
+          type: string
+          default: ''
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+          description: ''
+  /api/inventory/xlsx/:
+    get:
+      operationId: inventory_xlsx
+      description: 'Та же выборка, что на экране, целиком. Вторым листом — сами инвентаризации:
+        когда, на каком складе и сколько позиций разошлось.'
+      summary: Инвентаризация — выгрузка в Excel
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+          nullable: true
+      - in: query
+        name: folder
+        schema:
+          type: string
+          default: ''
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -correction
+          - -last
+          - -money
+          - -name
+          - -times
+          - correction
+          - last
+          - money
+          - name
+          - times
+          type: string
+          default: -money
+          minLength: 1
+        description: |-
+          * `-correction` - -correction
+          * `-last` - -last
+          * `-money` - -money
+          * `-name` - -name
+          * `-times` - -times
+          * `correction` - correction
+          * `last` - last
+          * `money` - money
+          * `name` - name
+          * `times` - times
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 10
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+      - in: query
+        name: store
+        schema:
+          type: string
+          default: ''
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+          description: ''
   /api/production/batch/:
     get:
       operationId: production_batch
@@ -2312,6 +2486,64 @@ components:
       - fraction
       - tone
       - total_kopecks
+    Coverage:
+      type: object
+      description: 'Блок «Что не считали»: доля пересчитанного по папкам.'
+      properties:
+        products_count:
+          type: integer
+        counted_count:
+          type: integer
+        never_counted_count:
+          type: integer
+        oldest_folder:
+          type: string
+        oldest_days_ago:
+          type: integer
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoverageFolder'
+      required:
+      - counted_count
+      - items
+      - never_counted_count
+      - oldest_days_ago
+      - oldest_folder
+      - products_count
+    CoverageFolder:
+      type: object
+      properties:
+        folder:
+          type: string
+        products_count:
+          type: integer
+        counted_count:
+          type: integer
+        share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+        days_ago:
+          type: integer
+          nullable: true
+        last_moment:
+          type: string
+          format: date-time
+          nullable: true
+        last_days_ago:
+          type: integer
+          nullable: true
+      required:
+      - counted_count
+      - days_ago
+      - folder
+      - last_days_ago
+      - last_moment
+      - products_count
+      - share
     Csrf:
       type: object
       properties:
@@ -3071,6 +3303,182 @@ components:
       - kind
       - label
       - usual
+    Inventory:
+      type: object
+      properties:
+        count:
+          type: integer
+        synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        totals:
+          $ref: '#/components/schemas/InventoryTotals'
+        coverage:
+          $ref: '#/components/schemas/Coverage'
+        worst:
+          $ref: '#/components/schemas/Worst'
+        repeats:
+          $ref: '#/components/schemas/Repeats'
+        documents:
+          $ref: '#/components/schemas/InventoryDocuments'
+        stores:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterOption'
+        folders:
+          type: array
+          items:
+            type: string
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryRow'
+      required:
+      - count
+      - coverage
+      - documents
+      - folders
+      - repeats
+      - results
+      - stores
+      - synced_at
+      - totals
+      - worst
+    InventoryDocument:
+      type: object
+      properties:
+        inventory_id:
+          type: integer
+        number:
+          type: string
+        moment:
+          type: string
+          format: date-time
+        store_name:
+          type: string
+        positions_count:
+          type: integer
+        diverged_count:
+          type: integer
+        description:
+          type: string
+      required:
+      - description
+      - diverged_count
+      - inventory_id
+      - moment
+      - number
+      - positions_count
+      - store_name
+    InventoryDocuments:
+      type: object
+      properties:
+        count:
+          type: integer
+        stores:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoreRecount'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryDocument'
+      required:
+      - count
+      - items
+      - stores
+    InventoryRow:
+      type: object
+      properties:
+        product_id:
+          type: integer
+        name:
+          type: string
+        article:
+          type: string
+        folder:
+          type: string
+        uom:
+          type: string
+        counted_times:
+          type: integer
+        diverged_times:
+          type: integer
+        last_moment:
+          type: string
+          format: date-time
+          nullable: true
+        last_store:
+          type: string
+        days_ago:
+          type: integer
+          nullable: true
+        calculated:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+          nullable: true
+        counted:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+          nullable: true
+        correction:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+          nullable: true
+        correction_money_kopecks:
+          type: integer
+          nullable: true
+        cost_kopecks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+          nullable: true
+        stock_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+          nullable: true
+      required:
+      - article
+      - calculated
+      - correction
+      - correction_money_kopecks
+      - cost_kopecks
+      - counted
+      - counted_times
+      - days_ago
+      - diverged_times
+      - folder
+      - last_moment
+      - last_store
+      - name
+      - product_id
+      - stock_quantity
+      - uom
+    InventoryTotals:
+      type: object
+      description: Итог под таблицей — про то, что в ней видно, с учётом поиска.
+      properties:
+        products_count:
+          type: integer
+        never_counted_count:
+          type: integer
+        diverged_count:
+          type: integer
+        money_kopecks:
+          type: integer
+        unpriced_count:
+          type: integer
+      required:
+      - diverged_count
+      - money_kopecks
+      - never_counted_count
+      - products_count
+      - unpriced_count
     LeadTime:
       type: object
       description: |-
@@ -4023,6 +4431,38 @@ components:
       - max_days
       - measurements
       - min_days
+    RepeatItem:
+      type: object
+      properties:
+        product_id:
+          type: integer
+        name:
+          type: string
+        folder:
+          type: string
+        counted_times:
+          type: integer
+        diverged_times:
+          type: integer
+      required:
+      - counted_times
+      - diverged_times
+      - folder
+      - name
+      - product_id
+    Repeats:
+      type: object
+      description: Блок «Расходится из раза в раз» — единственный про всю историю.
+      properties:
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepeatItem'
+      required:
+      - count
+      - items
     ShipmentMaterialDetail:
       type: object
       properties:
@@ -4440,6 +4880,47 @@ components:
       - quantity
       - reserved
       - stock_days
+    StoreRecount:
+      type: object
+      description: |-
+        Склад: когда считали и сколько его пересчитано.
+
+        Пересчёт — операция склада, а не папки: документ всегда про один склад
+        целиком. Знаменатель — позиции, которые на складе **лежат** сейчас:
+        доля от всей номенклатуры объявила бы «Готовую продукцию» заброшенной
+        за то, что на ней нет сырья.
+      properties:
+        store_name:
+          type: string
+        number:
+          type: string
+        moment:
+          type: string
+          format: date-time
+          nullable: true
+        days_ago:
+          type: integer
+          nullable: true
+        products_count:
+          type: integer
+        counted_count:
+          type: integer
+        share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,8})?$
+          nullable: true
+        unchecked_kopecks:
+          type: integer
+      required:
+      - counted_count
+      - days_ago
+      - moment
+      - number
+      - products_count
+      - share
+      - store_name
+      - unchecked_kopecks
     SupplierMaterial:
       type: object
       properties:
@@ -5078,6 +5559,53 @@ components:
       - product_id
       - quantity
       - revenue_kopecks
+      - uom
+    Worst:
+      type: object
+      description: |-
+        Блок «Где не сходится»: по последнему пересчёту каждой позиции.
+
+        По последнему, а не по всей истории, — как и таблица. Иначе два числа
+        на одном экране означали бы разное, оставаясь оба верными.
+      properties:
+        money_kopecks:
+          type: integer
+        diverged_count:
+          type: integer
+        counted_count:
+          type: integer
+        unpriced_count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorstItem'
+      required:
+      - counted_count
+      - diverged_count
+      - items
+      - money_kopecks
+      - unpriced_count
+    WorstItem:
+      type: object
+      properties:
+        product_id:
+          type: integer
+        name:
+          type: string
+        correction:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,3})?$
+        uom:
+          type: string
+        money_kopecks:
+          type: integer
+      required:
+      - correction
+      - money_kopecks
+      - name
+      - product_id
       - uom
   securitySchemes:
     cookieAuth:

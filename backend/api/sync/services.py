@@ -36,6 +36,7 @@ STALE_AFTER = timedelta(minutes=15)
 STAGE_LABELS = {
     "uom": "единицы измерения",
     "product": "товары",
+    "storestock": "остатки по складам",
     "processingplan": "техкарты",
     "counterparty": "контрагенты",
     "contract": "договоры",
@@ -44,6 +45,7 @@ STAGE_LABELS = {
     "demand": "отгрузки",
     "purchaseorder": "заказы поставщикам",
     "supply": "приёмки",
+    "inventory": "инвентаризации",
     "commissionreportin": "отчёты комиссионеров",
     "profit": "прибыльность",
 }
